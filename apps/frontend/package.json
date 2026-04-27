@@ -1,0 +1,38 @@
+{
+  "name": "@court-booking/frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Next.js 14 Frontend - Court Booking",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "zustand": "^4.0.0",
+    "axios": "^1.0.0",
+    "react-hook-form": "^7.0.0",
+    "zod": "^3.0.0",
+    "@hookform/resolvers": "^3.0.0",
+    "date-fns": "^3.0.0",
+    "next-auth": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "autoprefixer": "^10.0.0",
+    "postcss": "^8.0.0",
+    "tailwindcss": "^3.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.0.0",
+    "prettier": "^3.0.0"
+  }
+}
