@@ -1,0 +1,15 @@
+{
+  "name": "@court-booking/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared types and constants between BE and FE",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
