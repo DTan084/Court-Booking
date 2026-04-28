@@ -1,8 +1,22 @@
-import { Controller, Post, Body, UsePipes, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UsePipes,
+  HttpCode,
+  HttpStatus,
+  Get,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto, registerSchema } from './dto/register.dto';
 import { LoginDto, loginSchema } from './dto/login.dto';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { JwtAuthGuard } from './guards/jwt.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from './decorators/roles.decorator';
+import { Role } from '@court-booking/shared';
 
 @Controller('auth')
 export class AuthController {
@@ -27,6 +41,23 @@ export class AuthController {
     return {
       message: 'Login successful',
       ...result,
+    };
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMe(@Req() req: any) {
+    return {
+      user: req.user,
+    };
+  }
+
+  @Get('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async adminOnly() {
+    return {
+      message: 'Welcome Admin!',
     };
   }
 }
