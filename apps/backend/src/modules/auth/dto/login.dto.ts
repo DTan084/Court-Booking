@@ -1,6 +1,8 @@
-// TODO: Login DTO
-// - Zod schema: { email, password }
+import { z } from 'zod';
 
-export class LoginDto {
-  // TODO: Define with Zod schema
-}
+export const loginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+export type LoginDto = z.infer<typeof loginSchema>;
