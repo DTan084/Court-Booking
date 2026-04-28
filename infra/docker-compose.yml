@@ -38,8 +38,9 @@ services:
   # ── Backend (NestJS) ──────────────────────────
   backend:
     build:
-      context: ../apps/backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+
     container_name: court-booking-backend
     restart: unless-stopped
     ports:
@@ -56,8 +57,9 @@ services:
   # ── Frontend (Next.js) ────────────────────────
   frontend:
     build:
-      context: ../apps/frontend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/frontend/Dockerfile
+
     container_name: court-booking-frontend
     restart: unless-stopped
     ports:
