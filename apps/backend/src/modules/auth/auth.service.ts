@@ -1,17 +1,41 @@
-// TODO: Auth Service
-// - bcrypt.hash(password, 10) — hash khi register
-// - bcrypt.compare(plain, hash) — verify khi login
-// - jwt.sign({ sub, role, exp }) — tạo access token
-// - Throw ConflictException nếu email đã tồn tại
-
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserEntity } from '../../database/entities/user.entity';
+import { RegisterDto } from './dto/register.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-  // TODO: Inject JwtService, UserRepository
+  constructor(
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
+  ) {}
 
-  // TODO: register(dto: RegisterDto)
-  // TODO: login(dto: LoginDto)
-  // TODO: validateUser(email, password)
-  // TODO: generateTokens(user)
+  async register(registerDto: RegisterDto) {
+    const { name, email, password } = registerDto;
+
+    // Check if user already exists
+    const existingUser = await this.userRepository.findOne({ where: { email } });
+    if (existingUser) {
+      throw new ConflictException('Email already in use');
+    }
+
+    // Hash password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+
+    // Create and save user
+    const user = this.userRepository.create({
+      name,
+      email,
+      passwordHash,
+    });
+
+    await this.userRepository.save(user);
+
+    // Return user without password
+    const { passwordHash: _, ...result } = user;
+    return result;
+  }
 }

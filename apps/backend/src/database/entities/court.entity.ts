@@ -1,42 +1,48 @@
-// TODO: Court Entity
-// - @Entity("courts")
-// - Columns: id (UUID), name, sport_type, address, description, price_per_hour, is_active
-// - @OneToMany(() => Booking, b => b.court)
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { BookingEntity } from './booking.entity';
+import { SportType } from '@court-booking/shared';
 
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+export enum CourtStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
 
 @Entity('courts')
 export class CourtEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 150 })
   name: string;
 
-  @Column({ name: 'sport_type', length: 50 })
-  sportType: string;
+  @Column({ type: 'enum', enum: SportType })
+  sportType: SportType;
 
-  @Column({ length: 500 })
+  @Column({ type: 'text' })
   address: string;
 
-  @Column({ type: 'text', nullable: true })
-  description: string;
-
-  @Column({ name: 'price_per_hour', type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'price_per_hour' })
   pricePerHour: number;
 
-  @Column({ name: 'is_active', default: true })
-  isActive: boolean;
+  @Column({ type: 'enum', enum: CourtStatus, default: CourtStatus.ACTIVE })
+  status: CourtStatus;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'deleted_at' })
+  deletedAt: Date;
+
+  @OneToMany(() => BookingEntity, (booking) => booking.court)
+  bookings: BookingEntity[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  @DeleteDateColumn({ name: 'deleted_at' })
-  deletedAt: Date;
-
-  // TODO: @OneToMany(() => BookingEntity, booking => booking.court)
-  // bookings: BookingEntity[];
 }

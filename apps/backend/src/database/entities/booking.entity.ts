@@ -1,46 +1,53 @@
-// TODO: Booking Entity
-// - @Entity("bookings")
-// - Columns: id (UUID), court_id, user_id, start_time, end_time, status, total_price
-// - @ManyToOne(() => User), @ManyToOne(() => Court)
-// - Index: idx_bookings_court_time
-
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
+import { UserEntity } from './user.entity';
+import { CourtEntity } from './court.entity';
+import { BookingStatus } from '@court-booking/shared';
 
 @Entity('bookings')
-@Index('idx_bookings_court_time', ['courtId', 'startTime', 'endTime'])
 export class BookingEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'court_id' })
-  courtId: string;
-
-  @Column({ name: 'user_id' })
+  @Column({ type: 'uuid', name: 'user_id' })
   userId: string;
 
-  @Column({ name: 'start_time', type: 'timestamptz' })
+  @Column({ type: 'uuid', name: 'court_id' })
+  courtId: string;
+
+  @ManyToOne(() => UserEntity, (user) => user.bookings)
+  @JoinColumn({ name: 'user_id' })
+  user: UserEntity;
+
+  @ManyToOne(() => CourtEntity, (court) => court.bookings)
+  @JoinColumn({ name: 'court_id' })
+  court: CourtEntity;
+
+  @Column({ type: 'timestamp with time zone', name: 'start_time' })
   startTime: Date;
 
-  @Column({ name: 'end_time', type: 'timestamptz' })
+  @Column({ type: 'timestamp with time zone', name: 'end_time' })
   endTime: Date;
 
-  @Column({ default: 'confirmed' })
-  status: string;
+  @Column({ type: 'enum', enum: BookingStatus, default: BookingStatus.CONFIRMED })
+  status: BookingStatus;
 
-  @Column({ name: 'total_price', type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'total_price' })
   totalPrice: number;
+
+  @Column({ type: 'timestamp', nullable: true, name: 'cancelled_at' })
+  cancelledAt: Date;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  // TODO: @ManyToOne(() => UserEntity, user => user.bookings)
-  // @JoinColumn({ name: 'user_id' })
-  // user: UserEntity;
-
-  // TODO: @ManyToOne(() => CourtEntity, court => court.bookings)
-  // @JoinColumn({ name: 'court_id' })
-  // court: CourtEntity;
 }
