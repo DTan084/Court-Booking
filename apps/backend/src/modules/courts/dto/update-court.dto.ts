@@ -1,6 +1,6 @@
-// TODO: UpdateCourtDto
-// - Partial of CreateCourtDto
+import { createCourtSchema } from './create-court.dto';
+import { z } from 'zod';
 
-export class UpdateCourtDto {
-  // TODO: Define with Zod schema (partial)
-}
+export const updateCourtSchema = createCourtSchema.partial();
+
+export type UpdateCourtDto = z.infer<typeof updateCourtSchema>;
