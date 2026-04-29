@@ -14,7 +14,7 @@ import { LoginDto, loginSchema } from './dto/login.dto';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from './guards/jwt.guard';
 import { RolesGuard } from './guards/roles.guard';
-import { Roles } from './decorators/roles.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '@court-booking/shared';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
