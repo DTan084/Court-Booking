@@ -4,7 +4,9 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { BookingEntity } from './booking.entity';
 import { SportType } from '@court-booking/shared';
@@ -19,9 +21,11 @@ export class CourtEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column({ type: 'varchar', length: 150 })
   name: string;
 
+  @Index()
   @Column({ type: 'enum', enum: SportType })
   sportType: SportType;
 
@@ -34,7 +38,7 @@ export class CourtEntity {
   @Column({ type: 'enum', enum: CourtStatus, default: CourtStatus.ACTIVE })
   status: CourtStatus;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'deleted_at' })
+  @DeleteDateColumn({ name: 'deleted_at' })
   deletedAt: Date;
 
   @OneToMany(() => BookingEntity, (booking) => booking.court)
