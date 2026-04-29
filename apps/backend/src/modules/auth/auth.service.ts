@@ -8,7 +8,7 @@ import { RefreshTokenEntity } from '../../database/entities/refresh-token.entity
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -77,7 +77,7 @@ export class AuthService {
     const expiresInSeconds = this.parseExpiresInToSeconds(expiresIn);
 
     // Generate Refresh Token (UUID) — store in DB with 7d TTL
-    const refreshToken = uuidv4();
+    const refreshToken = randomUUID();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 

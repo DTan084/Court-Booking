@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './modules/auth/auth.module';
+import { CourtsModule } from './modules/courts/courts.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
@@ -32,7 +33,7 @@ import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
       }),
     }),
     AuthModule,
-    // TODO: CourtsModule
+    CourtsModule,
     // TODO: BookingsModule
   ],
   controllers: [],
