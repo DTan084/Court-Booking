@@ -13,7 +13,18 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   // Security
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: [`'self'`],
+          styleSrc: [`'self'`, `'unsafe-inline'`],
+          imgSrc: [`'self'`, 'data:', 'validator.swagger.io'],
+          scriptSrc: [`'self'`, `https: 'unsafe-inline'`, `'unsafe-eval'`],
+        },
+      },
+    }),
+  );
   app.enableCors({
     origin: configService.get<string>('FE_URL') || '*',
     credentials: true,
