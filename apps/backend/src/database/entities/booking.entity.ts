@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { UserEntity } from './user.entity';
 import { CourtEntity } from './court.entity';
@@ -16,9 +17,11 @@ export class BookingEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column({ type: 'uuid', name: 'user_id' })
   userId: string;
 
+  @Index()
   @Column({ type: 'uuid', name: 'court_id' })
   courtId: string;
 
@@ -30,12 +33,15 @@ export class BookingEntity {
   @JoinColumn({ name: 'court_id' })
   court: CourtEntity;
 
+  @Index()
   @Column({ type: 'timestamp with time zone', name: 'start_time' })
   startTime: Date;
 
+  @Index()
   @Column({ type: 'timestamp with time zone', name: 'end_time' })
   endTime: Date;
 
+  @Index()
   @Column({ type: 'enum', enum: BookingStatus, default: BookingStatus.CONFIRMED })
   status: BookingStatus;
 

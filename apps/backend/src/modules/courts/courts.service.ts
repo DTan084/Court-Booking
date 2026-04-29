@@ -1,16 +1,73 @@
-// TODO: Courts Service
-// - Filter query, soft delete logic
-// - findAll(query: CourtQueryDto)
-// - findOne(id: string)
-// - create(dto: CreateCourtDto)
-// - update(id: string, dto: UpdateCourtDto)
-// - softDelete(id: string)
-
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, IsNull, Like, ILike } from 'typeorm';
+import { CourtEntity } from '../../database/entities/court.entity';
+import { CreateCourtDto } from './dto/create-court.dto';
+import { GetCourtsDto } from './dto/get-courts.dto';
+import { UpdateCourtDto } from './dto/update-court.dto';
 
 @Injectable()
 export class CourtsService {
-  // TODO: Inject Court Repository
+  constructor(
+    @InjectRepository(CourtEntity)
+    private readonly courtRepository: Repository<CourtEntity>,
+  ) {}
 
-  // TODO: Implement methods
+  async create(createCourtDto: CreateCourtDto): Promise<CourtEntity> {
+    const court = this.courtRepository.create(createCourtDto);
+    return this.courtRepository.save(court);
+  }
+
+  async findAll(query: GetCourtsDto) {
+    const { page, limit, name, sportType, address } = query;
+    const skip = (page - 1) * limit;
+
+    const where: any = { deletedAt: IsNull() };
+
+    if (name) {
+      where.name = ILike(`%${name}%`);
+    }
+    if (sportType) {
+      where.sportType = sportType;
+    }
+    if (address) {
+      where.address = ILike(`%${address}%`);
+    }
+
+    const [data, total] = await this.courtRepository.findAndCount({
+      where,
+      take: limit,
+      skip,
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async findOne(id: string): Promise<CourtEntity> {
+    const court = await this.courtRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
+    if (!court) {
+      throw new NotFoundException(`Court with ID ${id} not found`);
+    }
+    return court;
+  }
+
+  async update(id: string, updateCourtDto: UpdateCourtDto): Promise<CourtEntity> {
+    const court = await this.findOne(id);
+    Object.assign(court, updateCourtDto);
+    return this.courtRepository.save(court);
+  }
+
+  async softDelete(id: string): Promise<void> {
+    await this.findOne(id);
+    await this.courtRepository.softDelete(id);
+  }
 }
