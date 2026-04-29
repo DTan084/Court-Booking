@@ -40,8 +40,13 @@ export class AuthService {
 
     await this.userRepository.save(user);
 
-    const { passwordHash: _, ...result } = user;
-    return result;
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      created_at: user.createdAt,
+    };
   }
 
   async login(loginDto: LoginDto) {
@@ -59,33 +64,40 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user);
 
-    const { passwordHash: _, ...userResult } = user;
-    return {
-      ...tokens,
-      user: userResult,
-    };
+    return tokens;
   }
 
   async generateTokens(user: UserEntity) {
     const payload = { sub: user.id, email: user.email, role: user.role };
+    const expiresIn = this.configService.get<string>('jwt.expiresIn') || '15m';
 
     const accessToken = this.jwtService.sign(payload);
 
-    // Generate Refresh Token (UUID)
+    // Convert expiresIn to seconds for response (e.g. '15m' → 900)
+    const expiresInSeconds = this.parseExpiresInToSeconds(expiresIn);
+
+    // Generate Refresh Token (UUID) — store in DB with 7d TTL
     const refreshToken = uuidv4();
-    const refreshExpiresInDays = parseInt(
-      this.configService.get<string>('jwt.refreshExpiresIn') || '7',
-      10,
-    );
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + refreshExpiresInDays);
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
     await this.storeRefreshToken(user.id, refreshToken, expiresAt);
 
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
+      token_type: 'Bearer',
+      expires_in: expiresInSeconds,
     };
+  }
+
+  private parseExpiresInToSeconds(expiresIn: string): number {
+    const match = expiresIn.match(/^(\d+)([smhd])$/);
+    if (!match) return 900; // default 15m
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+    const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+    return value * (multipliers[unit] ?? 1);
   }
 
   async storeRefreshToken(userId: string, token: string, expiresAt: Date) {

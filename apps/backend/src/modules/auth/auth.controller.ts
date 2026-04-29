@@ -7,7 +7,6 @@ import {
   HttpStatus,
   Get,
   UseGuards,
-  Req,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto, registerSchema } from './dto/register.dto';
@@ -17,6 +16,7 @@ import { JwtAuthGuard } from './guards/jwt.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { Role } from '@court-booking/shared';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -26,30 +26,20 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ZodValidationPipe(registerSchema))
   async register(@Body() registerDto: RegisterDto) {
-    const user = await this.authService.register(registerDto);
-    return {
-      message: 'User registered successfully',
-      user,
-    };
+    return this.authService.register(registerDto);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @UsePipes(new ZodValidationPipe(loginSchema))
   async login(@Body() loginDto: LoginDto) {
-    const result = await this.authService.login(loginDto);
-    return {
-      message: 'Login successful',
-      ...result,
-    };
+    return this.authService.login(loginDto);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async getMe(@Req() req: any) {
-    return {
-      user: req.user,
-    };
+  async getMe(@CurrentUser() user: any) {
+    return user;
   }
 
   @Get('admin')
