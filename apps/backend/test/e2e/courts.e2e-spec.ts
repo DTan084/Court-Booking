@@ -45,6 +45,9 @@ describe('CourtsController (e2e)', () => {
 
   afterAll(async () => {
     // Cleanup users created during test
+    await dataSource.query(
+      "DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'admin_e2e_%')",
+    );
     await dataSource.query("DELETE FROM users WHERE email LIKE 'admin_e2e_%'");
     // Cleanup courts created
     if (createdCourtId && createdCourtId.length === 36) {
