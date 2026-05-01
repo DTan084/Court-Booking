@@ -9,6 +9,7 @@ import {
 import { BookingEntity } from './booking.entity';
 import { RefreshTokenEntity } from './refresh-token.entity';
 import { Role } from '@court-booking/shared';
+import { Exclude } from 'class-transformer';
 
 @Entity('users')
 export class UserEntity {
@@ -21,6 +22,7 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 255, unique: true })
   email: string;
 
+  @Exclude()
   @Column({ type: 'varchar', length: 255, name: 'password_hash' })
   passwordHash: string;
 
