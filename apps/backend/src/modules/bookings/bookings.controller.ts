@@ -4,10 +4,28 @@
 // - GET /courts/:id/schedule — court schedule by date
 // - PATCH /bookings/:id/cancel — cancel booking
 
-import { Controller, Post, Body, UseGuards, UsePipes, Patch, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  UsePipes,
+  Patch,
+  Param,
+  Get,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto, createBookingSchema } from './dto/create-booking.dto';
+import { GetMyBookingsDto, getMyBookingsSchema } from './dto/get-my-bookings.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -64,5 +82,36 @@ export class BookingsController {
     return this.bookingsService.cancelBooking(id, user.sub);
   }
 
-  // TODO: Implement GET /bookings/me
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user booking history' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number', example: 1 })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['CONFIRMED', 'CANCELLED'],
+    description: 'Filter by status',
+  })
+  @ApiQuery({
+    name: 'fromDate',
+    required: false,
+    type: String,
+    description: 'From date (ISO 8601)',
+  })
+  @ApiQuery({ name: 'toDate', required: false, type: String, description: 'To date (ISO 8601)' })
+  @ApiResponse({ status: 200, description: 'Returns paginated booking list' })
+  async getMyBookings(
+    @Query(new ZodValidationPipe(getMyBookingsSchema)) query: GetMyBookingsDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.bookingsService.findMyBookings(user.sub, query);
+  }
 }

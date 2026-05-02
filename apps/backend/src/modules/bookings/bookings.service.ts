@@ -17,6 +17,7 @@ import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { BookingStatus } from '@court-booking/shared';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
 
 @Injectable()
 export class BookingsService {
@@ -147,5 +148,38 @@ export class BookingsService {
     return this.bookingRepository.save(booking);
   }
 
-  // TODO: findMyBookings(userId, query)
+  async findMyBookings(userId: string, query: GetMyBookingsDto) {
+    const { page, limit, status, fromDate, toDate } = query;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.bookingRepository
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.court', 'court')
+      .where('booking.user_id = :userId', { userId });
+
+    if (status) {
+      queryBuilder.andWhere('booking.status = :status', { status });
+    }
+
+    if (fromDate) {
+      queryBuilder.andWhere('booking.start_time >= :fromDate', { fromDate: new Date(fromDate) });
+    }
+
+    if (toDate) {
+      queryBuilder.andWhere('booking.start_time <= :toDate', { toDate: new Date(toDate) });
+    }
+
+    queryBuilder.orderBy('booking.start_time', 'DESC');
+    queryBuilder.skip(skip).take(limit);
+
+    const [items, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data: items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
 }
