@@ -22,6 +22,21 @@ export class BookingsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new court booking' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['courtId', 'startTime', 'endTime'],
+      properties: {
+        courtId: {
+          type: 'string',
+          format: 'uuid',
+          example: '123e4567-e89b-12d3-a456-426614174000',
+        },
+        startTime: { type: 'string', format: 'date-time', example: '2024-06-15T08:00:00Z' },
+        endTime: { type: 'string', format: 'date-time', example: '2024-06-15T10:00:00Z' },
+      },
+    },
+  })
   @ApiResponse({ status: 201, description: 'Booking created successfully' })
   @ApiResponse({ status: 400, description: 'Bad Request (invalid input or past date)' })
   @ApiResponse({ status: 404, description: 'Court not found' })
