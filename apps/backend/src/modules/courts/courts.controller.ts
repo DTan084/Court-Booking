@@ -30,11 +30,16 @@ import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, SportType } from '@court-booking/shared';
+import { BookingsService } from '../bookings/bookings.service';
+import { getScheduleSchema, GetScheduleDto } from '../bookings/dto/get-schedule.dto';
 
 @ApiTags('Courts')
 @Controller('courts')
 export class CourtsController {
-  constructor(private readonly courtsService: CourtsService) {}
+  constructor(
+    private readonly courtsService: CourtsService,
+    private readonly bookingsService: BookingsService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new court (Admin only)' })
@@ -131,5 +136,21 @@ export class CourtsController {
   async remove(@Param('id', ParseUUIDPipe) id: string) {
     await this.courtsService.softDelete(id);
     return { message: 'Court deleted successfully', id };
+  }
+
+  @Get(':id/schedule')
+  @ApiOperation({ summary: 'Get court schedule for a specific date' })
+  @ApiQuery({
+    name: 'date',
+    required: true,
+    type: String,
+    description: 'Date in YYYY-MM-DD format',
+  })
+  @ApiResponse({ status: 200, description: 'List of bookings for the date' })
+  @ApiResponse({ status: 400, description: 'Invalid date format' })
+  @ApiResponse({ status: 404, description: 'Court not found' })
+  @UsePipes(new ZodValidationPipe(getScheduleSchema))
+  async getSchedule(@Param('id', ParseUUIDPipe) id: string, @Query() query: GetScheduleDto) {
+    return this.bookingsService.getCourtSchedule(id, query.date);
   }
 }
