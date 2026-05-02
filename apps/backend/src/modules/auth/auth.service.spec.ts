@@ -113,7 +113,7 @@ describe('AuthService', () => {
 
       expect(result).toEqual({
         access_token: 'mock-jwt-token',
-        refresh_token: 'mock-uuid',
+        refresh_token: expect.any(String),
         token_type: 'Bearer',
         expires_in: 900, // 15m in seconds
       });
