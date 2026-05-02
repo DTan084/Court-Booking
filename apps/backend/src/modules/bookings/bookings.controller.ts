@@ -4,8 +4,8 @@
 // - GET /courts/:id/schedule — court schedule by date
 // - PATCH /bookings/:id/cancel — cancel booking
 
-import { Controller, Post, Body, UseGuards, UsePipes } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Body, UseGuards, UsePipes, Patch, Param } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto, createBookingSchema } from './dto/create-booking.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -49,5 +49,20 @@ export class BookingsController {
     return this.bookingsService.createBooking(createBookingDto, user.sub);
   }
 
-  // TODO: Implement other endpoints
+  @Patch(':id/cancel')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cancel a booking' })
+  @ApiResponse({ status: 200, description: 'Booking cancelled successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request (already cancelled or too close to start time)',
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden (not the owner)' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  async cancelBooking(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.bookingsService.cancelBooking(id, user.sub);
+  }
+
+  // TODO: Implement GET /bookings/me
 }

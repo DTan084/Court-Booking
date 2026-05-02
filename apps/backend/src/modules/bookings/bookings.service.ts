@@ -9,6 +9,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, Not, DataSource } from 'typeorm';
@@ -110,6 +111,41 @@ export class BookingsService {
     });
   }
 
-  // TODO: cancelBooking(id, userId)
+  async cancelBooking(id: string, userId: string): Promise<BookingEntity> {
+    const booking = await this.bookingRepository.findOne({
+      where: { id },
+      relations: ['court'], // Load court if needed
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.userId !== userId) {
+      throw new ForbiddenException('You do not have permission to cancel this booking');
+    }
+
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new ConflictException('Booking is already cancelled');
+    }
+
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException('Only confirmed bookings can be cancelled');
+    }
+
+    // Check if startTime is at least 2 hours away
+    const now = new Date();
+    const startTime = new Date(booking.startTime);
+    const timeDifferenceMs = startTime.getTime() - now.getTime();
+    const hoursDifference = timeDifferenceMs / (1000 * 60 * 60);
+
+    if (hoursDifference < 2) {
+      throw new BadRequestException('Bookings can only be cancelled at least 2 hours in advance');
+    }
+
+    booking.status = BookingStatus.CANCELLED;
+    return this.bookingRepository.save(booking);
+  }
+
   // TODO: findMyBookings(userId, query)
 }
