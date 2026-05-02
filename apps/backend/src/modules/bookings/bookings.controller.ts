@@ -29,7 +29,7 @@ import { GetMyBookingsDto, getMyBookingsSchema } from './dto/get-my-bookings.dto
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { JwtPayload } from '@court-booking/shared';
+import { UserEntity } from '../../database/entities/user.entity';
 
 @ApiTags('Bookings')
 @Controller('bookings')
@@ -63,8 +63,8 @@ export class BookingsController {
     description: 'Conflict - Court is already booked for the selected time slot',
   })
   @UsePipes(new ZodValidationPipe(createBookingSchema))
-  async createBooking(@Body() createBookingDto: CreateBookingDto, @CurrentUser() user: JwtPayload) {
-    return this.bookingsService.createBooking(createBookingDto, user.sub);
+  async createBooking(@Body() createBookingDto: CreateBookingDto, @CurrentUser() user: UserEntity) {
+    return this.bookingsService.createBooking(createBookingDto, user.id);
   }
 
   @Patch(':id/cancel')
@@ -78,8 +78,8 @@ export class BookingsController {
   })
   @ApiResponse({ status: 403, description: 'Forbidden (not the owner)' })
   @ApiResponse({ status: 404, description: 'Booking not found' })
-  async cancelBooking(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.bookingsService.cancelBooking(id, user.sub);
+  async cancelBooking(@Param('id') id: string, @CurrentUser() user: UserEntity) {
+    return this.bookingsService.cancelBooking(id, user.id);
   }
 
   @Get('me')
@@ -110,8 +110,8 @@ export class BookingsController {
   @ApiResponse({ status: 200, description: 'Returns paginated booking list' })
   async getMyBookings(
     @Query(new ZodValidationPipe(getMyBookingsSchema)) query: GetMyBookingsDto,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: UserEntity,
   ) {
-    return this.bookingsService.findMyBookings(user.sub, query);
+    return this.bookingsService.findMyBookings(user.id, query);
   }
 }
