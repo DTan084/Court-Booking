@@ -4,12 +4,18 @@
 // - cancelBooking — ownership + business rule checks
 // - getSchedule — trả về slots theo ngày
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, Not } from 'typeorm';
+import { Repository, Between, Not, DataSource } from 'typeorm';
 import { BookingEntity } from '../../database/entities/booking.entity';
-import { CourtEntity } from '../../database/entities/court.entity';
+import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { BookingStatus } from '@court-booking/shared';
+import { CreateBookingDto } from './dto/create-booking.dto';
 
 @Injectable()
 export class BookingsService {
@@ -18,17 +24,15 @@ export class BookingsService {
     private readonly bookingRepository: Repository<BookingEntity>,
     @InjectRepository(CourtEntity)
     private readonly courtRepository: Repository<CourtEntity>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
-    // Verify court exists
     const court = await this.courtRepository.findOne({ where: { id: courtId } });
     if (!court) {
       throw new NotFoundException('Court not found');
     }
 
-    // Create date range for the given day (00:00:00 to 23:59:59.999)
-    // Using UTC or server local time depending on requirements, here assuming date string is parsed to local timezone or UTC
     const startDate = new Date(`${date}T00:00:00Z`);
     const endDate = new Date(`${date}T23:59:59.999Z`);
 
@@ -41,14 +45,71 @@ export class BookingsService {
       order: {
         startTime: 'ASC',
       },
-      // Select only necessary fields for schedule visualization
       select: ['id', 'startTime', 'endTime', 'status'],
     });
 
     return bookings;
   }
 
-  // TODO: createBooking(dto, userId)
+  async createBooking(createBookingDto: CreateBookingDto, userId: string): Promise<BookingEntity> {
+    const { courtId, startTime, endTime } = createBookingDto;
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (start < new Date()) {
+      throw new BadRequestException('Cannot book in the past');
+    }
+
+    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    if (durationHours <= 0) {
+      throw new BadRequestException('Invalid booking duration');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      // 1. Pessimistic Lock on Court
+      const court = await manager.findOne(CourtEntity, {
+        where: { id: courtId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!court) {
+        throw new NotFoundException('Court not found');
+      }
+
+      if (court.status !== CourtStatus.ACTIVE) {
+        throw new BadRequestException('Court is not active');
+      }
+
+      // 2. Overlap Check
+      const overlappingBookings = await manager
+        .createQueryBuilder(BookingEntity, 'booking')
+        .where('booking.court_id = :courtId', { courtId })
+        .andWhere('booking.status != :status', { status: BookingStatus.CANCELLED })
+        .andWhere('booking.start_time < :endTime', { endTime: end })
+        .andWhere('booking.end_time > :startTime', { startTime: start })
+        .getMany();
+
+      if (overlappingBookings.length > 0) {
+        throw new ConflictException('Court is already booked for the selected time slot');
+      }
+
+      // 3. Calculate Price
+      const totalPrice = Number(court.pricePerHour) * durationHours;
+
+      // 4. Create Booking
+      const booking = manager.create(BookingEntity, {
+        courtId,
+        userId,
+        startTime: start,
+        endTime: end,
+        totalPrice,
+        status: BookingStatus.CONFIRMED,
+      });
+
+      return manager.save(booking);
+    });
+  }
+
   // TODO: cancelBooking(id, userId)
   // TODO: findMyBookings(userId, query)
 }
