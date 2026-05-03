@@ -85,10 +85,10 @@ export class BookingsService {
       // 2. Overlap Check
       const overlappingBookings = await manager
         .createQueryBuilder(BookingEntity, 'booking')
-        .where('booking.court_id = :courtId', { courtId })
+        .where('booking.courtId = :courtId', { courtId })
         .andWhere('booking.status != :status', { status: BookingStatus.CANCELLED })
-        .andWhere('booking.start_time < :endTime', { endTime: end })
-        .andWhere('booking.end_time > :startTime', { startTime: start })
+        .andWhere('booking.startTime < :endTime', { endTime: end })
+        .andWhere('booking.endTime > :startTime', { startTime: start })
         .getMany();
 
       if (overlappingBookings.length > 0) {

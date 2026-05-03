@@ -81,15 +81,15 @@ export class CourtsService {
 
     const stats = await this.dataSource
       .createQueryBuilder(BookingEntity, 'booking')
-      .select('COUNT(booking.id)', 'totalBookings')
+      .select('COUNT(booking.id)', 'bookingCount')
       .addSelect(
         'SUM(EXTRACT(EPOCH FROM (booking.end_time - booking.start_time))/3600)',
         'totalHours',
       )
-      .where('booking.court_id = :courtId', { courtId: id })
-      .andWhere('booking.status != :status', { status: BookingStatus.CANCELLED })
-      .andWhere('booking.start_time >= :fromDate', { fromDate: new Date(fromDate) })
-      .andWhere('booking.start_time <= :toDate', { toDate: new Date(toDate) })
+      .where('booking.courtId = :courtId', { courtId: id })
+      .andWhere('booking.status = :status', { status: BookingStatus.CONFIRMED })
+      .andWhere('booking.startTime >= :fromDate', { fromDate: new Date(fromDate) })
+      .andWhere('booking.startTime <= :toDate', { toDate: new Date(toDate) })
       .getRawOne();
 
     // Calculate total possible hours (assuming court is available 24/7 for simplicity, or 16 hours a day?)
