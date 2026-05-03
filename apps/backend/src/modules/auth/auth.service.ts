@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -9,6 +9,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import Redis from 'ioredis';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +20,7 @@ export class AuthService {
     private readonly refreshTokenRepository: Repository<RefreshTokenEntity>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -52,19 +54,57 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
+    // 1. Check if locked out
+    await this.checkLockout(email);
+
     const user = await this.userRepository.findOne({ where: { email } });
     if (!user) {
+      await this.incrementFailedAttempts(email);
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      await this.incrementFailedAttempts(email);
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    // Success - Reset failed attempts
+    await this.resetFailedAttempts(email);
 
     const tokens = await this.generateTokens(user);
 
     return tokens;
+  }
+
+  private async checkLockout(email: string) {
+    const lockoutKey = `lockout:${email}`;
+    const isLocked = await this.redis.get(lockoutKey);
+    if (isLocked) {
+      throw new UnauthorizedException('Account is temporarily locked. Please try again later.');
+    }
+  }
+
+  private async incrementFailedAttempts(email: string) {
+    const attemptsKey = `failed_attempts:${email}`;
+    const lockoutKey = `lockout:${email}`;
+    const maxAttempts = 5;
+    const lockoutDuration = 15 * 60; // 15 minutes
+
+    const attempts = await this.redis.incr(attemptsKey);
+    if (attempts === 1) {
+      await this.redis.expire(attemptsKey, 3600); // Reset attempts after 1 hour if no more failures
+    }
+
+    if (attempts >= maxAttempts) {
+      await this.redis.set(lockoutKey, 'true', 'EX', lockoutDuration);
+      await this.redis.del(attemptsKey);
+    }
+  }
+
+  private async resetFailedAttempts(email: string) {
+    const attemptsKey = `failed_attempts:${email}`;
+    await this.redis.del(attemptsKey);
   }
 
   async generateTokens(user: UserEntity) {
