@@ -1,9 +1,3 @@
-// TODO: Bookings Service
-// - createBooking trong transaction
-// - Overlap check: SELECT FOR UPDATE
-// - cancelBooking — ownership + business rule checks
-// - getSchedule — trả về slots theo ngày
-
 import {
   Injectable,
   NotFoundException,

@@ -1,7 +1,3 @@
-// TODO: App configuration
-// - port, cors, throttle settings
-// - registerAs('app', () => ({ ... }))
-
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('app', () => ({

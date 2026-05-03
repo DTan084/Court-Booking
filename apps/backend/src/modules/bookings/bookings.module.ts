@@ -1,5 +1,3 @@
-// TODO: Bookings Module
-
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BookingsController } from './bookings.controller';

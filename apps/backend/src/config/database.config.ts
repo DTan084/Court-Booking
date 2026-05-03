@@ -1,7 +1,3 @@
-// TODO: Database configuration
-// - PostgreSQL connection settings
-// - TypeORM DataSource options
-
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('database', () => ({
