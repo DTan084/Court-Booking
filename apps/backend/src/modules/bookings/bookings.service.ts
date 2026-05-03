@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, Not, DataSource } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { BookingStatus } from '@court-booking/shared';
@@ -27,6 +28,7 @@ export class BookingsService {
     @InjectRepository(CourtEntity)
     private readonly courtRepository: Repository<CourtEntity>,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
@@ -113,39 +115,48 @@ export class BookingsService {
   }
 
   async cancelBooking(id: string, userId: string): Promise<BookingEntity> {
-    const booking = await this.bookingRepository.findOne({
-      where: { id },
-      relations: ['court'], // Load court if needed
+    return this.dataSource.transaction(async (manager) => {
+      // Use pessimistic lock to prevent race conditions
+      const booking = await manager.findOne(BookingEntity, {
+        where: { id },
+        relations: ['court'],
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!booking) {
+        throw new NotFoundException('Booking not found');
+      }
+
+      if (booking.userId !== userId) {
+        throw new ForbiddenException('You do not have permission to cancel this booking');
+      }
+
+      if (booking.status === BookingStatus.CANCELLED) {
+        throw new ConflictException('Booking is already cancelled');
+      }
+
+      if (booking.status !== BookingStatus.CONFIRMED) {
+        throw new BadRequestException('Only confirmed bookings can be cancelled');
+      }
+
+      // Check if startTime is at least X hours away (configurable)
+      const now = new Date();
+      const startTime = new Date(booking.startTime);
+      const timeDifferenceMs = startTime.getTime() - now.getTime();
+      const hoursDifference = timeDifferenceMs / (1000 * 60 * 60);
+
+      const minCancelHours = this.configService.get<number>('booking.minCancelHours', 2);
+
+      if (hoursDifference < minCancelHours) {
+        throw new BadRequestException(
+          `Bookings can only be cancelled at least ${minCancelHours} hours in advance`,
+        );
+      }
+
+      booking.status = BookingStatus.CANCELLED;
+      booking.cancelledAt = new Date();
+      return manager.save(booking);
     });
-
-    if (!booking) {
-      throw new NotFoundException('Booking not found');
-    }
-
-    if (booking.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to cancel this booking');
-    }
-
-    if (booking.status === BookingStatus.CANCELLED) {
-      throw new ConflictException('Booking is already cancelled');
-    }
-
-    if (booking.status !== BookingStatus.CONFIRMED) {
-      throw new BadRequestException('Only confirmed bookings can be cancelled');
-    }
-
-    // Check if startTime is at least 2 hours away
-    const now = new Date();
-    const startTime = new Date(booking.startTime);
-    const timeDifferenceMs = startTime.getTime() - now.getTime();
-    const hoursDifference = timeDifferenceMs / (1000 * 60 * 60);
-
-    if (hoursDifference < 2) {
-      throw new BadRequestException('Bookings can only be cancelled at least 2 hours in advance');
-    }
-
-    booking.status = BookingStatus.CANCELLED;
-    return this.bookingRepository.save(booking);
   }
 
   async findMyBookings(userId: string, query: GetMyBookingsDto) {

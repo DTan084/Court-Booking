@@ -108,7 +108,7 @@ export class CourtsService {
         from: fromDate,
         to: toDate,
       },
-      totalBookings: Number(stats.totalBookings) || 0,
+      totalBookings: Number(stats.bookingCount) || 0,
       totalHours: Number(totalHours.toFixed(2)),
       utilizationPercentage: Number(utilizationPercentage.toFixed(2)),
     };

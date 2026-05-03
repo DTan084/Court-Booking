@@ -13,6 +13,7 @@ import { CourtEntity } from './court.entity';
 import { BookingStatus } from '@court-booking/shared';
 
 @Entity('bookings')
+@Index(['courtId', 'startTime', 'status'])
 export class BookingEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
