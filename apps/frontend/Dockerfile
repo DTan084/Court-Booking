@@ -3,14 +3,30 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
+# Build stage
 FROM base AS builder
 WORKDIR /app
-COPY . .
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/frontend/package.json ./apps/frontend/
+COPY packages/shared/package.json ./packages/shared/
+
+# Install dependencies (all)
 RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY apps/frontend ./apps/frontend
+COPY packages/shared ./packages/shared
+
+# Build shared package then frontend
+RUN pnpm --filter @court-booking/shared build
 RUN pnpm --filter @court-booking/frontend build
 
+# Runner stage
 FROM base AS runner
 WORKDIR /app
+ENV NODE_ENV production
+
+# Copy artifacts from builder
 COPY --from=builder /app/package.json .
 COPY --from=builder /app/pnpm-lock.yaml .
 COPY --from=builder /app/pnpm-workspace.yaml .
@@ -20,7 +36,7 @@ COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
 COPY --from=builder /app/apps/frontend/.next ./apps/frontend/.next
 COPY --from=builder /app/packages/shared ./packages/shared
 
-# Install only production dependencies
+# Install ONLY production dependencies
 RUN pnpm install --prod --frozen-lockfile --filter @court-booking/frontend
 
 EXPOSE 3000

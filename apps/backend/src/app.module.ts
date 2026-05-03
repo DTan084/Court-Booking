@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { WinstonModule } from 'nest-winston';
 import { AuthModule } from './modules/auth/auth.module';
 import { CourtsModule } from './modules/courts/courts.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
+import { HealthModule } from './modules/health/health.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
@@ -13,10 +16,7 @@ import { CourtEntity } from './database/entities/court.entity';
 import { BookingEntity } from './database/entities/booking.entity';
 import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
 import { RedisModule } from './common/redis/redis.module';
-import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './config/winston.config';
-import { HealthModule } from './modules/health/health.module';
-import { BookingsModule } from './modules/bookings/bookings.module';
 
 @Module({
   imports: [
