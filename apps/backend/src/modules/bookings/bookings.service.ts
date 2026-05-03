@@ -155,21 +155,21 @@ export class BookingsService {
     const queryBuilder = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.court', 'court')
-      .where('booking.user_id = :userId', { userId });
+      .where('booking.userId = :userId', { userId });
 
     if (status) {
       queryBuilder.andWhere('booking.status = :status', { status });
     }
 
     if (fromDate) {
-      queryBuilder.andWhere('booking.start_time >= :fromDate', { fromDate: new Date(fromDate) });
+      queryBuilder.andWhere('booking.startTime >= :fromDate', { fromDate: new Date(fromDate) });
     }
 
     if (toDate) {
-      queryBuilder.andWhere('booking.start_time <= :toDate', { toDate: new Date(toDate) });
+      queryBuilder.andWhere('booking.startTime <= :toDate', { toDate: new Date(toDate) });
     }
 
-    queryBuilder.orderBy('booking.start_time', 'DESC');
+    queryBuilder.orderBy('booking.startTime', 'DESC');
     queryBuilder.skip(skip).take(limit);
 
     const [items, total] = await queryBuilder.getManyAndCount();
