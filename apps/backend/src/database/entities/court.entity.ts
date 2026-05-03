@@ -9,6 +9,7 @@ import {
   Index,
 } from 'typeorm';
 import { BookingEntity } from './booking.entity';
+import { CourtTimeSlotEntity } from './court-time-slot.entity';
 import { SportType } from '@court-booking/shared';
 
 export enum CourtStatus {
@@ -43,6 +44,9 @@ export class CourtEntity {
 
   @OneToMany(() => BookingEntity, (booking) => booking.court)
   bookings: BookingEntity[];
+
+  @OneToMany(() => CourtTimeSlotEntity, (slot) => slot.court, { cascade: true })
+  timeSlots: CourtTimeSlotEntity[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

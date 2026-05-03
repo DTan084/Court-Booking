@@ -13,6 +13,7 @@ import redisConfig from './config/redis.config';
 import bookingConfig from './config/booking.config';
 import { UserEntity } from './database/entities/user.entity';
 import { CourtEntity } from './database/entities/court.entity';
+import { CourtTimeSlotEntity } from './database/entities/court-time-slot.entity';
 import { BookingEntity } from './database/entities/booking.entity';
 import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
 import { RedisModule } from './common/redis/redis.module';
@@ -36,7 +37,7 @@ import { winstonConfig } from './config/winston.config';
         username: configService.get<string>('database.user'),
         password: configService.get<string>('database.password'),
         database: configService.get<string>('database.name'),
-        entities: [UserEntity, CourtEntity, BookingEntity, RefreshTokenEntity],
+        entities: [UserEntity, CourtEntity, CourtTimeSlotEntity, BookingEntity, RefreshTokenEntity],
         synchronize: false,
       }),
     }),
