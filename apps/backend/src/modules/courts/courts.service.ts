@@ -1,16 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Like, ILike } from 'typeorm';
+import { Repository, IsNull, Like, ILike, DataSource } from 'typeorm';
 import { CourtEntity } from '../../database/entities/court.entity';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { GetCourtsDto } from './dto/get-courts.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
+import { GetCourtStatsDto } from './dto/get-court-stats.dto';
+import { BookingEntity } from '../../database/entities/booking.entity';
+import { BookingStatus } from '@court-booking/shared';
 
 @Injectable()
 export class CourtsService {
   constructor(
     @InjectRepository(CourtEntity)
     private readonly courtRepository: Repository<CourtEntity>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createCourtDto: CreateCourtDto): Promise<CourtEntity> {
@@ -69,5 +73,44 @@ export class CourtsService {
   async softDelete(id: string): Promise<void> {
     await this.findOne(id);
     await this.courtRepository.softDelete(id);
+  }
+
+  async getStats(id: string, query: GetCourtStatsDto) {
+    const court = await this.findOne(id);
+    const { fromDate, toDate } = query;
+
+    const stats = await this.dataSource
+      .createQueryBuilder(BookingEntity, 'booking')
+      .select('COUNT(booking.id)', 'totalBookings')
+      .addSelect(
+        'SUM(EXTRACT(EPOCH FROM (booking.end_time - booking.start_time))/3600)',
+        'totalHours',
+      )
+      .where('booking.court_id = :courtId', { courtId: id })
+      .andWhere('booking.status != :status', { status: BookingStatus.CANCELLED })
+      .andWhere('booking.start_time >= :fromDate', { fromDate: new Date(fromDate) })
+      .andWhere('booking.start_time <= :toDate', { toDate: new Date(toDate) })
+      .getRawOne();
+
+    // Calculate total possible hours (assuming court is available 24/7 for simplicity, or 16 hours a day?)
+    // To keep it simple as per "utilization %", let's calculate based on 24 hours
+    const daysDifference =
+      (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 3600 * 24) || 1;
+    const totalPossibleHours = daysDifference * 24; // If the court is open 24/7
+
+    const totalHours = Number(stats.totalHours) || 0;
+    const utilizationPercentage = (totalHours / totalPossibleHours) * 100;
+
+    return {
+      courtId: id,
+      courtName: court.name,
+      period: {
+        from: fromDate,
+        to: toDate,
+      },
+      totalBookings: Number(stats.totalBookings) || 0,
+      totalHours: Number(totalHours.toFixed(2)),
+      utilizationPercentage: Number(utilizationPercentage.toFixed(2)),
+    };
   }
 }
