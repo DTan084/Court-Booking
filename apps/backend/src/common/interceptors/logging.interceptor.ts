@@ -1,27 +1,24 @@
-// TODO: Logging Interceptor
-// - Log request ID, path, method, duration
-// - Chạy trước và sau controller
-
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-} from '@nestjs/common';
-import { Observable, tap } from 'rxjs';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger } from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { tap } from 'rxjs/operators';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
+  private readonly logger = new Logger('HTTP');
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    const { method, url } = request;
+    const { method, url, ip } = request;
+    const userAgent = request.get('user-agent') || '';
     const now = Date.now();
 
     return next.handle().pipe(
       tap(() => {
-        const duration = Date.now() - now;
-        // TODO: Use pino logger instead of console
-        console.log(`${method} ${url} — ${duration}ms`);
+        const response = context.switchToHttp().getResponse();
+        const { statusCode } = response;
+        const delay = Date.now() - now;
+
+        this.logger.log(`${method} ${url} ${statusCode} - ${userAgent} ${ip} +${delay}ms`);
       }),
     );
   }
