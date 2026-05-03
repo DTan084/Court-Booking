@@ -11,6 +11,7 @@ import {
   Delete,
   Param,
   Patch,
+  Put,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import {
@@ -26,6 +27,7 @@ import { CreateCourtDto, createCourtSchema } from './dto/create-court.dto';
 import { GetCourtsDto, getCourtsSchema } from './dto/get-courts.dto';
 import { UpdateCourtDto, updateCourtSchema } from './dto/update-court.dto';
 import { GetCourtStatsDto, getCourtStatsSchema } from './dto/get-court-stats.dto';
+import { UpsertTimeSlotsDto, upsertTimeSlotsSchema } from './dto/upsert-time-slots.dto';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -178,5 +180,49 @@ export class CourtsController {
   @UsePipes(new ZodValidationPipe(getCourtStatsSchema))
   async getStats(@Param('id', ParseUUIDPipe) id: string, @Query() query: GetCourtStatsDto) {
     return this.courtsService.getStats(id, query);
+  }
+
+  @Get(':id/time-slots')
+  @ApiOperation({ summary: 'Get time slots for a court' })
+  @ApiResponse({ status: 200, description: 'List of time slots' })
+  @ApiResponse({ status: 404, description: 'Court not found' })
+  async getTimeSlots(@Param('id', ParseUUIDPipe) id: string) {
+    return this.courtsService.getTimeSlots(id);
+  }
+
+  @Put(':id/time-slots')
+  @ApiOperation({ summary: 'Replace all time slots for a court (Admin only)' })
+  @ApiBearerAuth()
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['slots'],
+      properties: {
+        slots: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['dayOfWeek', 'startHour', 'endHour', 'price'],
+            properties: {
+              dayOfWeek: { type: 'integer', minimum: 0, maximum: 6, example: 1 },
+              startHour: { type: 'integer', minimum: 0, maximum: 23, example: 6 },
+              endHour: { type: 'integer', minimum: 1, maximum: 24, example: 8 },
+              price: { type: 'number', example: 100000 },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Time slots updated successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  @ApiResponse({ status: 404, description: 'Court not found' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async upsertTimeSlots(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(upsertTimeSlotsSchema)) body: UpsertTimeSlotsDto,
+  ) {
+    return this.courtsService.upsertTimeSlots(id, body);
   }
 }

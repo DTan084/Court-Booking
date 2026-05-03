@@ -10,6 +10,7 @@ import { Repository, Between, Not, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
+import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { BookingStatus } from '@court-booking/shared';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
@@ -21,6 +22,8 @@ export class BookingsService {
     private readonly bookingRepository: Repository<BookingEntity>,
     @InjectRepository(CourtEntity)
     private readonly courtRepository: Repository<CourtEntity>,
+    @InjectRepository(CourtTimeSlotEntity)
+    private readonly timeSlotRepository: Repository<CourtTimeSlotEntity>,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
   ) {}
@@ -63,6 +66,11 @@ export class BookingsService {
       throw new BadRequestException('Invalid booking duration');
     }
 
+    // startTime/endTime must be on whole hours
+    if (start.getMinutes() !== 0 || end.getMinutes() !== 0) {
+      throw new BadRequestException('Booking must start and end on the hour (e.g. 08:00, 10:00)');
+    }
+
     return this.dataSource.transaction(async (manager) => {
       // 1. Pessimistic Lock on Court
       const court = await manager.findOne(CourtEntity, {
@@ -78,7 +86,29 @@ export class BookingsService {
         throw new BadRequestException('Court is not active');
       }
 
-      // 2. Overlap Check
+      // 2. Validate time slots cover the requested range
+      const dayOfWeek = start.getDay(); // 0=Sun, 1=Mon, ...
+      const startHour = start.getUTCHours();
+      const endHour = end.getUTCHours() || 24; // midnight = 24
+
+      const slots = await this.timeSlotRepository.find({
+        where: { courtId, dayOfWeek },
+        order: { startHour: 'ASC' },
+      });
+
+      if (slots.length === 0) {
+        throw new BadRequestException('Court has no available time slots for this day');
+      }
+
+      // Find consecutive slots that cover [startHour, endHour]
+      const coveredSlots = this.findCoveringSlots(slots, startHour, endHour);
+      if (!coveredSlots) {
+        throw new BadRequestException(
+          'Requested time range is not covered by available time slots',
+        );
+      }
+
+      // 3. Overlap Check
       const overlappingBookings = await manager
         .createQueryBuilder(BookingEntity, 'booking')
         .where('booking.courtId = :courtId', { courtId })
@@ -91,10 +121,10 @@ export class BookingsService {
         throw new ConflictException('Court is already booked for the selected time slot');
       }
 
-      // 3. Calculate Price
-      const totalPrice = Number(court.pricePerHour) * durationHours;
+      // 4. Calculate price by summing covered slots
+      const totalPrice = coveredSlots.reduce((sum, slot) => sum + Number(slot.price), 0);
 
-      // 4. Create Booking
+      // 5. Create Booking
       const booking = manager.create(BookingEntity, {
         courtId,
         userId,
@@ -108,12 +138,35 @@ export class BookingsService {
     });
   }
 
+  /**
+   * Find consecutive slots that exactly cover [startHour, endHour].
+   * Returns the matching slots or null if not fully covered.
+   */
+  private findCoveringSlots(
+    slots: CourtTimeSlotEntity[],
+    startHour: number,
+    endHour: number,
+  ): CourtTimeSlotEntity[] | null {
+    const result: CourtTimeSlotEntity[] = [];
+    let current = startHour;
+
+    for (const slot of slots) {
+      if (slot.startHour === current) {
+        result.push(slot);
+        current = slot.endHour;
+        if (current === endHour) return result;
+      }
+    }
+
+    return null; // gap or not fully covered
+  }
+
   async cancelBooking(id: string, userId: string): Promise<BookingEntity> {
     return this.dataSource.transaction(async (manager) => {
       // Use pessimistic lock to prevent race conditions
+      // Note: cannot use relations with pessimistic_write (PostgreSQL FOR UPDATE + outer join restriction)
       const booking = await manager.findOne(BookingEntity, {
         where: { id },
-        relations: ['court'],
         lock: { mode: 'pessimistic_write' },
       });
 
