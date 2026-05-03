@@ -8,8 +8,12 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
