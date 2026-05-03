@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import dataSource from './data-source';
 import { UserEntity } from './entities/user.entity';
 import { CourtEntity } from './entities/court.entity';
@@ -5,9 +6,11 @@ import { Role, SportType } from '@court-booking/shared/types';
 import * as bcrypt from 'bcrypt';
 import { CourtStatus } from './entities/court.entity';
 
+const logger = new Logger('DatabaseSeed');
+
 async function runSeed() {
   await dataSource.initialize();
-  console.log('Database connected');
+  logger.log('Database connected');
 
   const userRepository = dataSource.getRepository(UserEntity);
   const courtRepository = dataSource.getRepository(CourtEntity);
@@ -24,9 +27,9 @@ async function runSeed() {
       role: Role.ADMIN,
     });
     await userRepository.save(admin);
-    console.log('Seeded Admin User');
+    logger.log('Seeded Admin User');
   } else {
-    console.log('Admin already exists');
+    logger.log('Admin already exists');
   }
 
   // Seed Courts
@@ -56,16 +59,16 @@ async function runSeed() {
       }),
     ];
     await courtRepository.save(courts);
-    console.log('Seeded Courts');
+    logger.log('Seeded Courts');
   } else {
-    console.log('Courts already exist');
+    logger.log('Courts already exist');
   }
 
   await dataSource.destroy();
-  console.log('Seed completed');
+  logger.log('Seed completed');
 }
 
 runSeed().catch((err) => {
-  console.error('Seed error:', err);
+  logger.error('Seed error:', err);
   process.exit(1);
 });

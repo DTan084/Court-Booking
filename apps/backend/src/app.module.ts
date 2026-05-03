@@ -6,18 +6,26 @@ import { CourtsModule } from './modules/courts/courts.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
+import redisConfig from './config/redis.config';
+import bookingConfig from './config/booking.config';
 import { UserEntity } from './database/entities/user.entity';
 import { CourtEntity } from './database/entities/court.entity';
 import { BookingEntity } from './database/entities/booking.entity';
 import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
+import { RedisModule } from './common/redis/redis.module';
+import { WinstonModule } from 'nest-winston';
+import { winstonConfig } from './config/winston.config';
+import { HealthModule } from './modules/health/health.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '../../.env',
-      load: [appConfig, databaseConfig, jwtConfig],
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig, bookingConfig],
     }),
+    WinstonModule.forRoot(winstonConfig),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -32,9 +40,11 @@ import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
         synchronize: false,
       }),
     }),
+    RedisModule,
     AuthModule,
     CourtsModule,
-    // TODO: BookingsModule
+    BookingsModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [],

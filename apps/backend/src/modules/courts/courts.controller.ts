@@ -25,6 +25,7 @@ import { CourtsService } from './courts.service';
 import { CreateCourtDto, createCourtSchema } from './dto/create-court.dto';
 import { GetCourtsDto, getCourtsSchema } from './dto/get-courts.dto';
 import { UpdateCourtDto, updateCourtSchema } from './dto/update-court.dto';
+import { GetCourtStatsDto, getCourtStatsSchema } from './dto/get-court-stats.dto';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -152,5 +153,30 @@ export class CourtsController {
   @UsePipes(new ZodValidationPipe(getScheduleSchema))
   async getSchedule(@Param('id', ParseUUIDPipe) id: string, @Query() query: GetScheduleDto) {
     return this.bookingsService.getCourtSchedule(id, query.date);
+  }
+
+  @Get(':id/stats')
+  @ApiOperation({ summary: 'Get court statistics (Admin only)' })
+  @ApiBearerAuth()
+  @ApiQuery({
+    name: 'fromDate',
+    required: true,
+    type: String,
+    description: 'Start date in ISO 8601 format',
+  })
+  @ApiQuery({
+    name: 'toDate',
+    required: true,
+    type: String,
+    description: 'End date in ISO 8601 format',
+  })
+  @ApiResponse({ status: 200, description: 'Court statistics' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  @ApiResponse({ status: 404, description: 'Court not found' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UsePipes(new ZodValidationPipe(getCourtStatsSchema))
+  async getStats(@Param('id', ParseUUIDPipe) id: string, @Query() query: GetCourtStatsDto) {
+    return this.courtsService.getStats(id, query);
   }
 }

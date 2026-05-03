@@ -1,9 +1,3 @@
-// TODO: Bookings Controller
-// - POST /bookings — create booking
-// - GET /bookings/me — user booking history
-// - GET /courts/:id/schedule — court schedule by date
-// - PATCH /bookings/:id/cancel — cancel booking
-
 import {
   Controller,
   Post,

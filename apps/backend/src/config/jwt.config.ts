@@ -1,6 +1,3 @@
-// TODO: JWT configuration
-// - secret, expiresIn, refreshExpiresIn
-
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('jwt', () => ({
