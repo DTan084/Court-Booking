@@ -21,6 +21,7 @@ describe('AuthService', () => {
   let userRepository: any;
   let refreshTokenRepository: any;
   let jwtService: any;
+  let redis: any;
 
   const mockUser = {
     id: 'user-id',
@@ -49,6 +50,14 @@ describe('AuthService', () => {
       }),
     };
 
+    const mockRedis = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue('OK'),
+      incr: jest.fn().mockResolvedValue(1),
+      expire: jest.fn().mockResolvedValue(1),
+      del: jest.fn().mockResolvedValue(1),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -56,6 +65,7 @@ describe('AuthService', () => {
         { provide: getRepositoryToken(RefreshTokenEntity), useValue: { ...mockRepo } },
         { provide: JwtService, useValue: mockJwt },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: 'REDIS_CLIENT', useValue: mockRedis },
       ],
     }).compile();
 
@@ -63,6 +73,7 @@ describe('AuthService', () => {
     userRepository = module.get(getRepositoryToken(UserEntity));
     refreshTokenRepository = module.get(getRepositoryToken(RefreshTokenEntity));
     jwtService = module.get(JwtService);
+    redis = module.get('REDIS_CLIENT');
   });
 
   describe('register', () => {
