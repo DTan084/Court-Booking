@@ -1,13 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { CourtsService } from './courts.service';
 import { CourtEntity } from '../../database/entities/court.entity';
+import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { SportType } from '@court-booking/shared';
 
 describe('CourtsService', () => {
   let service: CourtsService;
   let repository: any;
+  let timeSlotRepository: any;
+  let dataSource: any;
+  let redis: any;
 
   const mockCourt = {
     id: 'court-uuid',
@@ -26,6 +31,33 @@ describe('CourtsService', () => {
       softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
+    const mockTimeSlotRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+
+    const mockDataSource = {
+      createQueryBuilder: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawOne: jest.fn().mockResolvedValue({
+          bookingCount: '0',
+          totalHours: '0',
+        }),
+      }),
+      transaction: jest.fn(),
+    };
+
+    const mockRedis = {
+      get: jest.fn().mockResolvedValue(null),
+      setex: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1),
+      keys: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CourtsService,
@@ -33,11 +65,26 @@ describe('CourtsService', () => {
           provide: getRepositoryToken(CourtEntity),
           useValue: mockRepo,
         },
+        {
+          provide: getRepositoryToken(CourtTimeSlotEntity),
+          useValue: mockTimeSlotRepo,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
+        },
+        {
+          provide: 'REDIS_CLIENT',
+          useValue: mockRedis,
+        },
       ],
     }).compile();
 
     service = module.get<CourtsService>(CourtsService);
     repository = module.get(getRepositoryToken(CourtEntity));
+    timeSlotRepository = module.get(getRepositoryToken(CourtTimeSlotEntity));
+    dataSource = module.get(DataSource);
+    redis = module.get('REDIS_CLIENT');
   });
 
   it('should be defined', () => {

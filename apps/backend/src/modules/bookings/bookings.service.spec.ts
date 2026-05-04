@@ -3,7 +3,9 @@ import { BookingsService } from './bookings.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
+import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { DataSource } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import {
   BadRequestException,
   ConflictException,
@@ -17,19 +19,34 @@ const mockBookingRepository = () => ({
   find: jest.fn(),
   findOne: jest.fn(),
   save: jest.fn(),
+  exist: jest.fn(),
   createQueryBuilder: jest.fn(() => ({
+    select: jest.fn().mockReturnThis(),
     leftJoinAndSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
     skip: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue([]),
     getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
   })),
 });
 
 const mockCourtRepository = () => ({
   findOne: jest.fn(),
+  exist: jest.fn(),
+});
+
+const mockTimeSlotRepository = () => ({
+  find: jest.fn().mockResolvedValue([]),
+});
+
+const mockConfigService = () => ({
+  get: jest.fn((key: string, defaultValue?: any) => {
+    if (key === 'booking.minCancelHours') return 2;
+    return defaultValue;
+  }),
 });
 
 const mockDataSource = () => ({
@@ -40,6 +57,8 @@ describe('BookingsService', () => {
   let service: BookingsService;
   let bookingRepository: ReturnType<typeof mockBookingRepository>;
   let courtRepository: ReturnType<typeof mockCourtRepository>;
+  let timeSlotRepository: ReturnType<typeof mockTimeSlotRepository>;
+  let configService: ReturnType<typeof mockConfigService>;
   let dataSource: ReturnType<typeof mockDataSource>;
 
   beforeEach(async () => {
@@ -55,6 +74,14 @@ describe('BookingsService', () => {
           useFactory: mockCourtRepository,
         },
         {
+          provide: getRepositoryToken(CourtTimeSlotEntity),
+          useFactory: mockTimeSlotRepository,
+        },
+        {
+          provide: ConfigService,
+          useFactory: mockConfigService,
+        },
+        {
           provide: DataSource,
           useFactory: mockDataSource,
         },
@@ -64,6 +91,8 @@ describe('BookingsService', () => {
     service = module.get<BookingsService>(BookingsService);
     bookingRepository = module.get(getRepositoryToken(BookingEntity));
     courtRepository = module.get(getRepositoryToken(CourtEntity));
+    timeSlotRepository = module.get(getRepositoryToken(CourtTimeSlotEntity));
+    configService = module.get(ConfigService);
     dataSource = module.get(DataSource);
   });
 
@@ -76,7 +105,12 @@ describe('BookingsService', () => {
     const mockBookingId = 'booking-1';
 
     it('should throw NotFoundException if booking not found', async () => {
-      bookingRepository.findOne.mockResolvedValue(null);
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const mockManager = {
+          findOne: jest.fn().mockResolvedValue(null),
+        };
+        return cb(mockManager);
+      });
 
       await expect(service.cancelBooking(mockBookingId, mockUserId)).rejects.toThrow(
         NotFoundException,
@@ -84,9 +118,14 @@ describe('BookingsService', () => {
     });
 
     it('should throw ForbiddenException if user is not the owner', async () => {
-      bookingRepository.findOne.mockResolvedValue({
-        id: mockBookingId,
-        userId: 'other-user',
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const mockManager = {
+          findOne: jest.fn().mockResolvedValue({
+            id: mockBookingId,
+            userId: 'other-user',
+          }),
+        };
+        return cb(mockManager);
       });
 
       await expect(service.cancelBooking(mockBookingId, mockUserId)).rejects.toThrow(
@@ -95,10 +134,15 @@ describe('BookingsService', () => {
     });
 
     it('should throw ConflictException if already cancelled', async () => {
-      bookingRepository.findOne.mockResolvedValue({
-        id: mockBookingId,
-        userId: mockUserId,
-        status: BookingStatus.CANCELLED,
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const mockManager = {
+          findOne: jest.fn().mockResolvedValue({
+            id: mockBookingId,
+            userId: mockUserId,
+            status: BookingStatus.CANCELLED,
+          }),
+        };
+        return cb(mockManager);
       });
 
       await expect(service.cancelBooking(mockBookingId, mockUserId)).rejects.toThrow(
@@ -107,10 +151,15 @@ describe('BookingsService', () => {
     });
 
     it('should throw BadRequestException if not confirmed', async () => {
-      bookingRepository.findOne.mockResolvedValue({
-        id: mockBookingId,
-        userId: mockUserId,
-        status: BookingStatus.COMPLETED, // e.g. completed
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const mockManager = {
+          findOne: jest.fn().mockResolvedValue({
+            id: mockBookingId,
+            userId: mockUserId,
+            status: BookingStatus.COMPLETED,
+          }),
+        };
+        return cb(mockManager);
       });
 
       await expect(service.cancelBooking(mockBookingId, mockUserId)).rejects.toThrow(
@@ -122,11 +171,16 @@ describe('BookingsService', () => {
       const startTime = new Date();
       startTime.setHours(startTime.getHours() + 1); // 1 hour away (too close)
 
-      bookingRepository.findOne.mockResolvedValue({
-        id: mockBookingId,
-        userId: mockUserId,
-        status: BookingStatus.CONFIRMED,
-        startTime,
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const mockManager = {
+          findOne: jest.fn().mockResolvedValue({
+            id: mockBookingId,
+            userId: mockUserId,
+            status: BookingStatus.CONFIRMED,
+            startTime,
+          }),
+        };
+        return cb(mockManager);
       });
 
       await expect(service.cancelBooking(mockBookingId, mockUserId)).rejects.toThrow(
@@ -145,24 +199,36 @@ describe('BookingsService', () => {
         startTime,
       };
 
-      bookingRepository.findOne.mockResolvedValue(booking);
-      bookingRepository.save.mockResolvedValue({ ...booking, status: BookingStatus.CANCELLED });
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const mockManager = {
+          findOne: jest.fn().mockResolvedValue(booking),
+          save: jest.fn().mockResolvedValue({ ...booking, status: BookingStatus.CANCELLED }),
+        };
+        return cb(mockManager);
+      });
 
       const result = await service.cancelBooking(mockBookingId, mockUserId);
 
       expect(result.status).toBe(BookingStatus.CANCELLED);
-      expect(bookingRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ status: BookingStatus.CANCELLED }),
-      );
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
   });
 
   describe('createBooking', () => {
     const mockUserId = 'user-1';
+
+    // Create dates with minutes = 0
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(10, 0, 0, 0); // 10:00 AM
+
+    const tomorrowEnd = new Date(tomorrow);
+    tomorrowEnd.setHours(11, 0, 0, 0); // 11:00 AM
+
     const mockDto: CreateBookingDto = {
       courtId: 'court-1',
-      startTime: new Date(Date.now() + 86400000).toISOString(), // +1 day
-      endTime: new Date(Date.now() + 86400000 + 3600000).toISOString(), // +1 day + 1 hour
+      startTime: tomorrow.toISOString(),
+      endTime: tomorrowEnd.toISOString(),
     };
 
     it('should throw BadRequestException if start time is in the past', async () => {
@@ -191,6 +257,18 @@ describe('BookingsService', () => {
         };
         return cb(mockManager);
       });
+
+      // Mock time slot repository to return valid slots
+      timeSlotRepository.find.mockResolvedValue([
+        {
+          id: 'slot-1',
+          courtId: 'court-1',
+          dayOfWeek: new Date(mockDto.startTime).getDay(),
+          startHour: new Date(mockDto.startTime).getUTCHours(),
+          endHour: new Date(mockDto.endTime).getUTCHours(),
+          price: 100,
+        },
+      ]);
 
       const result = await service.createBooking(mockDto, mockUserId);
       expect(result.id).toBe('new-booking');

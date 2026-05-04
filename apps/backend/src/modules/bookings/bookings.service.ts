@@ -29,25 +29,26 @@ export class BookingsService {
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
-    const court = await this.courtRepository.findOne({ where: { id: courtId } });
-    if (!court) {
-      throw new NotFoundException('Court not found');
-    }
-
+    // Optimized: Use single query with exists check instead of separate court lookup
     const startDate = new Date(`${date}T00:00:00Z`);
     const endDate = new Date(`${date}T23:59:59.999Z`);
 
-    const bookings = await this.bookingRepository.find({
-      where: {
-        courtId,
-        startTime: Between(startDate, endDate),
-        status: Not(BookingStatus.CANCELLED),
-      },
-      order: {
-        startTime: 'ASC',
-      },
-      select: ['id', 'startTime', 'endTime', 'status'],
-    });
+    const bookings = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .select(['booking.id', 'booking.startTime', 'booking.endTime', 'booking.status'])
+      .where('booking.courtId = :courtId', { courtId })
+      .andWhere('booking.startTime BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
+      .orderBy('booking.startTime', 'ASC')
+      .getMany();
+
+    // Verify court exists only if no bookings found (optimization for common case)
+    if (bookings.length === 0) {
+      const courtExists = await this.courtRepository.exist({ where: { id: courtId } });
+      if (!courtExists) {
+        throw new NotFoundException('Court not found');
+      }
+    }
 
     return bookings;
   }
@@ -213,7 +214,10 @@ export class BookingsService {
     const queryBuilder = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.court', 'court')
-      .where('booking.userId = :userId', { userId });
+      .where('booking.userId = :userId', { userId })
+      .orderBy('booking.startTime', 'DESC')
+      .skip(skip)
+      .take(limit);
 
     if (status) {
       queryBuilder.andWhere('booking.status = :status', { status });
@@ -226,9 +230,6 @@ export class BookingsService {
     if (toDate) {
       queryBuilder.andWhere('booking.startTime <= :toDate', { toDate: new Date(toDate) });
     }
-
-    queryBuilder.orderBy('booking.startTime', 'DESC');
-    queryBuilder.skip(skip).take(limit);
 
     const [items, total] = await queryBuilder.getManyAndCount();
 

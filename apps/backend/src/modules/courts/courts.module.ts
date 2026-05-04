@@ -5,11 +5,13 @@ import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.ent
 import { CourtsService } from './courts.service';
 import { CourtsController } from './courts.controller';
 import { BookingsModule } from '../bookings/bookings.module';
+import { RedisModule } from '../../common/redis/redis.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([CourtEntity, CourtTimeSlotEntity]),
     forwardRef(() => BookingsModule),
+    RedisModule,
   ],
   controllers: [CourtsController],
   providers: [CourtsService],
