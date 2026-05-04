@@ -38,7 +38,15 @@ import { winstonConfig } from './config/winston.config';
         password: configService.get<string>('database.password'),
         database: configService.get<string>('database.name'),
         entities: [UserEntity, CourtEntity, CourtTimeSlotEntity, BookingEntity, RefreshTokenEntity],
-        synchronize: false,
+        synchronize: configService.get<boolean>('database.synchronize', false),
+        logging: configService.get<boolean>('database.logging', false),
+        maxQueryExecutionTime: configService.get<number>('database.maxQueryExecutionTime', 5000),
+        // Connection pooling
+        extra: {
+          max: configService.get<number>('database.poolSize', 10),
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 2000,
+        },
       }),
     }),
     RedisModule,
