@@ -7,6 +7,20 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
+import { QueryFailedError } from 'typeorm';
+
+interface ErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: any;
+    statusCode: number;
+    timestamp: string;
+    path: string;
+    requestId?: string;
+  };
+}
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -17,38 +31,94 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
 
-    const status =
-      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
+    // Generate request ID for tracking
+    const requestId = (request.headers['x-request-id'] as string) || this.generateRequestId();
 
-    const exceptionResponse = exception instanceof HttpException ? exception.getResponse() : null;
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let errorCode = 'INTERNAL_SERVER_ERROR';
+    let message = 'Internal server error';
+    let details: any = null;
 
-    const error =
-      exception instanceof HttpException ? exception.constructor.name : 'InternalServerError';
+    // Handle different types of exceptions
+    if (exception instanceof HttpException) {
+      status = exception.getStatus();
+      const exceptionResponse = exception.getResponse();
 
-    const message =
-      exception instanceof HttpException
-        ? (exceptionResponse as any).message || exception.message
-        : 'Internal server error';
+      if (typeof exceptionResponse === 'object') {
+        message = (exceptionResponse as any).message || exception.message;
+        details = (exceptionResponse as any).error || null;
+      } else {
+        message = exceptionResponse as string;
+      }
 
-    const details =
-      exception instanceof HttpException ? (exceptionResponse as any).error || null : null;
+      errorCode = this.getErrorCode(exception);
+    } else if (exception instanceof QueryFailedError) {
+      // Database errors
+      status = HttpStatus.BAD_REQUEST;
+      errorCode = 'DATABASE_ERROR';
+      message = 'Database operation failed';
 
-    const errorResponse = {
-      error,
-      message,
-      details,
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
+      // Don't expose internal database errors in production
+      if (process.env.NODE_ENV !== 'production') {
+        details = exception.message;
+      }
+    } else if (exception instanceof Error) {
+      // Generic errors
+      message = exception.message;
+      errorCode = 'INTERNAL_ERROR';
+
+      // Include stack trace in development
+      if (process.env.NODE_ENV !== 'production') {
+        details = exception.stack;
+      }
+    }
+
+    const errorResponse: ErrorResponse = {
+      success: false,
+      error: {
+        code: errorCode,
+        message: Array.isArray(message) ? message.join(', ') : message,
+        details,
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        requestId,
+      },
     };
 
-    // Log the error detail
-    this.logger.error(
-      `${request.method} ${request.url} ${status} error: ${
-        exception instanceof Error ? exception.stack : JSON.stringify(exception)
-      }`,
-    );
+    // Log with appropriate level
+    const logMessage = `[${requestId}] ${request.method} ${request.url} - ${status} ${errorCode}`;
+
+    if (status >= 500) {
+      this.logger.error(
+        `${logMessage}\n${exception instanceof Error ? exception.stack : JSON.stringify(exception)}`,
+      );
+    } else if (status >= 400) {
+      this.logger.warn(logMessage);
+    }
 
     response.status(status).json(errorResponse);
+  }
+
+  private getErrorCode(exception: HttpException): string {
+    const status = exception.getStatus();
+    const name = exception.constructor.name;
+
+    // Map exception names to error codes
+    const errorCodeMap: Record<string, string> = {
+      BadRequestException: 'BAD_REQUEST',
+      UnauthorizedException: 'UNAUTHORIZED',
+      ForbiddenException: 'FORBIDDEN',
+      NotFoundException: 'NOT_FOUND',
+      ConflictException: 'CONFLICT',
+      UnprocessableEntityException: 'UNPROCESSABLE_ENTITY',
+      InternalServerErrorException: 'INTERNAL_SERVER_ERROR',
+    };
+
+    return errorCodeMap[name] || `HTTP_${status}`;
+  }
+
+  private generateRequestId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 }

@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, Not, DataSource } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
@@ -44,8 +44,8 @@ export class BookingsService {
 
     // Verify court exists only if no bookings found (optimization for common case)
     if (bookings.length === 0) {
-      const courtExists = await this.courtRepository.exist({ where: { id: courtId } });
-      if (!courtExists) {
+      const courtCount = await this.courtRepository.count({ where: { id: courtId } });
+      if (courtCount === 0) {
         throw new NotFoundException('Court not found');
       }
     }

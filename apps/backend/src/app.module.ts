@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
+import { AppController } from './app.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { CourtsModule } from './modules/courts/courts.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
@@ -55,7 +56,7 @@ import { winstonConfig } from './config/winston.config';
     BookingsModule,
     HealthModule,
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [],
 })
 export class AppModule {}
