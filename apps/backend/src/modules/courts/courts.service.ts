@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, ILike, DataSource } from 'typeorm';
+import Redis from 'ioredis';
 import { CourtEntity } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { CreateCourtDto } from './dto/create-court.dto';
@@ -13,21 +14,41 @@ import { BookingStatus } from '@court-booking/shared';
 
 @Injectable()
 export class CourtsService {
+  private readonly CACHE_TTL = 300; // 5 minutes
+  private readonly COURT_CACHE_PREFIX = 'court:';
+  private readonly COURTS_LIST_PREFIX = 'courts:list:';
+
   constructor(
     @InjectRepository(CourtEntity)
     private readonly courtRepository: Repository<CourtEntity>,
     @InjectRepository(CourtTimeSlotEntity)
     private readonly timeSlotRepository: Repository<CourtTimeSlotEntity>,
     private readonly dataSource: DataSource,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
   async create(createCourtDto: CreateCourtDto): Promise<CourtEntity> {
     const court = this.courtRepository.create(createCourtDto);
-    return this.courtRepository.save(court);
+    const savedCourt = await this.courtRepository.save(court);
+
+    // Invalidate courts list cache
+    await this.invalidateCourtsListCache();
+
+    return savedCourt;
   }
 
   async findAll(query: GetCourtsDto) {
     const { page, limit, name, sportType, address } = query;
+
+    // Generate cache key based on query params
+    const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
+
+    // Try to get from cache
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
     const skip = (page - 1) * limit;
 
     const where: any = { deletedAt: IsNull() };
@@ -49,34 +70,61 @@ export class CourtsService {
       order: { createdAt: 'DESC' },
     });
 
-    return {
+    const result = {
       data,
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
     };
+
+    // Cache the result
+    await this.redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(result));
+
+    return result;
   }
 
   async findOne(id: string): Promise<CourtEntity> {
+    // Try to get from cache
+    const cacheKey = `${this.COURT_CACHE_PREFIX}${id}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
     const court = await this.courtRepository.findOne({
       where: { id, deletedAt: IsNull() },
     });
+
     if (!court) {
       throw new NotFoundException(`Court with ID ${id} not found`);
     }
+
+    // Cache the court
+    await this.redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(court));
+
     return court;
   }
 
   async update(id: string, updateCourtDto: UpdateCourtDto): Promise<CourtEntity> {
     const court = await this.findOne(id);
     Object.assign(court, updateCourtDto);
-    return this.courtRepository.save(court);
+    const updated = await this.courtRepository.save(court);
+
+    // Invalidate cache
+    await this.invalidateCourtCache(id);
+    await this.invalidateCourtsListCache();
+
+    return updated;
   }
 
   async softDelete(id: string): Promise<void> {
     await this.findOne(id);
     await this.courtRepository.softDelete(id);
+
+    // Invalidate cache
+    await this.invalidateCourtCache(id);
+    await this.invalidateCourtsListCache();
   }
 
   async getStats(id: string, query: GetCourtStatsDto) {
@@ -181,6 +229,24 @@ export class CourtsService {
       await manager.save(entities);
     });
 
+    // Invalidate cache since time slots affect court data
+    await this.invalidateCourtCache(courtId);
+
     return this.getTimeSlots(courtId);
+  }
+
+  // ── Cache Management ───────────────────────────────────────────────────────
+
+  private async invalidateCourtCache(courtId: string): Promise<void> {
+    const cacheKey = `${this.COURT_CACHE_PREFIX}${courtId}`;
+    await this.redis.del(cacheKey);
+  }
+
+  private async invalidateCourtsListCache(): Promise<void> {
+    const pattern = `${this.COURTS_LIST_PREFIX}*`;
+    const keys = await this.redis.keys(pattern);
+    if (keys.length > 0) {
+      await this.redis.del(...keys);
+    }
   }
 }

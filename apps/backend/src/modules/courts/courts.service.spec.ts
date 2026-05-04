@@ -12,6 +12,7 @@ describe('CourtsService', () => {
   let repository: any;
   let timeSlotRepository: any;
   let dataSource: any;
+  let redis: any;
 
   const mockCourt = {
     id: 'court-uuid',
@@ -50,6 +51,13 @@ describe('CourtsService', () => {
       transaction: jest.fn(),
     };
 
+    const mockRedis = {
+      get: jest.fn().mockResolvedValue(null),
+      setex: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1),
+      keys: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CourtsService,
@@ -65,6 +73,10 @@ describe('CourtsService', () => {
           provide: DataSource,
           useValue: mockDataSource,
         },
+        {
+          provide: 'REDIS_CLIENT',
+          useValue: mockRedis,
+        },
       ],
     }).compile();
 
@@ -72,6 +84,7 @@ describe('CourtsService', () => {
     repository = module.get(getRepositoryToken(CourtEntity));
     timeSlotRepository = module.get(getRepositoryToken(CourtTimeSlotEntity));
     dataSource = module.get(DataSource);
+    redis = module.get('REDIS_CLIENT');
   });
 
   it('should be defined', () => {
