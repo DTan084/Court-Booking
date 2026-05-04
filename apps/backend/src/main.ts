@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger, ClassSerializerInterceptor } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
+import compression from 'compression';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -17,7 +18,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
-  // Security
+  // Security - Helmet middleware
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -30,13 +31,20 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Performance - Response compression
+  app.use(compression());
+
+  // CORS configuration
   app.enableCors({
     origin: configService.get<string>('FE_URL') || '*',
     credentials: true,
   });
 
-  // Global Setup
-  app.setGlobalPrefix('api');
+  // API versioning
+  app.setGlobalPrefix('api/v1');
+
+  // Global filters and interceptors
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(
     new LoggingInterceptor(),
@@ -44,20 +52,28 @@ async function bootstrap() {
     new ClassSerializerInterceptor(app.get(Reflector)),
   );
 
-  // Swagger
+  // Swagger API Documentation
   const config = new DocumentBuilder()
     .setTitle('Court Booking API')
     .setDescription('The enterprise court booking system API description')
     .setVersion('1.0')
     .addBearerAuth()
+    .addTag('Authentication', 'User authentication and authorization')
+    .addTag('Courts', 'Court management and information')
+    .addTag('Bookings', 'Booking management')
+    .addTag('Health', 'Health check endpoints')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
   const port = configService.get<number>('PORT') || 3001;
   await app.listen(port);
-  logger.log(`🚀 Backend running on http://localhost:${port}/api`);
+
+  logger.log(`🚀 Backend running on http://localhost:${port}/api/v1`);
   logger.log(`📄 Swagger docs available at http://localhost:${port}/api/docs`);
+  logger.log(`🔒 Security: Helmet enabled`);
+  logger.log(`⚡ Performance: Compression enabled`);
+  logger.log(`🌍 Environment: ${configService.get<string>('NODE_ENV') || 'development'}`);
 }
 
 bootstrap();
