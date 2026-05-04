@@ -57,7 +57,12 @@ export class AuthService {
     // 1. Check if locked out
     await this.checkLockout(email);
 
-    const user = await this.userRepository.findOne({ where: { email } });
+    // 2. Fetch user with single query
+    const user = await this.userRepository.findOne({
+      where: { email },
+      select: ['id', 'email', 'passwordHash', 'name', 'role', 'createdAt'],
+    });
+
     if (!user) {
       await this.incrementFailedAttempts(email);
       throw new UnauthorizedException('Invalid email or password');
