@@ -96,12 +96,12 @@ export class CourtsService {
       .andWhere('booking.startTime <= :toDate', { toDate: new Date(toDate) })
       .getRawOne();
 
-    const daysDifference =
-      (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 3600 * 24) || 1;
-    const totalPossibleHours = daysDifference * 24;
+    // Calculate total possible hours based on time slots
+    const totalPossibleHours = await this.calculateAvailableHours(id, fromDate, toDate);
 
     const totalHours = Number(stats.totalHours) || 0;
-    const utilizationPercentage = (totalHours / totalPossibleHours) * 100;
+    const utilizationPercentage =
+      totalPossibleHours > 0 ? (totalHours / totalPossibleHours) * 100 : 0;
 
     return {
       courtId: id,
@@ -113,7 +113,50 @@ export class CourtsService {
       totalBookings: Number(stats.bookingCount) || 0,
       totalHours: Number(totalHours.toFixed(2)),
       utilizationPercentage: Number(utilizationPercentage.toFixed(2)),
+      totalAvailableHours: Number(totalPossibleHours.toFixed(2)),
     };
+  }
+
+  /**
+   * Calculate total available hours for a court based on time slots
+   * within a date range
+   */
+  private async calculateAvailableHours(
+    courtId: string,
+    fromDate: string,
+    toDate: string,
+  ): Promise<number> {
+    const timeSlots = await this.timeSlotRepository.find({
+      where: { courtId },
+    });
+
+    // If no time slots defined, fallback to 24h/day
+    if (timeSlots.length === 0) {
+      const daysDifference =
+        (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 3600 * 24) || 1;
+      return daysDifference * 24;
+    }
+
+    // Calculate hours per day of week
+    const hoursPerDayOfWeek = new Map<number, number>();
+    for (const slot of timeSlots) {
+      const hours = slot.endHour - slot.startHour;
+      const currentHours = hoursPerDayOfWeek.get(slot.dayOfWeek) || 0;
+      hoursPerDayOfWeek.set(slot.dayOfWeek, currentHours + hours);
+    }
+
+    // Count days in range and sum available hours
+    let totalHours = 0;
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+
+    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const hoursForDay = hoursPerDayOfWeek.get(dayOfWeek) || 0;
+      totalHours += hoursForDay;
+    }
+
+    return totalHours;
   }
 
   // ── Time Slots ─────────────────────────────────────────────────────────────
