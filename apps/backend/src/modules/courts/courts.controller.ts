@@ -35,6 +35,18 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role, SportType } from '@court-booking/shared';
 import { BookingsService } from '../bookings/bookings.service';
 import { getScheduleSchema, GetScheduleDto } from '../bookings/dto/get-schedule.dto';
+import { ApiErrorResponse } from '../../common/swagger/api-response.swagger';
+import {
+  CreateCourtBody,
+  UpdateCourtBody,
+  UpsertTimeSlotsBody,
+  CourtResponse,
+  CourtsListResponse,
+  TimeSlotsResponse,
+  CourtStatsResponse,
+  DeleteCourtResponse,
+} from './swagger/courts.swagger';
+import { ScheduleResponse } from '../bookings/swagger/bookings.swagger';
 
 @ApiTags('Courts')
 @Controller('courts')
@@ -47,26 +59,10 @@ export class CourtsController {
   @Post()
   @ApiOperation({ summary: 'Create a new court (Admin only)' })
   @ApiBearerAuth()
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['name', 'sportType', 'address', 'pricePerHour'],
-      properties: {
-        name: { type: 'string', example: 'Sân Cầu Lông ABC' },
-        sportType: {
-          type: 'string',
-          enum: Object.values(SportType),
-          example: SportType.BADMINTON,
-        },
-        address: { type: 'string', example: '123 Nguyễn Huệ, Quận 1, TP.HCM' },
-        pricePerHour: { type: 'number', example: 150000 },
-        description: { type: 'string', example: 'Sân tiêu chuẩn thi đấu' },
-      },
-    },
-  })
-  @ApiResponse({ status: 201, description: 'Court created successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  @ApiBody({ type: CreateCourtBody })
+  @ApiResponse({ status: 201, description: 'Court created successfully', type: CourtResponse })
+  @ApiResponse({ status: 401, description: 'Unauthorized', type: ApiErrorResponse })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only', type: ApiErrorResponse })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.CREATED)
@@ -77,16 +73,12 @@ export class CourtsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all courts with pagination and filters' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'name', required: false, type: String })
-  @ApiQuery({
-    name: 'sportType',
-    required: false,
-    enum: SportType,
-  })
+  @ApiQuery({ name: 'sportType', required: false, enum: SportType })
   @ApiQuery({ name: 'address', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'List of courts with pagination metadata' })
+  @ApiResponse({ status: 200, description: 'Paginated list of courts', type: CourtsListResponse })
   @UsePipes(new ZodValidationPipe(getCourtsSchema))
   async findAll(@Query() query: GetCourtsDto) {
     return this.courtsService.findAll(query);
@@ -94,8 +86,8 @@ export class CourtsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get court details' })
-  @ApiResponse({ status: 200, description: 'Court details' })
-  @ApiResponse({ status: 404, description: 'Court not found' })
+  @ApiResponse({ status: 200, description: 'Court details', type: CourtResponse })
+  @ApiResponse({ status: 404, description: 'Court not found', type: ApiErrorResponse })
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.courtsService.findOne(id);
   }
@@ -103,25 +95,10 @@ export class CourtsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update court information (Admin only)' })
   @ApiBearerAuth()
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', example: 'Sân Cầu Lông ABC (Updated)' },
-        sportType: {
-          type: 'string',
-          enum: Object.values(SportType),
-          example: SportType.BADMINTON,
-        },
-        address: { type: 'string', example: '456 Lê Lợi, Quận 1, TP.HCM' },
-        pricePerHour: { type: 'number', example: 180000 },
-        description: { type: 'string', example: 'Sân vừa được nâng cấp mặt sàn' },
-      },
-    },
-  })
-  @ApiResponse({ status: 200, description: 'Court updated successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  @ApiResponse({ status: 404, description: 'Court not found' })
+  @ApiBody({ type: UpdateCourtBody })
+  @ApiResponse({ status: 200, description: 'Court updated successfully', type: CourtResponse })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only', type: ApiErrorResponse })
+  @ApiResponse({ status: 404, description: 'Court not found', type: ApiErrorResponse })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @UsePipes(new ZodValidationPipe(updateCourtSchema))
@@ -132,8 +109,13 @@ export class CourtsController {
   @Delete(':id')
   @ApiOperation({ summary: 'Soft delete a court (Admin only)' })
   @ApiBearerAuth()
-  @ApiResponse({ status: 200, description: 'Court deleted successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
+  @ApiResponse({
+    status: 200,
+    description: 'Court deleted successfully',
+    type: DeleteCourtResponse,
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only', type: ApiErrorResponse })
+  @ApiResponse({ status: 404, description: 'Court not found', type: ApiErrorResponse })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   async remove(@Param('id', ParseUUIDPipe) id: string) {
@@ -148,33 +130,40 @@ export class CourtsController {
     required: true,
     type: String,
     description: 'Date in YYYY-MM-DD format',
+    example: '2026-06-15',
   })
-  @ApiResponse({ status: 200, description: 'List of bookings for the date' })
-  @ApiResponse({ status: 400, description: 'Invalid date format' })
-  @ApiResponse({ status: 404, description: 'Court not found' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bookings for the date',
+    type: ScheduleResponse,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid date format', type: ApiErrorResponse })
+  @ApiResponse({ status: 404, description: 'Court not found', type: ApiErrorResponse })
   @UsePipes(new ZodValidationPipe(getScheduleSchema))
   async getSchedule(@Param('id', ParseUUIDPipe) id: string, @Query() query: GetScheduleDto) {
     return this.bookingsService.getCourtSchedule(id, query.date);
   }
 
   @Get(':id/stats')
-  @ApiOperation({ summary: 'Get court statistics (Admin only)' })
+  @ApiOperation({ summary: 'Get court utilization statistics (Admin only)' })
   @ApiBearerAuth()
   @ApiQuery({
     name: 'fromDate',
     required: true,
     type: String,
-    description: 'Start date in ISO 8601 format',
+    description: 'Start date (ISO 8601)',
+    example: '2026-05-01',
   })
   @ApiQuery({
     name: 'toDate',
     required: true,
     type: String,
-    description: 'End date in ISO 8601 format',
+    description: 'End date (ISO 8601)',
+    example: '2026-05-31',
   })
-  @ApiResponse({ status: 200, description: 'Court statistics' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  @ApiResponse({ status: 404, description: 'Court not found' })
+  @ApiResponse({ status: 200, description: 'Court statistics', type: CourtStatsResponse })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only', type: ApiErrorResponse })
+  @ApiResponse({ status: 404, description: 'Court not found', type: ApiErrorResponse })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @UsePipes(new ZodValidationPipe(getCourtStatsSchema))
@@ -184,8 +173,8 @@ export class CourtsController {
 
   @Get(':id/time-slots')
   @ApiOperation({ summary: 'Get time slots for a court' })
-  @ApiResponse({ status: 200, description: 'List of time slots' })
-  @ApiResponse({ status: 404, description: 'Court not found' })
+  @ApiResponse({ status: 200, description: 'List of time slots', type: TimeSlotsResponse })
+  @ApiResponse({ status: 404, description: 'Court not found', type: ApiErrorResponse })
   async getTimeSlots(@Param('id', ParseUUIDPipe) id: string) {
     return this.courtsService.getTimeSlots(id);
   }
@@ -193,30 +182,14 @@ export class CourtsController {
   @Put(':id/time-slots')
   @ApiOperation({ summary: 'Replace all time slots for a court (Admin only)' })
   @ApiBearerAuth()
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['slots'],
-      properties: {
-        slots: {
-          type: 'array',
-          items: {
-            type: 'object',
-            required: ['dayOfWeek', 'startHour', 'endHour', 'price'],
-            properties: {
-              dayOfWeek: { type: 'integer', minimum: 0, maximum: 6, example: 1 },
-              startHour: { type: 'integer', minimum: 0, maximum: 23, example: 6 },
-              endHour: { type: 'integer', minimum: 1, maximum: 24, example: 8 },
-              price: { type: 'number', example: 100000 },
-            },
-          },
-        },
-      },
-    },
+  @ApiBody({ type: UpsertTimeSlotsBody })
+  @ApiResponse({
+    status: 200,
+    description: 'Time slots updated successfully',
+    type: TimeSlotsResponse,
   })
-  @ApiResponse({ status: 200, description: 'Time slots updated successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
-  @ApiResponse({ status: 404, description: 'Court not found' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only', type: ApiErrorResponse })
+  @ApiResponse({ status: 404, description: 'Court not found', type: ApiErrorResponse })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   async upsertTimeSlots(

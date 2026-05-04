@@ -1,31 +1,38 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
+
+class ApiInfoData {
+  @ApiProperty({ example: 'Court Booking API' })
+  name: string;
+
+  @ApiProperty({ example: '1.0.0' })
+  version: string;
+
+  @ApiProperty({ example: 'Enterprise court booking system' })
+  description: string;
+
+  @ApiProperty({ example: '/api/docs' })
+  documentation: string;
+
+  @ApiProperty({ example: '/api/v1/health' })
+  health: string;
+}
+
+class ApiInfoResponse {
+  @ApiProperty({ example: true })
+  success: boolean;
+
+  @ApiProperty({ type: ApiInfoData })
+  data: ApiInfoData;
+}
 
 @ApiTags('Root')
 @Controller()
 export class AppController {
   @Get()
-  @ApiOperation({ summary: 'API root endpoint' })
-  @ApiResponse({
-    status: 200,
-    description: 'API information',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        data: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', example: 'Court Booking API' },
-            version: { type: 'string', example: '1.0.0' },
-            description: { type: 'string', example: 'Enterprise court booking system' },
-            documentation: { type: 'string', example: '/api/docs' },
-            health: { type: 'string', example: '/api/v1/health' },
-          },
-        },
-      },
-    },
-  })
+  @ApiOperation({ summary: 'API information' })
+  @ApiResponse({ status: 200, description: 'API information', type: ApiInfoResponse })
   getRoot() {
     return {
       name: 'Court Booking API',
