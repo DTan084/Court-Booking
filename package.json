@@ -16,7 +16,7 @@
     "lint": "pnpm -r run lint",
     "format": "pnpm -r run format",
     "clean": "pnpm -r exec rm -rf node_modules dist .next .turbo",
-    "prepare": "husky"
+    "prepare": "node -e \"if (process.env.HUSKY === '0') process.exit(0)\" || husky"
   },
   "engines": {
     "node": ">=18.0.0",

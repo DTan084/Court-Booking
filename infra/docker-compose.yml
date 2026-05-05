@@ -35,12 +35,35 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── DB Migration (one-shot, run before backend) ──
+  # Usage: docker compose run --rm migrate
+  migrate:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    container_name: court-booking-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ../.env.docker
+    command:
+      - node
+      - -e
+      - |
+        const ds = require('./apps/backend/dist/database/data-source').default;
+        ds.initialize()
+          .then(() => ds.runMigrations())
+          .then(() => { console.log('✅ Migrations done'); process.exit(0); })
+          .catch(e => { console.error('❌ Migration failed:', e.message); process.exit(1); });
+    profiles:
+      - migrate
+
   # ── Backend (NestJS) ──────────────────────────
   backend:
     build:
       context: ..
       dockerfile: apps/backend/Dockerfile
-
     container_name: court-booking-backend
     restart: unless-stopped
     ports:
@@ -51,15 +74,13 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - ../.env
-    # TODO: volumes for dev hot-reload
+      - ../.env.docker
 
   # ── Frontend (Next.js) ────────────────────────
   frontend:
     build:
       context: ..
       dockerfile: apps/frontend/Dockerfile
-
     container_name: court-booking-frontend
     restart: unless-stopped
     ports:
@@ -67,7 +88,7 @@ services:
     depends_on:
       - backend
     env_file:
-      - ../.env
+      - ../.env.docker
 
   # ── Nginx (Reverse Proxy) ────────────────────
   nginx:
