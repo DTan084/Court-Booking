@@ -47,6 +47,7 @@ export function Navbar() {
   };
 
   const getInitials = (name: string) => {
+    if (!name) return '??';
     return name
       .split(' ')
       .map((n) => n[0])
@@ -117,7 +118,7 @@ export function Navbar() {
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar>
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {getInitials(user.name)}
+                    {getInitials(user?.name || '')}
                   </AvatarFallback>
                 </Avatar>
               </Button>

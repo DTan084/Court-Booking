@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/shared/Navbar';
@@ -10,23 +10,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const clearUser = useAuthStore((state) => state.clearUser);
+  const [isHydrating, setIsHydrating] = useState(false);
 
   useEffect(() => {
-    // Hydrate auth store if empty
-    if (!user) {
+    // Only hydrate if we don't have user in store and haven't tried yet
+    if (!user && !isHydrating) {
+      setIsHydrating(true);
+
       api
         .get<User>('/auth/me')
         .then((response) => {
           setUser(response.data);
         })
         .catch((error) => {
-          // 401 will be handled by axios interceptor (redirect to login)
+          // Silently fail - user is not logged in
+          // 401 will be handled by axios interceptor if needed
           if (error.response?.status === 401) {
             clearUser();
           }
+        })
+        .finally(() => {
+          setIsHydrating(false);
         });
     }
-  }, [user, setUser, clearUser]);
+  }, [user, setUser, clearUser, isHydrating]);
 
   return (
     <div className="min-h-screen bg-background">
