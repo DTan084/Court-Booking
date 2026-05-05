@@ -25,7 +25,7 @@ export function middleware(request: NextRequest) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       if (payload.role !== 'admin') {
-        return NextResponse.redirect(new URL('/courts', request.url));
+        return NextResponse.redirect(new URL('/', request.url));
       }
     } catch {
       return NextResponse.redirect(new URL('/login', request.url));
@@ -34,7 +34,7 @@ export function middleware(request: NextRequest) {
 
   // Redirect authenticated users from auth routes
   if (isAuthRoute && token) {
-    return NextResponse.redirect(new URL('/courts', request.url));
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return NextResponse.next();

@@ -15,7 +15,7 @@ export default function NotFound() {
         </div>
 
         <Button asChild size="lg">
-          <Link href="/courts">Về trang chủ</Link>
+          <Link href="/">Về trang chủ</Link>
         </Button>
       </div>
     </div>

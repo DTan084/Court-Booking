@@ -43,9 +43,9 @@ export function LoginForm() {
       // Save user to store
       setUser(response.data);
 
-      // Redirect to courts
+      // Redirect to home
       toast.success('Đăng nhập thành công!');
-      router.push('/courts');
+      router.push('/');
     } catch (error: any) {
       if (error.response?.status === 401) {
         setError('root', {

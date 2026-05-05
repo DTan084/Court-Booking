@@ -31,7 +31,7 @@ export default function Error({
             Thử lại
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <a href="/courts">Về trang chủ</a>
+            <a href="/">Về trang chủ</a>
           </Button>
         </div>
       </div>
