@@ -1,9 +1,25 @@
-// TODO: Auth utilities
-// - Zustand auth store
-// - Token management
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { User } from '@/types';
 
-// import { create } from 'zustand';
-// import { persist } from 'zustand/middleware';
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  setUser: (user: User) => void;
+  clearUser: () => void;
+}
 
-// TODO: useAuthStore — lưu access_token, user info sau login
-// TODO: Persist token vào localStorage
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      setUser: (user) => set({ user, isAuthenticated: true }),
+      clearUser: () => set({ user: null, isAuthenticated: false }),
+    }),
+    {
+      name: 'auth-storage',
+      // Chỉ persist user info, không persist token (token ở httpOnly cookie)
+    },
+  ),
+);

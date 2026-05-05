@@ -1,21 +1,3 @@
-// TODO: Booking types
-// - Booking interface
-// - BookingStatus enum
-
-export enum BookingStatus {
-  CONFIRMED = 'confirmed',
-  CANCELLED = 'cancelled',
-  COMPLETED = 'completed',
-}
-
-export interface Booking {
-  id: string;
-  courtId: string;
-  userId: string;
-  startTime: string;
-  endTime: string;
-  status: BookingStatus;
-  totalPrice: number;
-  createdAt: string;
-  updatedAt: string;
-}
+// Re-export booking-related types from index.ts for backward compatibility
+export type { Booking } from './index';
+export { BookingStatus } from './index';
