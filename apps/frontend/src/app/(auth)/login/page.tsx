@@ -1,13 +1,9 @@
-// TODO: Login Page
-// - react-hook-form + zod validation
-// - Call POST /auth/login
-// - Store token in zustand
+import { LoginForm } from '@/components/auth/LoginForm';
 
 export default function LoginPage() {
   return (
-    <div>
-      <h1>Đăng nhập</h1>
-      {/* TODO: Login form */}
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4">
+      <LoginForm />
     </div>
   );
 }
