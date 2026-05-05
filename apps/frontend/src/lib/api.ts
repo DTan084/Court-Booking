@@ -4,19 +4,44 @@ import axios, { type AxiosError } from 'axios';
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL + '/api/v1',
   headers: { 'Content-Type': 'application/json' },
-  withCredentials: true, // gửi httpOnly cookie tự động
+  withCredentials: true, // gửi httpOnly cookie tự động (nếu backend set cookie)
 });
+
+// Request interceptor: Add token to headers
+api.interceptors.request.use(
+  (config) => {
+    // Get token from localStorage
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
 
 // Response interceptor: 401 → clear store + redirect
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
+      // Clear token from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('access_token');
+      }
+
       // Import dynamically to avoid circular dependency
       import('./auth').then(({ useAuthStore }) => {
         useAuthStore.getState().clearUser();
+
+        // Only redirect if not already on login/register page
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          const currentPath = window.location.pathname;
+          if (currentPath !== '/login' && currentPath !== '/register') {
+            window.location.href = '/login';
+          }
         }
       });
     }

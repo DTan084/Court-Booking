@@ -18,9 +18,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setIsHydrating(true);
 
       api
-        .get<User>('/auth/me')
+        .get<any>('/auth/me')
         .then((response) => {
-          setUser(response.data);
+          // Backend wraps response: { success, data: { user }, meta }
+          const userData = response.data.data || response.data;
+          setUser(userData);
         })
         .catch((error) => {
           // Silently fail - user is not logged in

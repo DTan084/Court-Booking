@@ -37,22 +37,52 @@ export function LoginForm() {
     try {
       setIsLoading(true);
 
-      // Call login API
-      const response = await api.post('/auth/login', data);
+      // Call login API - returns tokens wrapped in { success, data, meta }
+      const loginResponse = await api.post('/auth/login', data);
+
+      // Backend wraps response: { success, data: { access_token, ... }, meta }
+      const responseData = loginResponse.data.data || loginResponse.data;
+      const token = responseData.access_token;
+
+      if (!token) {
+        console.error('Response structure:', loginResponse.data);
+        throw new Error('No access token in response');
+      }
+
+      // Store token in localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('access_token', token);
+      }
+
+      // Fetch user data with explicit Authorization header
+      const userResponse = await api.get('/auth/me', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // Backend might also wrap /auth/me response
+      const userData = userResponse.data.data || userResponse.data;
 
       // Save user to store
-      setUser(response.data);
+      setUser(userData);
 
       // Redirect to home
       toast.success('Đăng nhập thành công!');
       router.push('/');
     } catch (error: any) {
+      console.error('Login error:', error);
+
       if (error.response?.status === 401) {
         setError('root', {
           message: 'Email hoặc mật khẩu không đúng',
         });
       } else {
-        toast.error('Đã xảy ra lỗi, vui lòng thử lại');
+        const errorMessage = error.message || 'Đã xảy ra lỗi, vui lòng thử lại';
+        setError('root', {
+          message: errorMessage,
+        });
+        toast.error(errorMessage);
       }
     } finally {
       setIsLoading(false);

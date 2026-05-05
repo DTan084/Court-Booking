@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth';
@@ -23,12 +24,22 @@ export function Navbar() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const clearUser = useAuthStore((state) => state.clearUser);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     try {
-      // Call logout API (optional - backend will clear cookie)
+      // Clear token from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('access_token');
+      }
+
+      // Call logout API (optional - to invalidate refresh token)
       await api.post('/auth/logout').catch(() => {
-        // Ignore error - cookie might already be expired
+        // Ignore error
       });
 
       // Clear user from store
@@ -55,6 +66,21 @@ export function Navbar() {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  // Prevent hydration mismatch
+  if (!isMounted) {
+    return (
+      <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between">
+          <Link href="/" className="flex items-center space-x-2 font-bold text-xl">
+            <span className="text-primary">🎾</span>
+            <span>Court Booking</span>
+          </Link>
+          <div className="h-10 w-10" /> {/* Placeholder */}
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

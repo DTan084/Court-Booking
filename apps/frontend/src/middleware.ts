@@ -3,7 +3,17 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get('access_token')?.value;
+
+  // Try to get token from cookie first (for future cookie-based auth)
+  let token = request.cookies.get('access_token')?.value;
+
+  // If no cookie, check Authorization header (for current localStorage-based auth)
+  if (!token) {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+  }
 
   const isProtected =
     pathname.startsWith('/courts') ||
