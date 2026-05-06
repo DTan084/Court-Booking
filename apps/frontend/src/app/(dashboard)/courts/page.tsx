@@ -103,11 +103,11 @@ export default function CourtsPage() {
           </div>
 
           {/* Pagination */}
-          {data.totalPages > 1 && (
+          {data.meta.totalPages > 1 && (
             <div className="mt-8">
               <Pagination
                 page={page}
-                totalPages={data.totalPages}
+                totalPages={data.meta.totalPages}
                 onPageChange={handlePageChange}
               />
             </div>
@@ -115,8 +115,8 @@ export default function CourtsPage() {
 
           {/* Results Summary */}
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            Hiển thị {(page - 1) * limit + 1} - {Math.min(page * limit, data.total)} trong tổng số{' '}
-            {data.total} sân
+            Hiển thị {(page - 1) * limit + 1} - {Math.min(page * limit, data.meta.total)} trong tổng
+            số {data.meta.total} sân
           </div>
         </>
       )}

@@ -5,7 +5,8 @@ import { MapPin, Calendar, Clock, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CancelDialog } from './CancelDialog';
 import { formatCurrency, canCancelBooking, cn } from '@/lib/utils';
-import type { Booking, Court, BookingStatus } from '@/types';
+import { BookingStatus } from '@/types';
+import type { Booking, Court, BookingStatus as BookingStatusType } from '@/types';
 
 // ==================== TYPES ====================
 
@@ -17,10 +18,10 @@ interface BookingRowProps {
 
 // ==================== STATUS CONFIG ====================
 
-const statusConfig: Record<BookingStatus, { label: string; color: string }> = {
-  CONFIRMED: { label: 'Đã xác nhận', color: 'bg-green-100 text-green-700' },
-  CANCELLED: { label: 'Đã hủy', color: 'bg-gray-100 text-gray-700' },
-  COMPLETED: { label: 'Hoàn thành', color: 'bg-blue-100 text-blue-700' },
+const statusConfig: Record<BookingStatusType, { label: string; color: string }> = {
+  [BookingStatus.CONFIRMED]: { label: 'Đã xác nhận', color: 'bg-green-100 text-green-700' },
+  [BookingStatus.CANCELLED]: { label: 'Đã hủy', color: 'bg-gray-100 text-gray-700' },
+  [BookingStatus.COMPLETED]: { label: 'Hoàn thành', color: 'bg-blue-100 text-blue-700' },
 };
 
 // ==================== COMPONENT ====================
@@ -48,7 +49,8 @@ export function BookingRow({ booking }: BookingRowProps) {
   });
 
   // Check if booking can be cancelled
-  const canCancel = booking.status === 'CONFIRMED' && canCancelBooking(booking.startTime);
+  const canCancel =
+    booking.status === BookingStatus.CONFIRMED && canCancelBooking(booking.startTime);
 
   return (
     <>

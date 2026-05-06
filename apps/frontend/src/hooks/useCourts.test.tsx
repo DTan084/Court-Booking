@@ -51,10 +51,12 @@ describe('useCourts', () => {
           updatedAt: '2024-01-01T00:00:00Z',
         },
       ],
-      total: 1,
-      page: 1,
-      limit: 12,
-      totalPages: 1,
+      meta: {
+        total: 1,
+        page: 1,
+        limit: 12,
+        totalPages: 1,
+      },
     };
 
     vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: mockData } });
@@ -72,10 +74,12 @@ describe('useCourts', () => {
   it('should fetch courts with filter parameters', async () => {
     const mockData: PaginatedResult<Court> = {
       data: [],
-      total: 0,
-      page: 1,
-      limit: 12,
-      totalPages: 0,
+      meta: {
+        total: 0,
+        page: 1,
+        limit: 12,
+        totalPages: 0,
+      },
     };
 
     vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: mockData } });

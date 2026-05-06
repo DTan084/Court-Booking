@@ -6,7 +6,7 @@ import type { AxiosError } from 'axios';
  */
 export function handleApiError(error: AxiosError): string {
   const status = error.response?.status;
-  const message = error.response?.data?.message || '';
+  const message = (error.response?.data as any)?.message || '';
 
   // Map status codes to user-friendly messages
   switch (status) {

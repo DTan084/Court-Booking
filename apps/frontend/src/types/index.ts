@@ -14,9 +14,9 @@ export enum CourtStatus {
 }
 
 export enum BookingStatus {
-  CONFIRMED = 'confirmed',
-  CANCELLED = 'cancelled',
-  COMPLETED = 'completed',
+  CONFIRMED = 'CONFIRMED',
+  CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
 }
 
 export enum Role {
@@ -70,10 +70,12 @@ export interface Booking {
 
 export interface PaginatedResult<T> {
   data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 // ==================== HELPER TYPES ====================

@@ -3,12 +3,17 @@
 import { useState, useEffect } from 'react';
 import { Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { BookingStatus } from '@/types';
+import { BookingStatus } from '@/types';
+import type { BookingStatus as BookingStatusType } from '@/types';
 
 // ==================== TYPES ====================
 
 interface BookingFiltersProps {
-  onFilterChange: (filters: { status?: BookingStatus; fromDate?: string; toDate?: string }) => void;
+  onFilterChange: (filters: {
+    status?: BookingStatusType;
+    fromDate?: string;
+    toDate?: string;
+  }) => void;
 }
 
 type FilterTab = 'all' | 'confirmed' | 'cancelled';
@@ -23,16 +28,16 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
   // Update filters when tab or dates change
   useEffect(() => {
     const filters: {
-      status?: BookingStatus;
+      status?: BookingStatusType;
       fromDate?: string;
       toDate?: string;
     } = {};
 
     // Map tab to status
     if (activeTab === 'confirmed') {
-      filters.status = 'CONFIRMED';
+      filters.status = BookingStatus.CONFIRMED;
     } else if (activeTab === 'cancelled') {
-      filters.status = 'CANCELLED';
+      filters.status = BookingStatus.CANCELLED;
     }
 
     // Add date filters if provided
