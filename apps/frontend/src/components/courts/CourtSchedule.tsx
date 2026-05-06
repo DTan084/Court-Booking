@@ -12,6 +12,7 @@ interface CourtScheduleProps {
   timeSlots: CourtTimeSlot[];
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  onSlotSelect?: (startHour: number, endHour: number) => void;
 }
 
 export function CourtSchedule({
@@ -19,6 +20,7 @@ export function CourtSchedule({
   timeSlots,
   selectedDate,
   onDateChange,
+  onSlotSelect,
 }: CourtScheduleProps) {
   const formattedDate = formatDate(selectedDate);
   const { data: bookings, isLoading } = useSchedule(courtId, formattedDate);
@@ -72,7 +74,11 @@ export function CourtSchedule({
           <p className="text-sm text-muted-foreground">Không có khung giờ nào cho ngày này</p>
         </div>
       ) : (
-        <TimeSlotGrid timeSlots={daySlots} bookedRanges={bookedRanges} />
+        <TimeSlotGrid
+          timeSlots={daySlots}
+          bookedRanges={bookedRanges}
+          onSlotSelect={onSlotSelect}
+        />
       )}
     </div>
   );

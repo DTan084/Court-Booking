@@ -1,15 +1,15 @@
-'use client';
-
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapPin, DollarSign, AlertCircle, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCourt } from '@/hooks/useCourt';
 import { useTimeSlots } from '@/hooks/useTimeSlots';
+import { useSchedule } from '@/hooks/useSchedule';
 import { CourtSchedule } from '@/components/courts/CourtSchedule';
+import { BookingForm } from '@/components/bookings/BookingForm';
 import { Button } from '@/components/ui/button';
-import { cn, formatCurrency } from '@/lib/utils';
-import type { SportType, CourtStatus } from '@/types';
+import { cn, formatCurrency, formatDate } from '@/lib/utils';
+import type { SportType, CourtStatus, BookedRange } from '@/types';
 
 // Sport type labels in Vietnamese
 const sportTypeLabels: Record<SportType, string> = {
@@ -38,9 +38,25 @@ const statusConfig: Record<CourtStatus, { label: string; color: string }> = {
 export default function CourtDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
 
   const { data: court, isLoading: courtLoading, error: courtError } = useCourt(params.id);
   const { data: timeSlots, isLoading: slotsLoading } = useTimeSlots(params.id);
+  const { data: bookings } = useSchedule(params.id, formatDate(selectedDate));
+
+  // Convert bookings to BookedRange[] for the selected date
+  const bookedRanges = useMemo<BookedRange[]>(() => {
+    if (!bookings) return [];
+
+    return bookings.map((booking) => {
+      const start = new Date(booking.startTime);
+      const end = new Date(booking.endTime);
+      return {
+        startHour: start.getHours(),
+        endHour: end.getHours(),
+      };
+    });
+  }, [bookings]);
 
   // Handle 404 - court not found
   if (courtError) {
@@ -85,7 +101,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
   const isInactive = court.status === 'INACTIVE';
 
   const handleBookingClick = () => {
-    toast.info('Tính năng đang phát triển');
+    setIsBookingOpen(true);
   };
 
   return (
@@ -171,6 +187,17 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
             </Button>
           </div>
         )}
+
+        {/* Booking Form Dialog */}
+        <BookingForm
+          open={isBookingOpen}
+          onOpenChange={setIsBookingOpen}
+          courtId={params.id}
+          courtName={court.name}
+          selectedDate={selectedDate}
+          timeSlots={timeSlots}
+          bookedRanges={bookedRanges}
+        />
       </div>
     </div>
   );
