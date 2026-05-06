@@ -6,8 +6,9 @@ export function useCourt(id: string) {
   return useQuery({
     queryKey: queryKeys.courts.detail(id),
     queryFn: async () => {
-      const response = await api.get<Court>(`/courts/${id}`);
-      return response.data;
+      const response = await api.get<{ success: boolean; data: Court }>(`/courts/${id}`);
+      // Backend wraps response: { success, data: Court }
+      return response.data.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
