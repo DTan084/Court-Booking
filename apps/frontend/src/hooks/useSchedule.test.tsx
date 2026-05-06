@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSchedule } from './useSchedule';
 import { api } from '@/lib/api';
 import type { Booking } from '@/types';
+import { BookingStatus } from '@/types';
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -43,7 +44,7 @@ describe('useSchedule', () => {
         userId: 'user1',
         startTime: '2024-01-01T10:00:00Z',
         endTime: '2024-01-01T12:00:00Z',
-        status: 'confirmed',
+        status: BookingStatus.CONFIRMED,
         totalPrice: 200000,
         cancelledAt: null,
         createdAt: '2024-01-01T00:00:00Z',

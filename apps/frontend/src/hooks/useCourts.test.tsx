@@ -4,7 +4,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useCourts } from './useCourts';
 import { api } from '@/lib/api';
-import type { PaginatedResult, Court, SportType } from '@/types';
+import type { PaginatedResult, Court } from '@/types';
+import { SportType, CourtStatus } from '@/types';
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -41,10 +42,10 @@ describe('useCourts', () => {
         {
           id: '1',
           name: 'Court 1',
-          sportType: 'badminton' as SportType,
+          sportType: SportType.BADMINTON,
           address: '123 Main St',
           pricePerHour: 100000,
-          status: 'ACTIVE' as const,
+          status: CourtStatus.ACTIVE,
           deletedAt: null,
           createdAt: '2024-01-01T00:00:00Z',
           updatedAt: '2024-01-01T00:00:00Z',
@@ -83,7 +84,7 @@ describe('useCourts', () => {
       page: 1,
       limit: 12,
       name: 'Tennis',
-      sportType: 'tennis' as SportType,
+      sportType: SportType.TENNIS,
     };
 
     const { result } = renderHook(() => useCourts(params), { wrapper });
