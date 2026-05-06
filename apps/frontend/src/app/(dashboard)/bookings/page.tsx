@@ -7,6 +7,7 @@ import { useMyBookings } from '@/hooks/useBookings';
 import { BookingRow } from '@/components/bookings/BookingRow';
 import { BookingFilters } from '@/components/bookings/BookingFilters';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { SkeletonBookingRow } from '@/components/shared/SkeletonBookingRow';
 import { Pagination } from '@/components/shared/Pagination';
 import type { BookingStatus } from '@/types';
 
@@ -65,17 +66,7 @@ export default function BookingsPage() {
         {/* Content */}
         {isLoading ? (
           // Loading Skeleton
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="animate-pulse rounded-lg border bg-card p-4 shadow-sm">
-                <div className="space-y-3">
-                  <div className="h-6 w-2/3 rounded bg-gray-200" />
-                  <div className="h-4 w-1/2 rounded bg-gray-200" />
-                  <div className="h-4 w-1/3 rounded bg-gray-200" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <SkeletonBookingRow count={5} />
         ) : data && data.data.length > 0 ? (
           // Booking List
           <>
