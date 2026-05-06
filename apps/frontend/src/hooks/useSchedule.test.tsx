@@ -52,7 +52,7 @@ describe('useSchedule', () => {
       },
     ];
 
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockBookings });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: mockBookings } });
 
     const { result } = renderHook(() => useSchedule('1', '2024-01-01'), { wrapper });
 
@@ -65,7 +65,7 @@ describe('useSchedule', () => {
   });
 
   it('should return empty array when no bookings exist', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
 
     const { result } = renderHook(() => useSchedule('1', '2024-01-01'), { wrapper });
 
@@ -75,7 +75,7 @@ describe('useSchedule', () => {
   });
 
   it('should use correct query parameters', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
 
     const courtId = '123';
     const date = '2024-12-25';

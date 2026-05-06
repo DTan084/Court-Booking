@@ -55,7 +55,7 @@ describe('useTimeSlots', () => {
       },
     ];
 
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockTimeSlots });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: mockTimeSlots } });
 
     const { result } = renderHook(() => useTimeSlots('1'), { wrapper });
 
@@ -66,7 +66,7 @@ describe('useTimeSlots', () => {
   });
 
   it('should return empty array when no time slots exist', async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
 
     const { result } = renderHook(() => useTimeSlots('1'), { wrapper });
 

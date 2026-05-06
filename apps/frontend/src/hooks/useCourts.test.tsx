@@ -57,7 +57,7 @@ describe('useCourts', () => {
       totalPages: 1,
     };
 
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockData });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: mockData } });
 
     const { result } = renderHook(() => useCourts({ page: 1, limit: 12 }), { wrapper });
 
@@ -78,7 +78,7 @@ describe('useCourts', () => {
       totalPages: 0,
     };
 
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockData });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: mockData } });
 
     const params = {
       page: 1,

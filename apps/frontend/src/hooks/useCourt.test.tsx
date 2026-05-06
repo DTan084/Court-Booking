@@ -49,7 +49,7 @@ describe('useCourt', () => {
       updatedAt: '2024-01-01T00:00:00Z',
     };
 
-    vi.mocked(api.get).mockResolvedValueOnce({ data: mockCourt });
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { success: true, data: mockCourt } });
 
     const { result } = renderHook(() => useCourt('1'), { wrapper });
 
