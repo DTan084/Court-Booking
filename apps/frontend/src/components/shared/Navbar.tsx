@@ -137,8 +137,8 @@ export function Navbar() {
           )}
         </div>
 
-        {/* User Avatar Dropdown */}
-        {user && (
+        {/* User Avatar Dropdown or Login Button */}
+        {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -163,6 +163,15 @@ export function Navbar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        ) : (
+          <div className="flex items-center space-x-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/login">Đăng nhập</Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/register">Đăng ký</Link>
+            </Button>
+          </div>
         )}
       </div>
     </nav>
