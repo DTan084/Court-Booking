@@ -25,16 +25,11 @@ export class AddCourtTimeSlots1746284400000 implements MigrationInterface {
       ON "court_time_slots" ("court_id", "day_of_week")
     `);
 
-    await queryRunner.query(`
-      ALTER TABLE "courts" DROP COLUMN IF EXISTS "price_per_hour"
-    `);
+    // Keep price_per_hour as reference price for display in court list
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX "IDX_court_time_slots_court_day"`);
     await queryRunner.query(`DROP TABLE "court_time_slots"`);
-    await queryRunner.query(`
-      ALTER TABLE "courts" ADD COLUMN "price_per_hour" numeric(10,2) NOT NULL DEFAULT 0
-    `);
   }
 }

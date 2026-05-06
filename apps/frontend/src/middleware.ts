@@ -15,13 +15,16 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  const isProtected =
-    pathname.startsWith('/courts') ||
-    pathname.startsWith('/bookings') ||
-    pathname.startsWith('/admin');
-
+  // Define route types
   const isAdminRoute = pathname.startsWith('/admin');
   const isAuthRoute = pathname === '/login' || pathname === '/register';
+  const isPublicRoute = pathname === '/' || pathname.startsWith('/courts');
+  const isProtected = pathname.startsWith('/bookings') || pathname.startsWith('/admin');
+
+  // Allow public routes without authentication
+  if (isPublicRoute && !isAdminRoute) {
+    return NextResponse.next();
+  }
 
   // Redirect unauthenticated users from protected routes
   if (isProtected && !token) {
@@ -51,5 +54,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/courts/:path*', '/bookings/:path*', '/admin/:path*', '/login', '/register'],
+  matcher: ['/bookings/:path*', '/admin/:path*', '/login', '/register'],
 };
