@@ -29,9 +29,12 @@ export class BookingsService {
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
-    // Optimized: Use single query with exists check instead of separate court lookup
-    const startDate = new Date(`${date}T00:00:00Z`);
-    const endDate = new Date(`${date}T23:59:59.999Z`);
+    // date is "YYYY-MM-DD" in local time. Query the full local day.
+    // Using T00:00:00 and T23:59:59.999 without Z means the DB driver
+    // interprets them in the server's local timezone — consistent with how
+    // bookings are stored (frontend sends ISO with timezone offset).
+    const startDate = new Date(`${date}T00:00:00`);
+    const endDate = new Date(`${date}T23:59:59.999`);
 
     const bookings = await this.bookingRepository
       .createQueryBuilder('booking')
@@ -88,7 +91,10 @@ export class BookingsService {
       }
 
       // 2. Validate time slots cover the requested range
-      const dayOfWeek = start.getDay(); // 0=Sun, 1=Mon, ...
+      // Frontend sends ISO with timezone offset (e.g. 2026-05-07T08:00:00+07:00)
+      // getHours() on the parsed Date gives the correct local hour on the server.
+      // Since both frontend and backend agree on the wall-clock hour, this is consistent.
+      const dayOfWeek = start.getDay();
       const startHour = start.getHours();
       const endHour = end.getHours() || 24; // midnight = 24
 
