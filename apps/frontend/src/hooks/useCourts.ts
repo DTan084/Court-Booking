@@ -7,6 +7,7 @@ export interface GetCourtsParams {
   limit: number;
   name?: string;
   sportType?: SportType;
+  [key: string]: unknown;
 }
 
 export function useCourts(params: GetCourtsParams) {

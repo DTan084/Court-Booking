@@ -78,18 +78,28 @@ export function isSlotBooked(
 }
 
 /**
- * Format date to YYYY-MM-DD
+ * Format Date → "YYYY-MM-DD" dùng local timezone
  */
 export function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /**
- * Format time to HH:mm
+ * Build ISO string từ date + hour theo local timezone
+ * Ví dụ: date=2026-05-07, hour=8 → "2026-05-07T08:00:00+07:00"
  */
-export function formatTime(date: Date): string {
-  return date.toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+export function buildLocalISO(date: Date, hour: number): string {
+  const d = new Date(date);
+  d.setHours(hour, 0, 0, 0);
+  // toISOString() converts to UTC — we need local ISO
+  const offset = -d.getTimezoneOffset(); // minutes
+  const sign = offset >= 0 ? '+' : '-';
+  const absOffset = Math.abs(offset);
+  const hh = String(Math.floor(absOffset / 60)).padStart(2, '0');
+  const mm = String(absOffset % 60).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(hour)}:00:00${sign}${hh}:${mm}`;
 }

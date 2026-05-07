@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import axios from 'axios';
 
 const registerSchema = z
   .object({
@@ -78,8 +79,8 @@ export function RegisterForm() {
       // Success - redirect to login
       toast.success('Đăng ký thành công, mời đăng nhập');
       router.push('/login');
-    } catch (error: any) {
-      if (error.response?.status === 409) {
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
         setError('email', {
           message: 'Email đã được sử dụng',
         });

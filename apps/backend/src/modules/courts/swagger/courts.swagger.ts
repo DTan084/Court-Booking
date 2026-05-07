@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { PaginationMeta } from '../../../common/swagger/api-response.swagger';
 
 // ── Request Bodies ─────────────────────────────────────────────────────────
 

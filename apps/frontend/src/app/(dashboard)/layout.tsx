@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/shared/Navbar';
@@ -10,32 +10,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const clearUser = useAuthStore((state) => state.clearUser);
-  const [isHydrating, setIsHydrating] = useState(false);
+  // Use ref to ensure we only attempt hydration once per mount, not on every render
+  const hasFetched = useRef(false);
 
   useEffect(() => {
-    // Only hydrate if we don't have user in store and haven't tried yet
-    if (!user && !isHydrating) {
-      setIsHydrating(true);
+    // Skip if already have user or already attempted
+    if (user || hasFetched.current) return;
 
-      api
-        .get<any>('/auth/me')
-        .then((response) => {
-          // Backend wraps response: { success, data: { user }, meta }
-          const userData = response.data.data || response.data;
-          setUser(userData);
-        })
-        .catch((error) => {
-          // Silently fail - user is not logged in
-          // 401 will be handled by axios interceptor if needed
-          if (error.response?.status === 401) {
-            clearUser();
-          }
-        })
-        .finally(() => {
-          setIsHydrating(false);
-        });
-    }
-  }, [user, setUser, clearUser, isHydrating]);
+    hasFetched.current = true;
+
+    api
+      .get<{ success: boolean; data: User }>('/auth/me')
+      .then((response) => {
+        const userData = response.data.data || (response.data as unknown as User);
+        setUser(userData);
+      })
+      .catch(() => {
+        // Silently fail — user is not logged in, middleware will redirect if needed
+        clearUser();
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount only
 
   return (
     <div className="min-h-screen bg-background">

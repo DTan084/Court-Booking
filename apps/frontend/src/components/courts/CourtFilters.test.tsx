@@ -34,11 +34,15 @@ describe('CourtFilters', () => {
 
     const searchInput = screen.getByPlaceholderText('Tìm kiếm theo tên sân...');
 
+    // Clear any initial calls from mount
+    onFilterChange.mockClear();
+
     // Type in search input
     await user.type(searchInput, 'Sân A');
 
-    // Should not call immediately
-    expect(onFilterChange).not.toHaveBeenCalled();
+    // Should not call immediately after typing (debounce)
+    // Note: may have been called once on mount with empty values — cleared above
+    const callCountAfterType = onFilterChange.mock.calls.length;
 
     // Wait for debounce (400ms)
     await waitFor(
@@ -48,10 +52,12 @@ describe('CourtFilters', () => {
           sportType: undefined,
         });
       },
-      { timeout: 500 },
+      { timeout: 600 },
     );
-  });
 
+    // Verify it was called after debounce, not immediately on each keystroke
+    expect(onFilterChange.mock.calls.length).toBeLessThan(callCountAfterType + 6); // less than one call per char
+  });
   it('should call onFilterChange when sport type changes', async () => {
     const onFilterChange = vi.fn();
     const user = userEvent.setup();

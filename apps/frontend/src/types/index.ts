@@ -70,10 +70,12 @@ export interface Booking {
 
 export interface PaginatedResult<T> {
   data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 // ==================== HELPER TYPES ====================

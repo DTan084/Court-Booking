@@ -10,7 +10,6 @@ export class LoggingInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const { method, url, ip, body } = request;
-    const userAgent = request.get('user-agent') || '';
     const requestId = request.headers['x-request-id'] || this.generateRequestId();
 
     // Add request ID to request for tracking

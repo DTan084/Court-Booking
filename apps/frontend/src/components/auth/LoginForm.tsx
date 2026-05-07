@@ -11,6 +11,7 @@ import { useAuthStore } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import axios from 'axios';
 
 const loginSchema = z.object({
   email: z.string().email('Email không hợp lệ'),
@@ -42,24 +43,13 @@ export function LoginForm() {
 
       // Backend wraps response: { success, data: { access_token, ... }, meta }
       const responseData = loginResponse.data.data || loginResponse.data;
-      const token = responseData.access_token;
-
-      if (!token) {
+      if (!responseData) {
         console.error('Response structure:', loginResponse.data);
-        throw new Error('No access token in response');
+        throw new Error('Login response is empty');
       }
 
-      // Store token in localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', token);
-      }
-
-      // Fetch user data with explicit Authorization header
-      const userResponse = await api.get('/auth/me', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      // Fetch user data using httpOnly cookie
+      const userResponse = await api.get('/auth/me');
 
       // Backend might also wrap /auth/me response
       const userData = userResponse.data.data || userResponse.data;
@@ -67,18 +57,23 @@ export function LoginForm() {
       // Save user to store
       setUser(userData);
 
-      // Redirect to home
+      // Redirect to callbackUrl or home
       toast.success('Đăng nhập thành công!');
-      router.push('/');
-    } catch (error: any) {
+      const params = new URLSearchParams(window.location.search);
+      const callbackUrl = params.get('callbackUrl') || '/courts';
+      router.push(callbackUrl);
+    } catch (error: unknown) {
       console.error('Login error:', error);
 
-      if (error.response?.status === 401) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
         setError('root', {
           message: 'Email hoặc mật khẩu không đúng',
         });
       } else {
-        const errorMessage = error.message || 'Đã xảy ra lỗi, vui lòng thử lại';
+        const errorMessage =
+          (axios.isAxiosError(error) &&
+            (error.response?.data as { error?: { message?: string } })?.error?.message) ||
+          (error instanceof Error ? error.message : 'Đã xảy ra lỗi, vui lòng thử lại');
         setError('root', {
           message: errorMessage,
         });

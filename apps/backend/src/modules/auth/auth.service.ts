@@ -136,6 +136,39 @@ export class AuthService {
     };
   }
 
+  async refreshTokens(refreshToken: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    const existingToken = await this.refreshTokenRepository.findOne({
+      where: { token: refreshToken, revoked: false },
+    });
+
+    if (!existingToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (existingToken.expiresAt < new Date()) {
+      await this.revokeRefreshToken(refreshToken);
+      throw new UnauthorizedException('Refresh token expired');
+    }
+
+    const user = await this.userRepository.findOne({ where: { id: existingToken.userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Rotate refresh token
+    await this.revokeRefreshToken(refreshToken);
+    return this.generateTokens(user);
+  }
+
+  async revokeRefreshToken(refreshToken: string) {
+    if (!refreshToken) return;
+    await this.refreshTokenRepository.update({ token: refreshToken }, { revoked: true });
+  }
+
   private parseExpiresInToSeconds(expiresIn: string): number {
     const match = expiresIn.match(/^(\d+)([smhd])$/);
     if (!match) return 900; // default 15m

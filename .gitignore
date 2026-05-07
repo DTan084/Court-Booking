@@ -33,3 +33,6 @@ logs/
 # Misc
 .turbo/
 *.tsbuildinfo
+
+# Documentation files (local only)
+*.html
