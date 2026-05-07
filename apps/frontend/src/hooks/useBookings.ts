@@ -75,10 +75,22 @@ export function useCreateBooking() {
       return response.data;
     },
     onSuccess: (data, variables) => {
-      // Invalidate schedule for the booked court
-      const date = new Date(variables.startTime).toISOString().split('T')[0];
-      queryClient.invalidateQueries({
+      // Build date string from UTC parts of startTime (matches backend query format)
+      const startDate = new Date(variables.startTime);
+      const y = startDate.getUTCFullYear();
+      const m = String(startDate.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(startDate.getUTCDate()).padStart(2, '0');
+      const date = `${y}-${m}-${d}`;
+
+      // Force immediate refetch of the schedule (not just mark stale)
+      queryClient.refetchQueries({
         queryKey: queryKeys.courts.schedule(variables.courtId, date),
+      });
+
+      // Also refetch all schedules for this court to cover any date mismatch
+      queryClient.refetchQueries({
+        queryKey: ['courts', variables.courtId, 'schedule'],
+        type: 'active',
       });
 
       // Invalidate user's booking list
