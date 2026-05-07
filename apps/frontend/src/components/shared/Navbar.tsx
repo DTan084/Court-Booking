@@ -130,6 +130,11 @@ export function Navbar() {
                     Quản lý sân
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/stats" className="cursor-pointer">
+                    Thống kê
+                  </Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
