@@ -3,12 +3,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi } from 'vitest';
 import { CourtSchedule } from './CourtSchedule';
 import { useSchedule } from '@/hooks/useSchedule';
-import type { CourtTimeSlot } from '@/types';
+import type { Booking, CourtTimeSlot } from '@/types';
 
 // Mock the useSchedule hook
 vi.mock('@/hooks/useSchedule');
 
-const mockUseSchedule = useSchedule as ReturnType<typeof vi.fn>;
+const mockUseSchedule = vi.mocked(useSchedule);
+
+type UseScheduleResult = {
+  data?: Booking[];
+  isLoading: boolean;
+};
 
 describe('CourtSchedule', () => {
   const queryClient = new QueryClient({
@@ -60,7 +65,7 @@ describe('CourtSchedule', () => {
     mockUseSchedule.mockReturnValue({
       data: [],
       isLoading: false,
-    } as any);
+    } as UseScheduleResult);
 
     renderComponent();
 
@@ -73,7 +78,7 @@ describe('CourtSchedule', () => {
     mockUseSchedule.mockReturnValue({
       data: undefined,
       isLoading: true,
-    } as any);
+    } as UseScheduleResult);
 
     const { container } = renderComponent();
 
@@ -85,7 +90,7 @@ describe('CourtSchedule', () => {
     mockUseSchedule.mockReturnValue({
       data: [],
       isLoading: false,
-    } as any);
+    } as UseScheduleResult);
 
     const sunday = new Date('2024-01-07'); // Sunday
     render(
@@ -108,7 +113,7 @@ describe('CourtSchedule', () => {
     mockUseSchedule.mockReturnValue({
       data: [],
       isLoading: false,
-    } as any);
+    } as UseScheduleResult);
 
     renderComponent();
 
@@ -122,7 +127,7 @@ describe('CourtSchedule', () => {
     mockUseSchedule.mockReturnValue({
       data: [],
       isLoading: false,
-    } as any);
+    } as UseScheduleResult);
 
     const allSlots = [
       ...mockTimeSlots,

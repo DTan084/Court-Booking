@@ -55,10 +55,7 @@ const mockDataSource = () => ({
 
 describe('BookingsService', () => {
   let service: BookingsService;
-  let bookingRepository: ReturnType<typeof mockBookingRepository>;
-  let courtRepository: ReturnType<typeof mockCourtRepository>;
   let timeSlotRepository: ReturnType<typeof mockTimeSlotRepository>;
-  let configService: ReturnType<typeof mockConfigService>;
   let dataSource: ReturnType<typeof mockDataSource>;
 
   beforeEach(async () => {
@@ -89,10 +86,7 @@ describe('BookingsService', () => {
     }).compile();
 
     service = module.get<BookingsService>(BookingsService);
-    bookingRepository = module.get(getRepositoryToken(BookingEntity));
-    courtRepository = module.get(getRepositoryToken(CourtEntity));
     timeSlotRepository = module.get(getRepositoryToken(CourtTimeSlotEntity));
-    configService = module.get(ConfigService);
     dataSource = module.get(DataSource);
   });
 
@@ -264,8 +258,8 @@ describe('BookingsService', () => {
           id: 'slot-1',
           courtId: 'court-1',
           dayOfWeek: new Date(mockDto.startTime).getDay(),
-          startHour: new Date(mockDto.startTime).getUTCHours(),
-          endHour: new Date(mockDto.endTime).getUTCHours(),
+          startHour: new Date(mockDto.startTime).getHours(),
+          endHour: new Date(mockDto.endTime).getHours(),
           price: 100,
         },
       ]);

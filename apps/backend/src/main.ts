@@ -5,6 +5,7 @@ import { Logger, ClassSerializerInterceptor } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -34,6 +35,9 @@ async function bootstrap() {
 
   // Performance - Response compression
   app.use(compression());
+
+  // Cookies for auth
+  app.use(cookieParser());
 
   // CORS configuration
   app.enableCors({

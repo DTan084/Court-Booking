@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import Link from 'next/link';
 import { Calendar } from 'lucide-react';
 import { useMyBookings } from '@/hooks/useBookings';
 import { BookingRow } from '@/components/bookings/BookingRow';

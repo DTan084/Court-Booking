@@ -14,9 +14,9 @@ export enum CourtStatus {
 }
 
 export enum BookingStatus {
-  CONFIRMED = 'CONFIRMED',
-  CANCELLED = 'CANCELLED',
-  COMPLETED = 'COMPLETED',
+  CONFIRMED = 'confirmed',
+  CANCELLED = 'cancelled',
+  COMPLETED = 'completed',
 }
 
 export enum Role {

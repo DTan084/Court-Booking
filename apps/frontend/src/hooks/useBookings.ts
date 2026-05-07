@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api, queryKeys } from '@/lib/api';
 import { toast } from 'sonner';
+import type { AxiosError } from 'axios';
 import type { Booking, Court, PaginatedResult, BookingStatus } from '@/types';
 
 // ==================== TYPES ====================
@@ -21,6 +22,11 @@ export interface CreateBookingDto {
 
 export type BookingWithCourt = Booking & { court: Court };
 
+type ApiErrorPayload = {
+  error?: { message?: string };
+  message?: string;
+};
+
 // ==================== HOOKS ====================
 
 /**
@@ -31,7 +37,25 @@ export function useMyBookings(params: GetBookingsParams) {
     queryKey: queryKeys.bookings.myList(params),
     queryFn: async () => {
       const response = await api.get('/bookings/me', { params });
-      return response.data;
+      const payload = response.data?.data ?? response.data;
+
+      if (payload?.meta && payload?.data) {
+        return payload as PaginatedResult<BookingWithCourt>;
+      }
+
+      if (payload?.totalPages !== undefined) {
+        return {
+          data: payload.data ?? [],
+          meta: {
+            total: payload.total ?? payload.data?.length ?? 0,
+            page: payload.page ?? 1,
+            limit: payload.limit ?? payload.data?.length ?? 0,
+            totalPages: payload.totalPages ?? 1,
+          },
+        } as PaginatedResult<BookingWithCourt>;
+      }
+
+      return payload as PaginatedResult<BookingWithCourt>;
     },
     staleTime: 1 * 60 * 1000, // 1 minute
     placeholderData: keepPreviousData, // Keep previous data while fetching new page
@@ -63,9 +87,9 @@ export function useCreateBooking() {
 
       toast.success('Đặt sân thành công!');
     },
-    onError: (error: any) => {
+    onError: (error: AxiosError<ApiErrorPayload>) => {
       const status = error.response?.status;
-      const message = error.response?.data?.message || '';
+      const message = error.response?.data?.error?.message || error.response?.data?.message || '';
 
       if (status === 409) {
         toast.error('Khung giờ này đã được đặt, vui lòng chọn giờ khác');
@@ -102,9 +126,9 @@ export function useCancelBooking() {
 
       toast.success('Hủy đặt sân thành công');
     },
-    onError: (error: any) => {
+    onError: (error: AxiosError<ApiErrorPayload>) => {
       const status = error.response?.status;
-      const message = error.response?.data?.message || '';
+      const message = error.response?.data?.error?.message || error.response?.data?.message || '';
 
       if (status === 400 && message.toLowerCase().includes('2 hour')) {
         toast.error('Không thể hủy đặt sân trong vòng 2 giờ trước giờ chơi');

@@ -13,7 +13,7 @@ vi.mock('@/lib/api', () => ({
   },
   queryKeys: {
     courts: {
-      list: (params: any) => ['courts', 'list', params],
+      list: (params: unknown) => ['courts', 'list', params],
     },
   },
 }));

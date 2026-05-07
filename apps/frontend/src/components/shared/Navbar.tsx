@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LogOut, Settings, User, Shield } from 'lucide-react';
+import { LogOut, Shield } from 'lucide-react';
 import { Role } from '@/types';
 
 export function Navbar() {
@@ -32,11 +32,6 @@ export function Navbar() {
 
   const handleLogout = async () => {
     try {
-      // Clear token from localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
-      }
-
       // Call logout API (optional - to invalidate refresh token)
       await api.post('/auth/logout').catch(() => {
         // Ignore error
@@ -48,7 +43,7 @@ export function Navbar() {
       // Redirect to login
       toast.success('Đăng xuất thành công');
       router.push('/login');
-    } catch (error) {
+    } catch {
       toast.error('Đã xảy ra lỗi khi đăng xuất');
     }
   };

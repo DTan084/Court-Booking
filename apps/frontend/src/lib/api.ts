@@ -7,43 +7,41 @@ const api = axios.create({
   withCredentials: true, // gửi httpOnly cookie tự động (nếu backend set cookie)
 });
 
-// Request interceptor: Add token to headers
-api.interceptors.request.use(
-  (config) => {
-    // Get token from localStorage
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
-
 // Response interceptor: 401 → clear store + redirect
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // Clear token from localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
+      const originalRequest = error.config as
+        | (AxiosError['config'] & { _retry?: boolean })
+        | undefined;
+
+      if (originalRequest?.url?.includes('/auth/refresh')) {
+        return Promise.reject(error);
       }
 
-      // Import dynamically to avoid circular dependency
-      import('./auth').then(({ useAuthStore }) => {
-        useAuthStore.getState().clearUser();
+      if (originalRequest && !originalRequest._retry) {
+        originalRequest._retry = true;
+        return api
+          .post('/auth/refresh')
+          .then(() => api(originalRequest))
+          .catch((refreshError) => {
+            // Import dynamically to avoid circular dependency
+            import('./auth').then(({ useAuthStore }) => {
+              useAuthStore.getState().clearUser();
 
-        // Only redirect if not already on login/register page
-        if (typeof window !== 'undefined') {
-          const currentPath = window.location.pathname;
-          if (currentPath !== '/login' && currentPath !== '/register') {
-            window.location.href = '/login';
-          }
-        }
-      });
+              // Only redirect if not already on login/register page
+              if (typeof window !== 'undefined') {
+                const currentPath = window.location.pathname;
+                if (currentPath !== '/login' && currentPath !== '/register') {
+                  window.location.href = '/login';
+                }
+              }
+            });
+
+            return Promise.reject(refreshError);
+          });
+      }
     }
 
     // 403 Forbidden - show toast
@@ -76,15 +74,16 @@ api.interceptors.response.use(
 export const queryKeys = {
   courts: {
     all: ['courts'] as const,
-    list: (params: Record<string, any>) => ['courts', 'list', params] as const,
+    list: (params: Record<string, unknown>) => ['courts', 'list', params] as const,
     detail: (id: string) => ['courts', id] as const,
     schedule: (id: string, date: string) => ['courts', id, 'schedule', date] as const,
     timeSlots: (id: string) => ['courts', id, 'time-slots'] as const,
-    stats: (id: string, params: Record<string, any>) => ['courts', id, 'stats', params] as const,
+    stats: (id: string, params: Record<string, unknown>) =>
+      ['courts', id, 'stats', params] as const,
   },
   bookings: {
     all: ['bookings'] as const,
-    myList: (params: Record<string, any>) => ['bookings', 'me', params] as const,
+    myList: (params: Record<string, unknown>) => ['bookings', 'me', params] as const,
   },
   auth: {
     me: ['auth', 'me'] as const,

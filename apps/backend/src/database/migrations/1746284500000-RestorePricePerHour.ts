@@ -20,7 +20,7 @@ export class RestorePricePerHour1746284500000 implements MigrationInterface {
     `);
   }
 
-  public async down(queryRunner: QueryRunner): Promise<void> {
+  public async down(_queryRunner: QueryRunner): Promise<void> {
     // Don't drop the column in down migration to avoid data loss
   }
 }

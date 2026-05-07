@@ -89,8 +89,8 @@ export class BookingsService {
 
       // 2. Validate time slots cover the requested range
       const dayOfWeek = start.getDay(); // 0=Sun, 1=Mon, ...
-      const startHour = start.getUTCHours();
-      const endHour = end.getUTCHours() || 24; // midnight = 24
+      const startHour = start.getHours();
+      const endHour = end.getHours() || 24; // midnight = 24
 
       const slots = await this.timeSlotRepository.find({
         where: { courtId, dayOfWeek },

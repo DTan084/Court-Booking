@@ -5,6 +5,7 @@ import { useAuthStore } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/shared/Navbar';
 import { User } from '@/types';
+import axios from 'axios';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((state) => state.user);
@@ -18,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setIsHydrating(true);
 
       api
-        .get<any>('/auth/me')
+        .get<{ success: boolean; data: User }>('/auth/me')
         .then((response) => {
           // Backend wraps response: { success, data: { user }, meta }
           const userData = response.data.data || response.data;
@@ -27,7 +28,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .catch((error) => {
           // Silently fail - user is not logged in
           // 401 will be handled by axios interceptor if needed
-          if (error.response?.status === 401) {
+          if (axios.isAxiosError(error) && error.response?.status === 401) {
             clearUser();
           }
         })
