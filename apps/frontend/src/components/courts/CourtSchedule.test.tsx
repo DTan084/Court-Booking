@@ -15,6 +15,10 @@ type UseScheduleResult = {
   isLoading: boolean;
 };
 
+// Helper to create mock return value - bypass strict UseQueryResult type in tests
+const mockScheduleReturn = (result: UseScheduleResult) =>
+  mockUseSchedule.mockReturnValue(result as any);
+
 describe('CourtSchedule', () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -62,10 +66,7 @@ describe('CourtSchedule', () => {
   });
 
   it('should render date picker', () => {
-    mockUseSchedule.mockReturnValue({
-      data: [],
-      isLoading: false,
-    } as UseScheduleResult);
+    mockScheduleReturn({ data: [], isLoading: false });
 
     renderComponent();
 
@@ -75,10 +76,7 @@ describe('CourtSchedule', () => {
   });
 
   it('should show loading spinner when fetching schedule', () => {
-    mockUseSchedule.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    } as UseScheduleResult);
+    mockScheduleReturn({ data: undefined, isLoading: true });
 
     const { container } = renderComponent();
 
@@ -87,10 +85,7 @@ describe('CourtSchedule', () => {
   });
 
   it('should show empty state when no slots for selected day', async () => {
-    mockUseSchedule.mockReturnValue({
-      data: [],
-      isLoading: false,
-    } as UseScheduleResult);
+    mockScheduleReturn({ data: [], isLoading: false });
 
     const sunday = new Date('2024-01-07'); // Sunday
     render(
@@ -110,10 +105,7 @@ describe('CourtSchedule', () => {
   });
 
   it('should render TimeSlotGrid with correct slots for selected day', async () => {
-    mockUseSchedule.mockReturnValue({
-      data: [],
-      isLoading: false,
-    } as UseScheduleResult);
+    mockScheduleReturn({ data: [], isLoading: false });
 
     renderComponent();
 
@@ -124,10 +116,7 @@ describe('CourtSchedule', () => {
   });
 
   it('should filter slots by day of week', async () => {
-    mockUseSchedule.mockReturnValue({
-      data: [],
-      isLoading: false,
-    } as UseScheduleResult);
+    mockScheduleReturn({ data: [], isLoading: false });
 
     const allSlots = [
       ...mockTimeSlots,
