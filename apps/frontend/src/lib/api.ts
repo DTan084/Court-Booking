@@ -7,41 +7,75 @@ const api = axios.create({
   withCredentials: true, // gửi httpOnly cookie tự động (nếu backend set cookie)
 });
 
-// Response interceptor: 401 → clear store + redirect
+// Track if a refresh is already in progress to prevent concurrent refresh calls
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+}> = [];
+
+const processQueue = (error: unknown) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(null);
+  });
+  failedQueue = [];
+};
+
+// Response interceptor: 401 → try refresh once → redirect if fails
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      const originalRequest = error.config as
-        | (AxiosError['config'] & { _retry?: boolean })
-        | undefined;
+    const originalRequest = error.config as
+      | (AxiosError['config'] & { _retry?: boolean })
+      | undefined;
 
-      if (originalRequest?.url?.includes('/auth/refresh')) {
-        return Promise.reject(error);
-      }
+    // Don't retry refresh endpoint itself — break the loop
+    if (originalRequest?.url?.includes('/auth/refresh')) {
+      return Promise.reject(error);
+    }
 
-      if (originalRequest && !originalRequest._retry) {
-        originalRequest._retry = true;
-        return api
-          .post('/auth/refresh')
+    // Don't retry /auth/me — it's a probe call, not critical
+    if (originalRequest?.url?.includes('/auth/me')) {
+      return Promise.reject(error);
+    }
+
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      if (isRefreshing) {
+        // Queue the request until refresh completes
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
           .then(() => api(originalRequest))
-          .catch((refreshError) => {
-            // Import dynamically to avoid circular dependency
-            import('./auth').then(({ useAuthStore }) => {
-              useAuthStore.getState().clearUser();
-
-              // Only redirect if not already on login/register page
-              if (typeof window !== 'undefined') {
-                const currentPath = window.location.pathname;
-                if (currentPath !== '/login' && currentPath !== '/register') {
-                  window.location.href = '/login';
-                }
-              }
-            });
-
-            return Promise.reject(refreshError);
-          });
+          .catch((err) => Promise.reject(err));
       }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      return api
+        .post('/auth/refresh')
+        .then(() => {
+          processQueue(null);
+          return api(originalRequest);
+        })
+        .catch((refreshError) => {
+          processQueue(refreshError);
+          // Clear user and redirect to login
+          import('./auth').then(({ useAuthStore }) => {
+            useAuthStore.getState().clearUser();
+            if (typeof window !== 'undefined') {
+              const currentPath = window.location.pathname;
+              if (currentPath !== '/login' && currentPath !== '/register') {
+                window.location.href = '/login';
+              }
+            }
+          });
+          return Promise.reject(refreshError);
+        })
+        .finally(() => {
+          isRefreshing = false;
+        });
     }
 
     // 403 Forbidden - show toast

@@ -57,9 +57,11 @@ export function LoginForm() {
       // Save user to store
       setUser(userData);
 
-      // Redirect to home
+      // Redirect to callbackUrl or home
       toast.success('Đăng nhập thành công!');
-      router.push('/');
+      const params = new URLSearchParams(window.location.search);
+      const callbackUrl = params.get('callbackUrl') || '/courts';
+      router.push(callbackUrl);
     } catch (error: unknown) {
       console.error('Login error:', error);
 

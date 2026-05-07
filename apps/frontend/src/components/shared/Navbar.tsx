@@ -97,14 +97,17 @@ export function Navbar() {
             Danh sách sân
           </Link>
 
-          <Link
-            href="/bookings"
-            className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/bookings') ? 'text-foreground' : 'text-muted-foreground'
-            }`}
-          >
-            Lịch đặt của tôi
-          </Link>
+          {/* Only show for logged-in users */}
+          {user && (
+            <Link
+              href="/bookings"
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                isActive('/bookings') ? 'text-foreground' : 'text-muted-foreground'
+              }`}
+            >
+              Lịch đặt của tôi
+            </Link>
+          )}
 
           {/* Admin Dropdown */}
           {user?.role === Role.ADMIN && (
