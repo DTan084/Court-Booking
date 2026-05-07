@@ -76,7 +76,7 @@ export default function BookingsPage() {
             </div>
 
             {/* Pagination */}
-            {data.meta.totalPages > 1 && (
+            {data.meta?.totalPages > 1 && (
               <div className="flex justify-center">
                 <Pagination
                   page={page}

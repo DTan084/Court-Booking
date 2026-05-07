@@ -12,6 +12,7 @@ export interface GetBookingsParams {
   status?: BookingStatus;
   fromDate?: string; // YYYY-MM-DD
   toDate?: string; // YYYY-MM-DD
+  [key: string]: unknown; // Add index signature
 }
 
 export interface CreateBookingDto {
@@ -95,6 +96,8 @@ export function useCreateBooking() {
         toast.error('Khung giờ này đã được đặt, vui lòng chọn giờ khác');
       } else if (status === 400 && message.toLowerCase().includes('time slot')) {
         toast.error('Khung giờ không hợp lệ theo lịch hoạt động của sân');
+      } else if (status === 400) {
+        toast.error(`Lỗi: ${message || 'Dữ liệu không hợp lệ'}`);
       } else {
         toast.error('Không thể đặt sân, vui lòng thử lại');
       }

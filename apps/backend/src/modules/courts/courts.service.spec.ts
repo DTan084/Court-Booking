@@ -144,10 +144,12 @@ describe('CourtsService', () => {
 
       expect(result).toEqual({
         data: [mockCourt],
-        total: 1,
-        page: 1,
-        limit: 10,
-        totalPages: 1,
+        meta: {
+          total: 1,
+          page: 1,
+          limit: 10,
+          totalPages: 1,
+        },
       });
       expect(repository.findAndCount).toHaveBeenCalledWith({
         where: { deletedAt: expect.anything() },

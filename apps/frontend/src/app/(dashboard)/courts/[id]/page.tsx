@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapPin, DollarSign, AlertCircle, Calendar } from 'lucide-react';
