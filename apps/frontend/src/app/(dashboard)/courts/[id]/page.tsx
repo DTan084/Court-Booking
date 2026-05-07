@@ -47,6 +47,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
   const { data: bookings } = useSchedule(params.id, formatDate(selectedDate));
 
   // Convert bookings to BookedRange[] for the selected date
+  // Use UTC hours to match backend time slot validation
   const bookedRanges = useMemo<BookedRange[]>(() => {
     if (!bookings) return [];
 
@@ -54,8 +55,8 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
       const start = new Date(booking.startTime);
       const end = new Date(booking.endTime);
       return {
-        startHour: start.getHours(),
-        endHour: end.getHours(),
+        startHour: start.getUTCHours(),
+        endHour: end.getUTCHours() || 24,
       };
     });
   }, [bookings]);

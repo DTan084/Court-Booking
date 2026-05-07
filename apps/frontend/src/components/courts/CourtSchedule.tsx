@@ -25,26 +25,34 @@ export function CourtSchedule({
   const formattedDate = formatDate(selectedDate);
   const { data: bookings, isLoading } = useSchedule(courtId, formattedDate);
 
-  // Convert bookings to BookedRange[]
+  // Convert bookings to BookedRange[] using local hours
+  // Backend stores timestamps with timezone — getHours() gives correct local hour
   const bookedRanges = useMemo<BookedRange[]>(() => {
     if (!bookings) return [];
-
     return bookings.map((booking) => {
       const start = new Date(booking.startTime);
       const end = new Date(booking.endTime);
       return {
         startHour: start.getHours(),
-        endHour: end.getHours(),
+        endHour: end.getHours() || 24,
       };
     });
   }, [bookings]);
 
-  // Filter time slots for the selected day of week
+  // Use local day-of-week — consistent with how user sees the calendar
   const dayOfWeek = selectedDate.getDay();
   const daySlots = useMemo(
     () => timeSlots.filter((slot) => slot.dayOfWeek === dayOfWeek),
     [timeSlots, dayOfWeek],
   );
+
+  // Pass current local hour only when viewing today — to grey out past slots
+  const now = new Date();
+  const isToday = formattedDate === formatDate(now);
+  const currentHour = isToday ? now.getHours() : undefined;
+
+  // Min date for date picker = today (local)
+  const minDate = formatDate(now);
 
   return (
     <div className="space-y-4">
@@ -54,8 +62,11 @@ export function CourtSchedule({
         <input
           type="date"
           value={formattedDate}
+          min={minDate}
           onChange={(e) => {
-            const newDate = new Date(e.target.value);
+            if (!e.target.value) return;
+            // Parse as local date by appending T00:00 without Z
+            const newDate = new Date(`${e.target.value}T00:00:00`);
             if (!isNaN(newDate.getTime())) {
               onDateChange(newDate);
             }
@@ -77,6 +88,7 @@ export function CourtSchedule({
         <TimeSlotGrid
           timeSlots={daySlots}
           bookedRanges={bookedRanges}
+          currentHour={currentHour}
           onSlotSelect={onSlotSelect}
         />
       )}

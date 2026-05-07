@@ -7,7 +7,13 @@ import { z } from 'zod';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCreateBooking } from '@/hooks/useBookings';
-import { calculateBookingPrice, formatCurrency, formatDate, isSlotBooked } from '@/lib/utils';
+import {
+  calculateBookingPrice,
+  formatCurrency,
+  formatDate,
+  buildLocalISO,
+  isSlotBooked,
+} from '@/lib/utils';
 import type { CourtTimeSlot, BookedRange } from '@/types';
 
 // ==================== TYPES & SCHEMA ====================
@@ -51,10 +57,18 @@ export function BookingForm({
     coveredSlots: CourtTimeSlot[];
   } | null>(null);
 
+  // Use local day-of-week — consistent with how user sees the calendar
   const dayOfWeek = selectedDate.getDay();
+
+  // Slots for the selected day, sorted by hour
   const availableSlots = timeSlots
     .filter((slot) => slot.dayOfWeek === dayOfWeek)
     .sort((a, b) => a.startHour - b.startHour);
+
+  // Filter past slots when selected date is today (local)
+  const now = new Date();
+  const isToday = formatDate(selectedDate) === formatDate(now);
+  const currentHour = now.getHours();
 
   const {
     register,
@@ -82,22 +96,14 @@ export function BookingForm({
   }, [startHour, endHour, timeSlots, dayOfWeek]);
 
   const onSubmit = (data: BookingFormData) => {
-    if (!priceBreakdown) {
-      return;
-    }
+    if (!priceBreakdown) return;
 
-    const startTime = new Date(selectedDate);
-    startTime.setHours(data.startHour, 0, 0, 0);
-
-    const endTime = new Date(selectedDate);
-    endTime.setHours(data.endHour, 0, 0, 0);
+    // Build ISO strings with local timezone offset so backend receives correct time
+    const startTime = buildLocalISO(selectedDate, data.startHour);
+    const endTime = buildLocalISO(selectedDate, data.endHour === 24 ? 0 : data.endHour);
 
     createBooking(
-      {
-        courtId,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-      },
+      { courtId, startTime, endTime },
       {
         onSuccess: () => {
           onOpenChange(false);
@@ -114,13 +120,17 @@ export function BookingForm({
 
   if (!open) return null;
 
-  // Get available hours (not booked)
-  const availableHours = availableSlots
-    .filter((slot) => !isSlotBooked(slot.startHour, slot.endHour, bookedRanges))
+  // Available start hours: not booked, not in the past
+  const availableStartHours = availableSlots
+    .filter((slot) => {
+      if (isSlotBooked(slot.startHour, slot.endHour, bookedRanges)) return false;
+      if (isToday && slot.startHour <= currentHour) return false;
+      return true;
+    })
     .map((slot) => slot.startHour);
 
-  const uniqueStartHours = Array.from(new Set(availableHours)).sort((a, b) => a - b);
-  const uniqueEndHours = Array.from(new Set(availableSlots.map((slot) => slot.endHour))).sort(
+  const uniqueStartHours = Array.from(new Set(availableStartHours)).sort((a, b) => a - b);
+  const uniqueEndHours = Array.from(new Set(availableSlots.map((s) => s.endHour))).sort(
     (a, b) => a - b,
   );
 
@@ -132,7 +142,7 @@ export function BookingForm({
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Đặt sân</h2>
             <p className="mt-1 text-sm text-gray-600">
-              {courtName} - {formatDate(selectedDate)}
+              {courtName} — {formatDate(selectedDate)}
             </p>
           </div>
           <button
@@ -144,96 +154,103 @@ export function BookingForm({
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Start Hour */}
-          <div>
-            <label htmlFor="startHour" className="block text-sm font-medium text-gray-700">
-              Giờ bắt đầu
-            </label>
-            <select
-              id="startHour"
-              {...register('startHour', { valueAsNumber: true })}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              disabled={isPending}
-            >
-              {uniqueStartHours.map((hour) => (
-                <option key={hour} value={hour}>
-                  {hour.toString().padStart(2, '0')}:00
-                </option>
-              ))}
-            </select>
-            {errors.startHour && (
-              <p className="mt-1 text-sm text-red-600">{errors.startHour.message}</p>
-            )}
+        {uniqueStartHours.length === 0 ? (
+          <div className="rounded-lg bg-yellow-50 p-4 text-center text-sm text-yellow-700">
+            Không còn khung giờ trống cho ngày này.
           </div>
-
-          {/* End Hour */}
-          <div>
-            <label htmlFor="endHour" className="block text-sm font-medium text-gray-700">
-              Giờ kết thúc
-            </label>
-            <select
-              id="endHour"
-              {...register('endHour', { valueAsNumber: true })}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              disabled={isPending}
-            >
-              {uniqueEndHours.map((hour) => (
-                <option key={hour} value={hour}>
-                  {hour.toString().padStart(2, '0')}:00
-                </option>
-              ))}
-            </select>
-            {errors.endHour && (
-              <p className="mt-1 text-sm text-red-600">{errors.endHour.message}</p>
-            )}
-          </div>
-
-          {/* Price Breakdown */}
-          {priceBreakdown ? (
-            <div className="rounded-lg bg-blue-50 p-4">
-              <h3 className="mb-2 text-sm font-medium text-gray-900">Chi tiết giá</h3>
-              <div className="space-y-1">
-                {priceBreakdown.coveredSlots.map((slot, index) => (
-                  <div key={index} className="flex justify-between text-sm text-gray-700">
-                    <span>
-                      {slot.startHour.toString().padStart(2, '0')}:00 -{' '}
-                      {slot.endHour.toString().padStart(2, '0')}:00
-                    </span>
-                    <span>{formatCurrency(slot.price)}</span>
-                  </div>
+        ) : (
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Start Hour */}
+            <div>
+              <label htmlFor="startHour" className="block text-sm font-medium text-gray-700">
+                Giờ bắt đầu
+              </label>
+              <select
+                id="startHour"
+                {...register('startHour', { valueAsNumber: true })}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                disabled={isPending}
+              >
+                {uniqueStartHours.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {String(hour).padStart(2, '0')}:00
+                  </option>
                 ))}
-                <div className="mt-2 flex justify-between border-t border-blue-200 pt-2 font-semibold text-gray-900">
-                  <span>Tổng cộng</span>
-                  <span className="text-blue-600">{formatCurrency(priceBreakdown.totalPrice)}</span>
+              </select>
+              {errors.startHour && (
+                <p className="mt-1 text-sm text-red-600">{errors.startHour.message}</p>
+              )}
+            </div>
+
+            {/* End Hour */}
+            <div>
+              <label htmlFor="endHour" className="block text-sm font-medium text-gray-700">
+                Giờ kết thúc
+              </label>
+              <select
+                id="endHour"
+                {...register('endHour', { valueAsNumber: true })}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                disabled={isPending}
+              >
+                {uniqueEndHours.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {String(hour === 24 ? 0 : hour).padStart(2, '0')}:00
+                  </option>
+                ))}
+              </select>
+              {errors.endHour && (
+                <p className="mt-1 text-sm text-red-600">{errors.endHour.message}</p>
+              )}
+            </div>
+
+            {/* Price Breakdown */}
+            {priceBreakdown ? (
+              <div className="rounded-lg bg-blue-50 p-4">
+                <h3 className="mb-2 text-sm font-medium text-gray-900">Chi tiết giá</h3>
+                <div className="space-y-1">
+                  {priceBreakdown.coveredSlots.map((slot, i) => (
+                    <div key={i} className="flex justify-between text-sm text-gray-700">
+                      <span>
+                        {String(slot.startHour).padStart(2, '0')}:00 —{' '}
+                        {String(slot.endHour).padStart(2, '0')}:00
+                      </span>
+                      <span>{formatCurrency(slot.price)}</span>
+                    </div>
+                  ))}
+                  <div className="mt-2 flex justify-between border-t border-blue-200 pt-2 font-semibold text-gray-900">
+                    <span>Tổng cộng</span>
+                    <span className="text-blue-600">
+                      {formatCurrency(priceBreakdown.totalPrice)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="rounded-lg bg-red-50 p-4">
-              <p className="text-sm text-red-600">
-                Khung giờ không hợp lệ. Vui lòng chọn các khung giờ liên tiếp.
-              </p>
-            </div>
-          )}
+            ) : (
+              <div className="rounded-lg bg-red-50 p-4">
+                <p className="text-sm text-red-600">
+                  Khung giờ không hợp lệ. Vui lòng chọn các khung giờ liên tiếp.
+                </p>
+              </div>
+            )}
 
-          {/* Actions */}
-          <div className="flex gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={isPending}
-              className="flex-1"
-            >
-              Hủy
-            </Button>
-            <Button type="submit" disabled={isPending || !priceBreakdown} className="flex-1">
-              {isPending ? 'Đang xử lý...' : 'Xác nhận đặt sân'}
-            </Button>
-          </div>
-        </form>
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={isPending}
+                className="flex-1"
+              >
+                Hủy
+              </Button>
+              <Button type="submit" disabled={isPending || !priceBreakdown} className="flex-1">
+                {isPending ? 'Đang xử lý...' : 'Xác nhận đặt sân'}
+              </Button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

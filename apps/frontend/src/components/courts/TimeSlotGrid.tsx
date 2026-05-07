@@ -9,6 +9,7 @@ interface TimeSlotGridProps {
   bookedRanges: BookedRange[];
   selectedStart?: number;
   selectedEnd?: number;
+  currentHour?: number; // If provided (today), slots at or before this hour are marked past
   onSlotClick?: (startHour: number, endHour: number) => void;
   onSlotSelect?: (startHour: number, endHour: number) => void;
 }
@@ -18,17 +19,19 @@ export function TimeSlotGrid({
   bookedRanges,
   selectedStart,
   selectedEnd,
+  currentHour,
   onSlotClick,
   onSlotSelect,
 }: TimeSlotGridProps) {
-  // Sort slots by start hour
   const sortedSlots = [...timeSlots].sort((a, b) => a.startHour - b.startHour);
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {sortedSlots.map((slot) => {
         const booked = isSlotBooked(slot.startHour, slot.endHour, bookedRanges);
-        const clickable = !booked && (onSlotClick || onSlotSelect);
+        const isPast = currentHour !== undefined && slot.startHour <= currentHour;
+        const unavailable = booked || isPast;
+        const clickable = !unavailable && (onSlotClick || onSlotSelect);
 
         // Check if this slot is in the selected range
         const isSelected =
@@ -50,16 +53,18 @@ export function TimeSlotGrid({
           <button
             key={slot.id}
             onClick={handleClick}
-            disabled={booked || (!onSlotClick && !onSlotSelect)}
+            disabled={unavailable || (!onSlotClick && !onSlotSelect)}
             className={cn(
               'rounded-lg border p-4 text-left transition-all',
-              booked
-                ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
-                : isSelected
-                  ? 'cursor-pointer border-blue-400 bg-blue-100 ring-2 ring-blue-300 hover:bg-blue-200'
-                  : clickable
-                    ? 'cursor-pointer border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100 hover:shadow-sm'
-                    : 'border-gray-200 bg-white',
+              isPast
+                ? 'cursor-not-allowed border-gray-100 bg-gray-50 opacity-40'
+                : booked
+                  ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
+                  : isSelected
+                    ? 'cursor-pointer border-blue-400 bg-blue-100 ring-2 ring-blue-300 hover:bg-blue-200'
+                    : clickable
+                      ? 'cursor-pointer border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100 hover:shadow-sm'
+                      : 'border-gray-200 bg-white',
             )}
           >
             {/* Time Range */}
@@ -78,7 +83,11 @@ export function TimeSlotGrid({
 
             {/* Status Badge */}
             <div>
-              {booked ? (
+              {isPast ? (
+                <span className="inline-block rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500">
+                  Đã qua
+                </span>
+              ) : booked ? (
                 <span className="inline-block rounded-full bg-gray-200 px-2 py-1 text-xs font-medium text-gray-700">
                   Đã đặt
                 </span>
