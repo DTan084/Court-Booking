@@ -29,7 +29,7 @@ export interface TimeSlotInput {
 }
 
 export interface UpsertTimeSlotsDto {
-  timeSlots: TimeSlotInput[];
+  slots: TimeSlotInput[];
 }
 
 type ApiErrorPayload = {
@@ -47,7 +47,7 @@ export function useCreateCourt() {
 
   return useMutation({
     mutationFn: async (dto: CreateCourtDto) => {
-      const response = await api.post('/admin/courts', dto);
+      const response = await api.post('/courts', dto);
       return response.data;
     },
     onSuccess: () => {
@@ -76,7 +76,7 @@ export function useUpdateCourt() {
 
   return useMutation({
     mutationFn: async ({ id, dto }: { id: string; dto: UpdateCourtDto }) => {
-      const response = await api.patch(`/admin/courts/${id}`, dto);
+      const response = await api.patch(`/courts/${id}`, dto);
       return response.data;
     },
     onSuccess: (_data, variables) => {
@@ -99,7 +99,7 @@ export function useDeleteCourt() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.delete(`/admin/courts/${id}`);
+      const response = await api.delete(`/courts/${id}`);
       return response.data;
     },
     onSuccess: () => {
@@ -128,7 +128,7 @@ export function useUpsertTimeSlots() {
 
   return useMutation({
     mutationFn: async ({ courtId, dto }: { courtId: string; dto: UpsertTimeSlotsDto }) => {
-      const response = await api.put(`/admin/courts/${courtId}/time-slots`, dto);
+      const response = await api.put(`/courts/${courtId}/time-slots`, dto);
       return response.data;
     },
     onSuccess: (_data, variables) => {

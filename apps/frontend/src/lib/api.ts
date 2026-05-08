@@ -122,9 +122,6 @@ export const queryKeys = {
   auth: {
     me: ['auth', 'me'] as const,
   },
-  admin: {
-    stats: (params: Record<string, unknown>) => ['admin', 'stats', params] as const,
-  },
 };
 
 export { api };

@@ -147,10 +147,16 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
       return;
     }
 
+    if (slots.length === 0) {
+      // Backend requires at least 1 slot — show warning
+      alert('Cần có ít nhất 1 khung giờ trước khi lưu.');
+      return;
+    }
+
     upsertTimeSlots({
       courtId,
       dto: {
-        timeSlots: slots.map(({ dayOfWeek, startHour, endHour, price }) => ({
+        slots: slots.map(({ dayOfWeek, startHour, endHour, price }) => ({
           dayOfWeek,
           startHour,
           endHour,
@@ -162,6 +168,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
 
   const totalSlots = slots.length;
   const hasErrors = slots.some((s) => s.error);
+  const canSave = totalSlots > 0 && !hasErrors;
 
   return (
     <div className="space-y-6">
@@ -348,8 +355,11 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
         <p className="text-sm text-muted-foreground">
           Tổng: <span className="font-medium text-foreground">{totalSlots} khung giờ</span>
           {hasErrors && <span className="ml-2 text-red-600">— Có lỗi cần sửa trước khi lưu</span>}
+          {totalSlots === 0 && (
+            <span className="ml-2 text-yellow-600">— Cần ít nhất 1 khung giờ</span>
+          )}
         </p>
-        <Button onClick={handleSave} disabled={isPending || hasErrors} className="gap-2">
+        <Button onClick={handleSave} disabled={isPending || !canSave} className="gap-2">
           <Save className="h-4 w-4" />
           {isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
         </Button>

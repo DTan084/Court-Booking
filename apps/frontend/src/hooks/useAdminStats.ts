@@ -3,38 +3,35 @@ import { api, queryKeys } from '@/lib/api';
 
 // ==================== TYPES ====================
 
-export interface TopCourt {
+export interface CourtStats {
   courtId: string;
   courtName: string;
-  bookingCount: number;
-}
-
-export interface AdminStats {
+  period: { from: string; to: string };
   totalBookings: number;
-  totalRevenue: number;
-  utilizationRate: number;
-  topCourts: TopCourt[];
+  totalHours: number;
+  utilizationPercentage: number;
+  totalAvailableHours: number;
 }
 
-export interface AdminStatsParams {
-  fromDate?: string; // YYYY-MM-DD
-  toDate?: string; // YYYY-MM-DD
+export interface CourtStatsParams {
+  fromDate: string; // ISO 8601 datetime e.g. "2026-04-01T00:00:00.000Z"
+  toDate: string; // ISO 8601 datetime
   [key: string]: unknown;
 }
 
 // ==================== HOOK ====================
 
 /**
- * Hook to fetch admin statistics
+ * Hook to fetch stats for a specific court (admin only)
  */
-export function useAdminStats(params: AdminStatsParams) {
-  return useQuery<AdminStats>({
-    queryKey: queryKeys.admin.stats(params),
+export function useCourtStats(courtId: string, params: CourtStatsParams) {
+  return useQuery<CourtStats>({
+    queryKey: queryKeys.courts.stats(courtId, params),
     queryFn: async () => {
-      const response = await api.get('/admin/stats', { params });
-      // Handle both wrapped and unwrapped responses
+      const response = await api.get(`/courts/${courtId}/stats`, { params });
       return response.data?.data ?? response.data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
+    enabled: !!courtId,
   });
 }

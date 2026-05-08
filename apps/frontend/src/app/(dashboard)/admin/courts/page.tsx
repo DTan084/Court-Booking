@@ -18,7 +18,7 @@ export default function AdminCourtsPage() {
   const [deleteCourt, setDeleteCourt] = useState<Court | null>(null);
 
   // Fetch all courts (admin view — no pagination needed for management)
-  const { data, isLoading } = useCourts({ page: 1, limit: 100 });
+  const { data, isLoading } = useCourts({ page: 1, limit: 50 });
   const courts = data?.data ?? [];
 
   return (
