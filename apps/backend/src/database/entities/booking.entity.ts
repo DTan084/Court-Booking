@@ -43,11 +43,30 @@ export class BookingEntity {
   endTime: Date;
 
   @Index()
-  @Column({ type: 'enum', enum: BookingStatus, default: BookingStatus.CONFIRMED })
+  @Column({ type: 'enum', enum: BookingStatus, default: BookingStatus.PENDING_PAYMENT })
   status: BookingStatus;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, name: 'total_price' })
   totalPrice: number;
+
+  // Phase 2: Payment fields
+  @Column({ type: 'timestamp with time zone', name: 'payment_deadline', nullable: true })
+  paymentDeadline: Date | null;
+
+  @Column({ type: 'timestamp with time zone', name: 'paid_at', nullable: true })
+  paidAt: Date | null;
+
+  @Column({ name: 'payment_method', nullable: true })
+  paymentMethod: string | null;
+
+  @Column({ name: 'payment_ref', nullable: true })
+  paymentRef: string | null;
+
+  @Column({ type: 'timestamp with time zone', name: 'expired_at', nullable: true })
+  expiredAt: Date | null;
+
+  @Column({ type: 'timestamp with time zone', name: 'completed_at', nullable: true })
+  completedAt: Date | null;
 
   @Column({ type: 'timestamp', nullable: true, name: 'cancelled_at' })
   cancelledAt: Date;

@@ -33,6 +33,10 @@ export class CourtEntity {
   @Column({ type: 'text' })
   address: string;
 
+  @Index()
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  district: string | null;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, name: 'price_per_hour' })
   pricePerHour: number;
 

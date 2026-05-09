@@ -29,6 +29,12 @@ export class UserEntity {
   @Column({ type: 'enum', enum: Role, default: Role.USER })
   role: Role;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phone: string | null;
+
+  @Column({ type: 'varchar', length: 500, name: 'avatar_url', nullable: true })
+  avatarUrl: string | null;
+
   @OneToMany(() => BookingEntity, (booking) => booking.user)
   bookings: BookingEntity[];
 
