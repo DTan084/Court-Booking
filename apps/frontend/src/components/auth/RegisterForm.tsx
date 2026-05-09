@@ -15,8 +15,12 @@ import axios from 'axios';
 const registerSchema = z
   .object({
     name: z.string().min(2, 'Tên tối thiểu 2 ký tự'),
-    email: z.string().email('Email không hợp lệ'),
-    password: z.string().min(8, 'Mật khẩu tối thiểu 8 ký tự'),
+    email: z.string().email('Email không hợp lệ').trim().toLowerCase(),
+    password: z
+      .string()
+      .min(8, 'Mật khẩu tối thiểu 8 ký tự')
+      .regex(/[A-Z]/, 'Mật khẩu phải chứa ít nhất 1 chữ hoa')
+      .regex(/[0-9]/, 'Mật khẩu phải chứa ít nhất 1 chữ số'),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {

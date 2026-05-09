@@ -14,7 +14,7 @@ import Link from 'next/link';
 import axios from 'axios';
 
 const loginSchema = z.object({
-  email: z.string().email('Email không hợp lệ'),
+  email: z.string().email('Email không hợp lệ').trim().toLowerCase(),
   password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
 });
 
