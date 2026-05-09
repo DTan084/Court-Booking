@@ -72,6 +72,19 @@
     }
   }
 
+  @keyframes bounce-subtle {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-2px);
+    }
+  }
+
+  .animate-bounce-subtle {
+    animation: bounce-subtle 0.5s ease-in-out infinite;
+  }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }

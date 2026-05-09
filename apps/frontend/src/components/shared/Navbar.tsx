@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut, Shield, User as UserIcon, Bell } from 'lucide-react';
 import { Role } from '@/types';
 import { AvatarImage } from '@/components/ui/avatar';
+import { NotificationBell } from './notification-bell';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -141,43 +142,46 @@ export function Navbar() {
           )}
         </div>
 
-        {/* User Avatar Dropdown or Login Button */}
+        {/* User Actions */}
         {user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative h-10 w-10 rounded-full border-2 border-primary/20 hover:border-primary/50 transition-all overflow-hidden"
-              >
-                <Avatar>
-                  <AvatarImage src={user.avatarUrl || ''} alt={user.name} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {getInitials(user?.name || '')}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user.name}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild className="cursor-pointer">
-                <Link href="/profile" className="flex items-center w-full">
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  <span>Hồ sơ của tôi</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Đăng xuất</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="relative h-10 w-10 rounded-full border-2 border-primary/20 hover:border-primary/50 transition-all overflow-hidden"
+                >
+                  <Avatar>
+                    <AvatarImage src={user.avatarUrl || ''} alt={user.name} />
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {getInitials(user?.name || '')}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link href="/profile" className="flex items-center w-full">
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>Hồ sơ của tôi</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Đăng xuất</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         ) : (
           <div className="flex items-center space-x-2">
             <Button asChild variant="ghost" size="sm">
