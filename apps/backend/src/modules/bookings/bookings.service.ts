@@ -11,7 +11,8 @@ import { differenceInHours } from 'date-fns';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
-import { BookingStatus } from '@court-booking/shared';
+import { BookingStatus, NotificationType } from '@court-booking/shared';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
 
@@ -29,6 +30,7 @@ export class BookingsService {
     @InjectRepository(CourtTimeSlotEntity)
     private readonly timeSlotRepository: Repository<CourtTimeSlotEntity>,
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
@@ -186,7 +188,24 @@ export class BookingsService {
       // REQ-17.3: PENDING_PAYMENT → CONFIRMED
       booking.status = BookingStatus.CONFIRMED;
       booking.paidAt = new Date();
-      return manager.save(booking);
+      const savedBooking = await manager.save(booking);
+
+      // REQ-23.2: Notification on CONFIRMED
+      const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
+
+      await this.notificationsService.create({
+        userId: savedBooking.userId,
+        type: NotificationType.BOOKING_CONFIRMED,
+        title: 'Đặt sân thành công',
+        message: `Bạn đã đặt thành công sân ${savedBooking.court?.name || 'thể thao'} lúc ${startTimeStr} ngày ${startDateStr}.`,
+        bookingId: savedBooking.id,
+      });
+
+      return savedBooking;
     });
   }
 
@@ -248,7 +267,24 @@ export class BookingsService {
 
       booking.status = BookingStatus.CANCELLED;
       booking.cancelledAt = now;
-      return manager.save(booking);
+      const savedBooking = await manager.save(booking);
+
+      // REQ-23.2: Notification on CANCELLED
+      const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
+
+      await this.notificationsService.create({
+        userId: savedBooking.userId,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: 'Đặt sân đã bị hủy',
+        message: `Lịch đặt sân ${savedBooking.court?.name || ''} lúc ${startTimeStr} ngày ${startDateStr} của bạn đã được hủy thành công.`,
+        bookingId: savedBooking.id,
+      });
+
+      return savedBooking;
     });
   }
 

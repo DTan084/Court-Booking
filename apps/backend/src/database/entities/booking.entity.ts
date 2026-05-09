@@ -71,6 +71,12 @@ export class BookingEntity {
   @Column({ type: 'timestamp', nullable: true, name: 'cancelled_at' })
   cancelledAt: Date;
 
+  @Column({ type: 'boolean', name: 'payment_reminder_sent', default: false })
+  paymentReminderSent: boolean;
+
+  @Column({ type: 'boolean', name: 'booking_reminder_sent', default: false })
+  bookingReminderSent: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -8,6 +8,7 @@ import { CourtsModule } from './modules/courts/courts.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
@@ -18,6 +19,7 @@ import { CourtEntity } from './database/entities/court.entity';
 import { CourtTimeSlotEntity } from './database/entities/court-time-slot.entity';
 import { BookingEntity } from './database/entities/booking.entity';
 import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
+import { NotificationEntity } from './database/entities/notification.entity';
 import { RedisModule } from './common/redis/redis.module';
 import { winstonConfig } from './config/winston.config';
 
@@ -39,7 +41,14 @@ import { winstonConfig } from './config/winston.config';
         username: configService.get<string>('database.user'),
         password: configService.get<string>('database.password'),
         database: configService.get<string>('database.name'),
-        entities: [UserEntity, CourtEntity, CourtTimeSlotEntity, BookingEntity, RefreshTokenEntity],
+        entities: [
+          UserEntity,
+          CourtEntity,
+          CourtTimeSlotEntity,
+          BookingEntity,
+          RefreshTokenEntity,
+          NotificationEntity,
+        ],
         synchronize: configService.get<boolean>('database.synchronize', false),
         logging: configService.get<boolean>('database.logging', false),
         maxQueryExecutionTime: configService.get<number>('database.maxQueryExecutionTime', 5000),
@@ -57,6 +66,7 @@ import { winstonConfig } from './config/winston.config';
     BookingsModule,
     HealthModule,
     UsersModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [],

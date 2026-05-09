@@ -34,6 +34,13 @@ export class BookingJobsScheduler implements OnApplicationBootstrap {
       { repeat: { cron: '*/5 * * * *' }, removeOnComplete: true, removeOnFail: false },
     );
 
-    this.logger.log('Booking lifecycle jobs scheduled');
+    // Schedule: send reminders (payment & booking) every 5 minutes
+    await this.bookingQueue.add(
+      'send-reminders',
+      {},
+      { repeat: { cron: '*/5 * * * *' }, removeOnComplete: true, removeOnFail: false },
+    );
+
+    this.logger.log('Booking lifecycle and reminder jobs scheduled');
   }
 }
