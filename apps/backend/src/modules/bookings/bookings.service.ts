@@ -150,7 +150,7 @@ export class BookingsService {
    * Chuyển PENDING_PAYMENT → CONFIRMED khi deadline chưa qua.
    */
   async confirmPayment(bookingId: string, userId: string): Promise<BookingEntity> {
-    return this.dataSource.transaction(async (manager) => {
+    const savedBooking = await this.dataSource.transaction(async (manager) => {
       const booking = await manager.findOne(BookingEntity, {
         where: { id: bookingId },
         lock: { mode: 'pessimistic_write' },
@@ -188,25 +188,27 @@ export class BookingsService {
       // REQ-17.3: PENDING_PAYMENT → CONFIRMED
       booking.status = BookingStatus.CONFIRMED;
       booking.paidAt = new Date();
-      const savedBooking = await manager.save(booking);
+      return manager.save(booking);
+    });
 
-      // REQ-23.2: Notification on CONFIRMED
-      const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
+    // REQ-23.2: Notification on CONFIRMED
+    const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
 
-      await this.notificationsService.create({
+    this.notificationsService
+      .create({
         userId: savedBooking.userId,
         type: NotificationType.BOOKING_CONFIRMED,
         title: 'Đặt sân thành công',
         message: `Bạn đã đặt thành công sân ${savedBooking.court?.name || 'thể thao'} lúc ${startTimeStr} ngày ${startDateStr}.`,
         bookingId: savedBooking.id,
-      });
+      })
+      .catch(console.error);
 
-      return savedBooking;
-    });
+    return savedBooking;
   }
 
   private findCoveringSlots(
@@ -232,7 +234,7 @@ export class BookingsService {
    * REQ-19: Cancel policy — 24h creation window + 12h before start
    */
   async cancelBooking(id: string, userId: string): Promise<BookingEntity> {
-    return this.dataSource.transaction(async (manager) => {
+    const savedBooking = await this.dataSource.transaction(async (manager) => {
       const booking = await manager.findOne(BookingEntity, {
         where: { id },
         lock: { mode: 'pessimistic_write' },
@@ -267,25 +269,27 @@ export class BookingsService {
 
       booking.status = BookingStatus.CANCELLED;
       booking.cancelledAt = now;
-      const savedBooking = await manager.save(booking);
+      return manager.save(booking);
+    });
 
-      // REQ-23.2: Notification on CANCELLED
-      const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
+    // REQ-23.2: Notification on CANCELLED
+    const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
 
-      await this.notificationsService.create({
+    this.notificationsService
+      .create({
         userId: savedBooking.userId,
         type: NotificationType.BOOKING_CANCELLED,
         title: 'Đặt sân đã bị hủy',
         message: `Lịch đặt sân ${savedBooking.court?.name || ''} lúc ${startTimeStr} ngày ${startDateStr} của bạn đã được hủy thành công.`,
         bookingId: savedBooking.id,
-      });
+      })
+      .catch(console.error);
 
-      return savedBooking;
-    });
+    return savedBooking;
   }
 
   async findMyBookings(userId: string, query: GetMyBookingsDto) {

@@ -91,16 +91,6 @@ export class BookingsController {
     return this.bookingsService.confirmPayment(id, user.id);
   }
 
-  @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a single booking by ID (owner only)' })
-  @ApiResponse({ status: 200, description: 'Booking detail', type: BookingResponse })
-  @ApiResponse({ status: 404, description: 'Booking not found', type: ApiErrorResponse })
-  async getBooking(@Param('id') id: string, @CurrentUser() user: UserEntity) {
-    return this.bookingsService.findOne(id, user.id);
-  }
-
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -120,5 +110,15 @@ export class BookingsController {
     @CurrentUser() user: UserEntity,
   ) {
     return this.bookingsService.findMyBookings(user.id, query);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a single booking by ID (owner only)' })
+  @ApiResponse({ status: 200, description: 'Booking detail', type: BookingResponse })
+  @ApiResponse({ status: 404, description: 'Booking not found', type: ApiErrorResponse })
+  async getBooking(@Param('id') id: string, @CurrentUser() user: UserEntity) {
+    return this.bookingsService.findOne(id, user.id);
   }
 }
