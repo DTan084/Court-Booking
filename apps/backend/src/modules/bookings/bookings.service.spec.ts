@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { BookingStatus } from '@court-booking/shared';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const mockBookingRepository = () => ({
   find: jest.fn(),
@@ -81,6 +82,12 @@ describe('BookingsService', () => {
         {
           provide: DataSource,
           useFactory: mockDataSource,
+        },
+        {
+          provide: NotificationsService,
+          useValue: {
+            create: jest.fn().mockResolvedValue({}),
+          },
         },
       ],
     }).compile();
@@ -163,7 +170,7 @@ describe('BookingsService', () => {
 
     it('should throw BadRequestException if cancellation is too close to start time', async () => {
       const startTime = new Date();
-      startTime.setHours(startTime.getHours() + 1); // 1 hour away (too close)
+      startTime.setHours(startTime.getHours() + 1); // 1 hour away (too close, must be > 12h)
 
       dataSource.transaction.mockImplementation(async (cb) => {
         const mockManager = {
@@ -172,6 +179,7 @@ describe('BookingsService', () => {
             userId: mockUserId,
             status: BookingStatus.CONFIRMED,
             startTime,
+            createdAt: new Date(), // Just created
           }),
         };
         return cb(mockManager);
@@ -184,13 +192,14 @@ describe('BookingsService', () => {
 
     it('should cancel the booking if all conditions are met', async () => {
       const startTime = new Date();
-      startTime.setHours(startTime.getHours() + 3); // 3 hours away (valid)
+      startTime.setHours(startTime.getHours() + 15); // 15 hours away (valid, > 12h)
 
       const booking = {
         id: mockBookingId,
         userId: mockUserId,
         status: BookingStatus.CONFIRMED,
         startTime,
+        createdAt: new Date(), // Just created (valid, < 24h)
       };
 
       dataSource.transaction.mockImplementation(async (cb) => {

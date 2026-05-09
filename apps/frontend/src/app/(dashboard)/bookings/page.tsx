@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Calendar } from 'lucide-react';
 import { useMyBookings } from '@/hooks/useBookings';
 import { BookingRow } from '@/components/bookings/BookingRow';
@@ -43,6 +44,21 @@ export default function BookingsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // REQ-24.9: Handle deep linking with highlight
+  const searchParams = useSearchParams();
+  const highlightedId = searchParams.get('highlight');
+
+  useEffect(() => {
+    if (highlightedId && !isLoading && data?.data) {
+      const element = document.getElementById(`booking-${highlightedId}`);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      }
+    }
+  }, [highlightedId, isLoading, data]);
+
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8">
       <div className="space-y-6">
@@ -71,7 +87,11 @@ export default function BookingsPage() {
           <>
             <div className="space-y-4">
               {data.data.map((booking) => (
-                <BookingRow key={booking.id} booking={booking} />
+                <BookingRow
+                  key={booking.id}
+                  booking={booking}
+                  isHighlighted={highlightedId === booking.id}
+                />
               ))}
             </div>
 

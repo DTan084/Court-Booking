@@ -6,7 +6,7 @@ import { CancelDialog } from './CancelDialog';
 import { formatCurrency, cn } from '@/lib/utils';
 import { canCancelBooking } from '@/lib/booking-utils';
 import { CreditCard, MapPin, Calendar, Clock, DollarSign } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { BookingStatus } from '@/types';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -19,6 +19,7 @@ export type BookingWithCourt = Booking & { court: Court };
 
 interface BookingRowProps {
   booking: BookingWithCourt;
+  isHighlighted?: boolean;
 }
 
 // ==================== STATUS CONFIG ====================
@@ -36,7 +37,7 @@ const statusConfig: Record<BookingStatusType, { label: string; color: string }> 
 
 // ==================== COMPONENT ====================
 
-export function BookingRow({ booking }: BookingRowProps) {
+export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const router = useRouter();
 
@@ -66,7 +67,15 @@ export function BookingRow({ booking }: BookingRowProps) {
 
   return (
     <>
-      <div className="rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md">
+      <div
+        id={`booking-${booking.id}`}
+        className={cn(
+          'rounded-xl border bg-card p-5 shadow-sm transition-all duration-500',
+          isHighlighted
+            ? 'ring-2 ring-primary border-primary bg-primary/5 shadow-lg scale-[1.01] animate-pulse-subtle'
+            : 'hover:shadow-md border-muted-foreground/20',
+        )}
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           {/* Left: Booking Info */}
           <div className="flex-1 space-y-3">

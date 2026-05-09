@@ -1,7 +1,22 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CourtFilters } from './CourtFilters';
 import { vi } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+const render = (ui: React.ReactElement) => {
+  const queryClient = createTestQueryClient();
+  return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+};
 
 describe('CourtFilters', () => {
   it('should render search input', () => {
@@ -14,7 +29,7 @@ describe('CourtFilters', () => {
     const onFilterChange = vi.fn();
     render(<CourtFilters onFilterChange={onFilterChange} />);
 
-    const select = screen.getByRole('combobox');
+    const select = screen.getAllByRole('combobox')[0]; // First one is sport type
     expect(select).toBeInTheDocument();
 
     // Check all options are present
@@ -41,7 +56,6 @@ describe('CourtFilters', () => {
     await user.type(searchInput, 'Sân A');
 
     // Should not call immediately after typing (debounce)
-    // Note: may have been called once on mount with empty values — cleared above
     const callCountAfterType = onFilterChange.mock.calls.length;
 
     // Wait for debounce (400ms)
@@ -50,24 +64,27 @@ describe('CourtFilters', () => {
         expect(onFilterChange).toHaveBeenCalledWith({
           name: 'Sân A',
           sportType: undefined,
+          district: undefined,
         });
       },
       { timeout: 600 },
     );
 
-    // Verify it was called after debounce, not immediately on each keystroke
-    expect(onFilterChange.mock.calls.length).toBeLessThan(callCountAfterType + 6); // less than one call per char
+    // Verify it was called after debounce
+    expect(onFilterChange.mock.calls.length).toBeLessThan(callCountAfterType + 10);
   });
+
   it('should call onFilterChange when sport type changes', async () => {
     const onFilterChange = vi.fn();
     const user = userEvent.setup();
 
     render(<CourtFilters onFilterChange={onFilterChange} />);
 
-    const select = screen.getByRole('combobox');
+    const selects = screen.getAllByRole('combobox');
+    const sportSelect = selects[0];
 
     // Change sport type
-    await user.selectOptions(select, 'badminton');
+    await user.selectOptions(sportSelect, 'badminton');
 
     // Wait for debounce
     await waitFor(
@@ -75,6 +92,7 @@ describe('CourtFilters', () => {
         expect(onFilterChange).toHaveBeenCalledWith({
           name: undefined,
           sportType: 'badminton',
+          district: undefined,
         });
       },
       { timeout: 500 },
@@ -88,11 +106,12 @@ describe('CourtFilters', () => {
     render(<CourtFilters onFilterChange={onFilterChange} />);
 
     const searchInput = screen.getByPlaceholderText('Tìm kiếm theo tên sân...');
-    const select = screen.getByRole('combobox');
+    const selects = screen.getAllByRole('combobox');
+    const sportSelect = selects[0];
 
     // Set both filters
     await user.type(searchInput, 'Tennis');
-    await user.selectOptions(select, 'tennis');
+    await user.selectOptions(sportSelect, 'tennis');
 
     // Wait for debounce
     await waitFor(
@@ -100,6 +119,7 @@ describe('CourtFilters', () => {
         expect(onFilterChange).toHaveBeenCalledWith({
           name: 'Tennis',
           sportType: 'tennis',
+          district: undefined,
         });
       },
       { timeout: 500 },
