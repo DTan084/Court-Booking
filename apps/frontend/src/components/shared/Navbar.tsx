@@ -16,8 +16,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LogOut, Shield } from 'lucide-react';
+import { LogOut, Shield, User as UserIcon, Bell } from 'lucide-react';
 import { Role } from '@/types';
+import { AvatarImage } from '@/components/ui/avatar';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -144,8 +145,12 @@ export function Navbar() {
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+              <Button
+                variant="ghost"
+                className="relative h-10 w-10 rounded-full border-2 border-primary/20 hover:border-primary/50 transition-all overflow-hidden"
+              >
                 <Avatar>
+                  <AvatarImage src={user.avatarUrl || ''} alt={user.name} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
                     {getInitials(user?.name || '')}
                   </AvatarFallback>
@@ -159,6 +164,13 @@ export function Navbar() {
                   <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                 </div>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/profile" className="flex items-center w-full">
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  <span>Hồ sơ của tôi</span>
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                 <LogOut className="mr-2 h-4 w-4" />
