@@ -7,6 +7,8 @@ export const getCourtsSchema = z.object({
   name: z.string().optional(),
   sportType: z.nativeEnum(SportType).optional(),
   address: z.string().optional(),
+  district: z.string().optional(), // REQ-21.2: exact match filter
+  location: z.string().optional(), // REQ-21.2: ILIKE search in address
 });
 
 export type GetCourtsDto = z.infer<typeof getCourtsSchema>;

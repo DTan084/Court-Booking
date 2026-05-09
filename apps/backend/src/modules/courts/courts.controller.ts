@@ -78,10 +78,33 @@ export class CourtsController {
   @ApiQuery({ name: 'name', required: false, type: String })
   @ApiQuery({ name: 'sportType', required: false, enum: SportType })
   @ApiQuery({ name: 'address', required: false, type: String })
+  @ApiQuery({
+    name: 'district',
+    required: false,
+    type: String,
+    description: 'Exact match (case-insensitive)',
+  })
+  @ApiQuery({
+    name: 'location',
+    required: false,
+    type: String,
+    description: 'ILIKE search in address',
+  })
   @ApiResponse({ status: 200, description: 'Paginated list of courts', type: CourtsListResponse })
   @UsePipes(new ZodValidationPipe(getCourtsSchema))
   async findAll(@Query() query: GetCourtsDto) {
     return this.courtsService.findAll(query);
+  }
+
+  @Get('districts')
+  @ApiOperation({ summary: 'Get distinct districts of active courts (REQ-21.4)' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of districts',
+    schema: { type: 'array', items: { type: 'string' } },
+  })
+  async getDistricts() {
+    return this.courtsService.getDistricts();
   }
 
   @Get(':id')

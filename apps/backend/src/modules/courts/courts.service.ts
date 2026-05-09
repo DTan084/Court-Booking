@@ -38,7 +38,7 @@ export class CourtsService {
   }
 
   async findAll(query: GetCourtsDto) {
-    const { page, limit, name, sportType, address } = query;
+    const { page, limit, name, sportType, address, district } = query;
 
     // Generate cache key based on query params
     const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
@@ -61,6 +61,10 @@ export class CourtsService {
     }
     if (address) {
       where.address = ILike(`%${address}%`);
+    }
+    if (district) {
+      // REQ-21.3: case-insensitive exact match
+      where.district = ILike(district);
     }
 
     const [data, total] = await this.courtRepository.findAndCount({
@@ -127,6 +131,22 @@ export class CourtsService {
     // Invalidate cache
     await this.invalidateCourtCache(id);
     await this.invalidateCourtsListCache();
+  }
+
+  /**
+   * REQ-21.4: GET /courts/districts — distinct districts of ACTIVE courts
+   */
+  async getDistricts(): Promise<string[]> {
+    const rows = await this.courtRepository
+      .createQueryBuilder('c')
+      .select('DISTINCT c.district', 'district')
+      .where('c.deleted_at IS NULL')
+      .andWhere('c.district IS NOT NULL')
+      .andWhere("c.status = 'ACTIVE'")
+      .orderBy('district', 'ASC')
+      .getRawMany();
+
+    return rows.map((r) => r.district as string);
   }
 
   async getStats(id: string, query: GetCourtStatsDto) {

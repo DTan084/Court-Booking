@@ -9,6 +9,7 @@ export const createCourtSchema = z.object({
   address: z.string().min(5, 'Address must be at least 5 characters long'),
   pricePerHour: z.number().min(0, 'Price must be positive'),
   description: z.string().max(500).optional(),
+  district: z.string().max(100).optional(), // REQ-21.8
 });
 
 export type CreateCourtDto = z.infer<typeof createCourtSchema>;
