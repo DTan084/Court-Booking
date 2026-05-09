@@ -56,10 +56,10 @@ export class BookingEntity {
   @Column({ type: 'timestamp with time zone', name: 'paid_at', nullable: true })
   paidAt: Date | null;
 
-  @Column({ name: 'payment_method', nullable: true })
+  @Column({ type: 'varchar', name: 'payment_method', nullable: true })
   paymentMethod: string | null;
 
-  @Column({ name: 'payment_ref', nullable: true })
+  @Column({ type: 'varchar', name: 'payment_ref', nullable: true })
   paymentRef: string | null;
 
   @Column({ type: 'timestamp with time zone', name: 'expired_at', nullable: true })
@@ -68,7 +68,7 @@ export class BookingEntity {
   @Column({ type: 'timestamp with time zone', name: 'completed_at', nullable: true })
   completedAt: Date | null;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'cancelled_at' })
+  @Column({ type: 'timestamp with time zone', nullable: true, name: 'cancelled_at' })
   cancelledAt: Date;
 
   @Column({ type: 'boolean', name: 'payment_reminder_sent', default: false })

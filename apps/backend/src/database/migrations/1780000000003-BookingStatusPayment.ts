@@ -2,6 +2,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class BookingStatusPayment1780000000003 implements MigrationInterface {
   name = 'BookingStatusPayment1780000000003';
+  transaction = false;
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Add new enum values (PostgreSQL requires individual ALTER TYPE statements)
@@ -9,7 +10,12 @@ export class BookingStatusPayment1780000000003 implements MigrationInterface {
       `ALTER TYPE "bookings_status_enum" ADD VALUE IF NOT EXISTS 'PENDING_PAYMENT'`,
     );
     await queryRunner.query(`ALTER TYPE "bookings_status_enum" ADD VALUE IF NOT EXISTS 'EXPIRED'`);
-    // COMPLETED already exists from Phase 1 but was lowercase — add uppercase
+    await queryRunner.query(
+      `ALTER TYPE "bookings_status_enum" ADD VALUE IF NOT EXISTS 'CONFIRMED'`,
+    );
+    await queryRunner.query(
+      `ALTER TYPE "bookings_status_enum" ADD VALUE IF NOT EXISTS 'CANCELLED'`,
+    );
     await queryRunner.query(
       `ALTER TYPE "bookings_status_enum" ADD VALUE IF NOT EXISTS 'COMPLETED'`,
     );
