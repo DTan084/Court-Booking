@@ -51,8 +51,9 @@ export function ProfileClient() {
       onSuccess: () => {
         toast.success('Cập nhật thông tin thành công');
       },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật hồ sơ');
+      onError: (error: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        toast.error((error as any).response?.data?.message || 'Có lỗi xảy ra khi cập nhật hồ sơ');
       },
     });
   };
