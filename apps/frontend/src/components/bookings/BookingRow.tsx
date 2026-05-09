@@ -6,7 +6,7 @@ import { CancelDialog } from './CancelDialog';
 import { formatCurrency, cn } from '@/lib/utils';
 import { canCancelBooking } from '@/lib/booking-utils';
 import { CreditCard, MapPin, Calendar, Clock, DollarSign } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { BookingStatus } from '@/types';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';

@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   CheckCircle2,
   AlertTriangle,
+  Info,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -79,7 +80,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
     try {
       await confirmPayment.mutateAsync(bookingId);
       setIsConfirmOpen(false);
-    } catch (error) {
+    } catch (_error) {
+      // eslint-disable-line @typescript-eslint/no-unused-vars
       // Error handled by mutation
       setIsConfirmOpen(false);
     }

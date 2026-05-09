@@ -7,7 +7,13 @@ import { z } from 'zod';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCreateBooking } from '@/hooks/useBookings';
-import { calculateBookingPrice, formatCurrency, formatDate, isSlotBooked } from '@/lib/utils';
+import {
+  calculateBookingPrice,
+  formatCurrency,
+  formatDate,
+  isSlotBooked,
+  buildLocalISO,
+} from '@/lib/utils';
 import { getBookingTimeWarning } from '@/lib/booking-utils';
 import { DoubleConfirmationDialog } from '@/components/shared/double-confirmation-dialog';
 import { useRouter } from 'next/navigation';
