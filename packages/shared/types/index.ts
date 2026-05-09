@@ -3,8 +3,8 @@
 // ── Enums ──────────────────────────────────────
 
 export enum Role {
-  USER = 'user',
-  ADMIN = 'admin',
+  USER = 'USER',
+  ADMIN = 'ADMIN',
 }
 
 export enum BookingStatus {
@@ -24,11 +24,16 @@ export enum NotificationType {
 }
 
 export enum SportType {
-  BADMINTON = 'badminton',
-  TENNIS = 'tennis',
-  FOOTBALL = 'football',
-  BASKETBALL = 'basketball',
-  VOLLEYBALL = 'volleyball',
+  BADMINTON = 'BADMINTON',
+  TENNIS = 'TENNIS',
+  FOOTBALL = 'FOOTBALL',
+  BASKETBALL = 'BASKETBALL',
+  VOLLEYBALL = 'VOLLEYBALL',
+}
+
+export enum CourtStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
 }
 
 // ── Base Types ─────────────────────────────────
