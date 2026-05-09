@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { useDistricts } from '@/hooks/useCourts';
 import type { SportType } from '@/types';
+import { SportType as SportTypeEnum } from '@court-booking/shared';
 
 interface CourtFiltersProps {
   onFilterChange: (filters: { name?: string; sportType?: SportType; district?: string }) => void;
@@ -13,11 +14,11 @@ interface CourtFiltersProps {
 // Sport type options
 const sportTypeOptions: { value: SportType | ''; label: string }[] = [
   { value: '', label: 'Tất cả' },
-  { value: 'badminton' as SportType, label: 'Cầu lông' },
-  { value: 'tennis' as SportType, label: 'Tennis' },
-  { value: 'football' as SportType, label: 'Bóng đá' },
-  { value: 'basketball' as SportType, label: 'Bóng rổ' },
-  { value: 'volleyball' as SportType, label: 'Bóng chuyền' },
+  { value: SportTypeEnum.BADMINTON, label: 'Cầu lông' },
+  { value: SportTypeEnum.TENNIS, label: 'Tennis' },
+  { value: SportTypeEnum.FOOTBALL, label: 'Bóng đá' },
+  { value: SportTypeEnum.BASKETBALL, label: 'Bóng rổ' },
+  { value: SportTypeEnum.VOLLEYBALL, label: 'Bóng chuyền' },
 ];
 
 export function CourtFilters({ onFilterChange }: CourtFiltersProps) {
@@ -77,11 +78,12 @@ export function CourtFilters({ onFilterChange }: CourtFiltersProps) {
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <option value="">Tất cả khu vực</option>
-          {districts.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
+          {Array.isArray(districts) &&
+            districts.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
         </select>
       </div>
     </div>

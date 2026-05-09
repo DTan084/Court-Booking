@@ -84,14 +84,14 @@ describe('CourtFilters', () => {
     const sportSelect = selects[0];
 
     // Change sport type
-    await user.selectOptions(sportSelect, 'badminton');
+    await user.selectOptions(sportSelect, 'BADMINTON');
 
     // Wait for debounce
     await waitFor(
       () => {
         expect(onFilterChange).toHaveBeenCalledWith({
           name: undefined,
-          sportType: 'badminton',
+          sportType: 'BADMINTON',
           district: undefined,
         });
       },
@@ -111,14 +111,14 @@ describe('CourtFilters', () => {
 
     // Set both filters
     await user.type(searchInput, 'Tennis');
-    await user.selectOptions(sportSelect, 'tennis');
+    await user.selectOptions(sportSelect, 'TENNIS');
 
     // Wait for debounce
     await waitFor(
       () => {
         expect(onFilterChange).toHaveBeenCalledWith({
           name: 'Tennis',
-          sportType: 'tennis',
+          sportType: 'TENNIS',
           district: undefined,
         });
       },

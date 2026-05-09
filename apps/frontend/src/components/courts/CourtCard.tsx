@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { MapPin, DollarSign } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
-import type { Court, SportType, CourtStatus } from '@/types';
+import { SportType, CourtStatus } from '@/types';
+import type { Court } from '@/types';
 
 interface CourtCardProps {
   court: Court;
@@ -9,20 +10,20 @@ interface CourtCardProps {
 
 // Sport type labels in Vietnamese
 const sportTypeLabels: Record<SportType, string> = {
-  badminton: 'Cầu lông',
-  tennis: 'Tennis',
-  football: 'Bóng đá',
-  basketball: 'Bóng rổ',
-  volleyball: 'Bóng chuyền',
+  [SportType.BADMINTON]: 'Cầu lông',
+  [SportType.TENNIS]: 'Tennis',
+  [SportType.FOOTBALL]: 'Bóng đá',
+  [SportType.BASKETBALL]: 'Bóng rổ',
+  [SportType.VOLLEYBALL]: 'Bóng chuyền',
 };
 
 // Sport type colors
 const sportTypeColors: Record<SportType, string> = {
-  badminton: 'bg-blue-100 text-blue-700',
-  tennis: 'bg-green-100 text-green-700',
-  football: 'bg-orange-100 text-orange-700',
-  basketball: 'bg-purple-100 text-purple-700',
-  volleyball: 'bg-pink-100 text-pink-700',
+  [SportType.BADMINTON]: 'bg-blue-100 text-blue-700',
+  [SportType.TENNIS]: 'bg-green-100 text-green-700',
+  [SportType.FOOTBALL]: 'bg-orange-100 text-orange-700',
+  [SportType.BASKETBALL]: 'bg-purple-100 text-purple-700',
+  [SportType.VOLLEYBALL]: 'bg-pink-100 text-pink-700',
 };
 
 // Status labels and colors

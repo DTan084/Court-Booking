@@ -16,6 +16,7 @@ type UseScheduleResult = {
 };
 
 // Helper to create mock return value - bypass strict UseQueryResult type in tests
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockScheduleReturn = (result: UseScheduleResult) =>
   mockUseSchedule.mockReturnValue(result as any);
 
