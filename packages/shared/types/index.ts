@@ -8,9 +8,19 @@ export enum Role {
 }
 
 export enum BookingStatus {
-  CONFIRMED = 'confirmed',
-  CANCELLED = 'cancelled',
-  COMPLETED = 'completed',
+  PENDING_PAYMENT = 'PENDING_PAYMENT',
+  CONFIRMED = 'CONFIRMED',
+  CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
+  EXPIRED = 'EXPIRED',
+}
+
+export enum NotificationType {
+  BOOKING_CONFIRMED = 'BOOKING_CONFIRMED',
+  PAYMENT_REMINDER = 'PAYMENT_REMINDER',
+  BOOKING_REMINDER = 'BOOKING_REMINDER',
+  BOOKING_EXPIRED = 'BOOKING_EXPIRED',
+  BOOKING_CANCELLED = 'BOOKING_CANCELLED',
 }
 
 export enum SportType {
@@ -27,7 +37,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  phone?: string;
+  phone: string | null;
+  avatarUrl: string | null;
   role: Role;
   createdAt: string;
   updatedAt: string;
@@ -38,9 +49,11 @@ export interface Court {
   name: string;
   sportType: SportType;
   address: string;
+  district: string | null;
   description?: string;
   pricePerHour: number;
   isActive: boolean;
+  status?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -49,12 +62,29 @@ export interface Booking {
   id: string;
   courtId: string;
   userId: string;
+  court?: Court;
   startTime: string;
   endTime: string;
   status: BookingStatus;
   totalPrice: number;
+  paymentDeadline: string | null;
+  paidAt: string | null;
+  cancelledAt: string | null;
+  cancellationDeadline: string | null; // createdAt + 24h
+  latestCancellableTime: string | null; // startTime - 12h
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  bookingId: string | null;
+  createdAt: string;
 }
 
 // ── API Response Types ─────────────────────────
