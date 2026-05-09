@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LogOut, Shield, User as UserIcon, Bell } from 'lucide-react';
+import { LogOut, Shield, User as UserIcon } from 'lucide-react';
 import { Role } from '@/types';
 import { AvatarImage } from '@/components/ui/avatar';
 import { NotificationBell } from './notification-bell';

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Bell, CheckCheck, Loader2 } from 'lucide-react';
+import { Bell, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
