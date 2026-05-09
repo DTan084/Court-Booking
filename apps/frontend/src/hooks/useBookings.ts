@@ -129,26 +129,65 @@ export function useCancelBooking() {
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate user's booking list
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.bookings.all,
-      });
-
-      // Invalidate all court schedules (we don't know which court was affected)
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.courts.all,
-      });
-
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
       toast.success('Hủy đặt sân thành công');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
-      const status = error.response?.status;
-      const message = error.response?.data?.error?.message || error.response?.data?.message || '';
+      const message = error.response?.data?.message || '';
 
-      if (status === 400 && message.toLowerCase().includes('2 hour')) {
-        toast.error('Không thể hủy đặt sân trong vòng 2 giờ trước giờ chơi');
+      if (message.includes('12 giờ')) {
+        toast.error('Không thể hủy đặt sân trong vòng 12 giờ trước giờ chơi');
+      } else if (message.includes('24 giờ')) {
+        toast.error('Chỉ có thể hủy trong vòng 24 giờ kể từ khi đặt');
       } else {
         toast.error('Không thể hủy đặt sân, vui lòng thử lại');
+      }
+    },
+  });
+}
+
+/**
+ * Hook to fetch a single booking detail (REQ-18.10)
+ */
+export function useBooking(id: string, options?: { refetchInterval?: number }) {
+  return useQuery<BookingWithCourt>({
+    queryKey: queryKeys.bookings.detail(id),
+    queryFn: async () => {
+      const response = await api.get(`/bookings/${id}`);
+      return response.data;
+    },
+    enabled: !!id,
+    ...options,
+  });
+}
+
+/**
+ * Hook to confirm payment (REQ-17)
+ */
+export function useConfirmPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post(`/bookings/${id}/confirm-payment`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+      toast.success('Thanh toán thành công!');
+    },
+    onError: (error: AxiosError<ApiErrorPayload>) => {
+      const status = error.response?.status;
+      const message = error.response?.data?.message || '';
+
+      if (status === 400 && message.includes('hết hạn')) {
+        toast.error('Booking đã hết hạn thanh toán');
+      } else if (status === 409) {
+        toast.error('Booking này đã được thanh toán');
+      } else {
+        toast.error('Không thể xác nhận thanh toán, vui lòng thử lại');
       }
     },
   });
