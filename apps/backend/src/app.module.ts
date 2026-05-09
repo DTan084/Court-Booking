@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CourtsModule } from './modules/courts/courts.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { HealthModule } from './modules/health/health.module';
+import { UsersModule } from './modules/users/users.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
@@ -55,6 +56,7 @@ import { winstonConfig } from './config/winston.config';
     CourtsModule,
     BookingsModule,
     HealthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [],
