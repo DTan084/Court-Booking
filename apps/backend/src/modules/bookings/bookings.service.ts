@@ -7,13 +7,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
+import { differenceInHours } from 'date-fns';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { BookingStatus } from '@court-booking/shared';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
+
+const PAYMENT_DEADLINE_MINUTES = 30;
+const CANCEL_WITHIN_HOURS = 24; // Rule A: must be within 24h of creation
+const NO_CANCEL_BEFORE_HOURS = 12; // Rule B: must be > 12h before start
 
 @Injectable()
 export class BookingsService {
@@ -25,14 +29,9 @@ export class BookingsService {
     @InjectRepository(CourtTimeSlotEntity)
     private readonly timeSlotRepository: Repository<CourtTimeSlotEntity>,
     private readonly dataSource: DataSource,
-    private readonly configService: ConfigService,
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
-    // date is "YYYY-MM-DD" in local time. Query the full local day.
-    // Using T00:00:00 and T23:59:59.999 without Z means the DB driver
-    // interprets them in the server's local timezone — consistent with how
-    // bookings are stored (frontend sends ISO with timezone offset).
     const startDate = new Date(`${date}T00:00:00`);
     const endDate = new Date(`${date}T23:59:59.999`);
 
@@ -41,11 +40,11 @@ export class BookingsService {
       .select(['booking.id', 'booking.startTime', 'booking.endTime', 'booking.status'])
       .where('booking.courtId = :courtId', { courtId })
       .andWhere('booking.startTime BETWEEN :startDate AND :endDate', { startDate, endDate })
-      .andWhere('booking.status != :cancelledStatus', { cancelledStatus: BookingStatus.CANCELLED })
+      // REQ-16.7: Only CONFIRMED blocks the slot. PENDING_PAYMENT does NOT block.
+      .andWhere('booking.status = :confirmedStatus', { confirmedStatus: BookingStatus.CONFIRMED })
       .orderBy('booking.startTime', 'ASC')
       .getMany();
 
-    // Verify court exists only if no bookings found (optimization for common case)
     if (bookings.length === 0) {
       const courtCount = await this.courtRepository.count({ where: { id: courtId } });
       if (courtCount === 0) {
@@ -70,7 +69,6 @@ export class BookingsService {
       throw new BadRequestException('Invalid booking duration');
     }
 
-    // startTime/endTime must be on whole hours
     if (start.getMinutes() !== 0 || end.getMinutes() !== 0) {
       throw new BadRequestException('Booking must start and end on the hour (e.g. 08:00, 10:00)');
     }
@@ -90,13 +88,10 @@ export class BookingsService {
         throw new BadRequestException('Court is not active');
       }
 
-      // 2. Validate time slots cover the requested range
-      // Frontend sends ISO with timezone offset (e.g. 2026-05-07T08:00:00+07:00)
-      // getHours() on the parsed Date gives the correct local hour on the server.
-      // Since both frontend and backend agree on the wall-clock hour, this is consistent.
+      // 2. Validate time slots
       const dayOfWeek = start.getDay();
       const startHour = start.getHours();
-      const endHour = end.getHours() || 24; // midnight = 24
+      const endHour = end.getHours() || 24;
 
       const slots = await this.timeSlotRepository.find({
         where: { courtId, dayOfWeek },
@@ -107,7 +102,6 @@ export class BookingsService {
         throw new BadRequestException('Court has no available time slots for this day');
       }
 
-      // Find consecutive slots that cover [startHour, endHour]
       const coveredSlots = this.findCoveringSlots(slots, startHour, endHour);
       if (!coveredSlots) {
         throw new BadRequestException(
@@ -115,11 +109,11 @@ export class BookingsService {
         );
       }
 
-      // 3. Overlap Check
+      // 3. Overlap Check — REQ-16.7: only CONFIRMED blocks slot
       const overlappingBookings = await manager
         .createQueryBuilder(BookingEntity, 'booking')
         .where('booking.courtId = :courtId', { courtId })
-        .andWhere('booking.status != :status', { status: BookingStatus.CANCELLED })
+        .andWhere('booking.status = :status', { status: BookingStatus.CONFIRMED })
         .andWhere('booking.startTime < :endTime', { endTime: end })
         .andWhere('booking.endTime > :startTime', { startTime: start })
         .getMany();
@@ -128,17 +122,21 @@ export class BookingsService {
         throw new ConflictException('Court is already booked for the selected time slot');
       }
 
-      // 4. Calculate price by summing covered slots
+      // 4. Calculate price
       const totalPrice = coveredSlots.reduce((sum, slot) => sum + Number(slot.price), 0);
 
-      // 5. Create Booking
+      // 5. Create Booking — REQ-16.2: default PENDING_PAYMENT + paymentDeadline
+      const now = new Date();
+      const paymentDeadline = new Date(now.getTime() + PAYMENT_DEADLINE_MINUTES * 60 * 1000);
+
       const booking = manager.create(BookingEntity, {
         courtId,
         userId,
         startTime: start,
         endTime: end,
         totalPrice,
-        status: BookingStatus.CONFIRMED,
+        status: BookingStatus.PENDING_PAYMENT,
+        paymentDeadline,
       });
 
       return manager.save(booking);
@@ -146,9 +144,52 @@ export class BookingsService {
   }
 
   /**
-   * Find consecutive slots that exactly cover [startHour, endHour].
-   * Returns the matching slots or null if not fully covered.
+   * REQ-17: POST /bookings/:id/confirm-payment
+   * Chuyển PENDING_PAYMENT → CONFIRMED khi deadline chưa qua.
    */
+  async confirmPayment(bookingId: string, userId: string): Promise<BookingEntity> {
+    return this.dataSource.transaction(async (manager) => {
+      const booking = await manager.findOne(BookingEntity, {
+        where: { id: bookingId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!booking) throw new NotFoundException('Booking not found');
+      if (booking.userId !== userId) throw new ForbiddenException();
+
+      // REQ-17.5: already confirmed
+      if (booking.status === BookingStatus.CONFIRMED) {
+        throw new ConflictException('Booking đã được thanh toán');
+      }
+
+      // REQ-17.4: expired
+      if (booking.status === BookingStatus.EXPIRED) {
+        throw new BadRequestException('Booking đã hết hạn thanh toán');
+      }
+
+      // REQ-16.6: terminal states
+      if (
+        booking.status === BookingStatus.COMPLETED ||
+        booking.status === BookingStatus.CANCELLED
+      ) {
+        throw new BadRequestException(`Không thể xác nhận booking ở trạng thái ${booking.status}`);
+      }
+
+      // Double check deadline hasn't passed (job may not have run yet)
+      if (booking.paymentDeadline && booking.paymentDeadline < new Date()) {
+        booking.status = BookingStatus.EXPIRED;
+        booking.expiredAt = new Date();
+        await manager.save(booking);
+        throw new BadRequestException('Booking đã hết hạn thanh toán');
+      }
+
+      // REQ-17.3: PENDING_PAYMENT → CONFIRMED
+      booking.status = BookingStatus.CONFIRMED;
+      booking.paidAt = new Date();
+      return manager.save(booking);
+    });
+  }
+
   private findCoveringSlots(
     slots: CourtTimeSlotEntity[],
     startHour: number,
@@ -165,22 +206,20 @@ export class BookingsService {
       }
     }
 
-    return null; // gap or not fully covered
+    return null;
   }
 
+  /**
+   * REQ-19: Cancel policy — 24h creation window + 12h before start
+   */
   async cancelBooking(id: string, userId: string): Promise<BookingEntity> {
     return this.dataSource.transaction(async (manager) => {
-      // Use pessimistic lock to prevent race conditions
-      // Note: cannot use relations with pessimistic_write (PostgreSQL FOR UPDATE + outer join restriction)
       const booking = await manager.findOne(BookingEntity, {
         where: { id },
         lock: { mode: 'pessimistic_write' },
       });
 
-      if (!booking) {
-        throw new NotFoundException('Booking not found');
-      }
-
+      if (!booking) throw new NotFoundException('Booking not found');
       if (booking.userId !== userId) {
         throw new ForbiddenException('You do not have permission to cancel this booking');
       }
@@ -193,22 +232,22 @@ export class BookingsService {
         throw new BadRequestException('Only confirmed bookings can be cancelled');
       }
 
-      // Check if startTime is at least X hours away (configurable)
       const now = new Date();
-      const startTime = new Date(booking.startTime);
-      const timeDifferenceMs = startTime.getTime() - now.getTime();
-      const hoursDifference = timeDifferenceMs / (1000 * 60 * 60);
 
-      const minCancelHours = this.configService.get<number>('booking.minCancelHours', 2);
+      // REQ-19.3: Rule A — must cancel within 24h of creation
+      const hoursSinceCreated = differenceInHours(now, booking.createdAt);
+      if (hoursSinceCreated >= CANCEL_WITHIN_HOURS) {
+        throw new BadRequestException('Chỉ có thể hủy trong vòng 24 giờ kể từ khi đặt');
+      }
 
-      if (hoursDifference < minCancelHours) {
-        throw new BadRequestException(
-          `Bookings can only be cancelled at least ${minCancelHours} hours in advance`,
-        );
+      // REQ-19.2: Rule B — must be > 12h before start
+      const hoursUntilStart = differenceInHours(booking.startTime, now);
+      if (hoursUntilStart <= NO_CANCEL_BEFORE_HOURS) {
+        throw new BadRequestException('Không thể hủy đặt sân trong vòng 12 giờ trước giờ chơi');
       }
 
       booking.status = BookingStatus.CANCELLED;
-      booking.cancelledAt = new Date();
+      booking.cancelledAt = now;
       return manager.save(booking);
     });
   }
@@ -239,14 +278,53 @@ export class BookingsService {
 
     const [items, total] = await queryBuilder.getManyAndCount();
 
+    // REQ-19.6: Compute cancellationDeadline + latestCancellableTime for each booking
+    const enriched = items.map((b) => {
+      const cancellationDeadline = new Date(b.createdAt);
+      cancellationDeadline.setHours(cancellationDeadline.getHours() + CANCEL_WITHIN_HOURS);
+
+      const latestCancellableTime = new Date(b.startTime);
+      latestCancellableTime.setHours(latestCancellableTime.getHours() - NO_CANCEL_BEFORE_HOURS);
+
+      return {
+        ...b,
+        cancellationDeadline: cancellationDeadline.toISOString(),
+        latestCancellableTime: latestCancellableTime.toISOString(),
+      };
+    });
+
     return {
-      data: items,
+      data: enriched,
       meta: {
         total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async findOne(
+    id: string,
+    userId: string,
+  ): Promise<BookingEntity & { cancellationDeadline: string; latestCancellableTime: string }> {
+    const booking = await this.bookingRepository.findOne({
+      where: { id, userId },
+      relations: ['court'],
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const cancellationDeadline = new Date(booking.createdAt);
+    cancellationDeadline.setHours(cancellationDeadline.getHours() + CANCEL_WITHIN_HOURS);
+
+    const latestCancellableTime = new Date(booking.startTime);
+    latestCancellableTime.setHours(latestCancellableTime.getHours() - NO_CANCEL_BEFORE_HOURS);
+
+    return {
+      ...booking,
+      cancellationDeadline: cancellationDeadline.toISOString(),
+      latestCancellableTime: latestCancellableTime.toISOString(),
     };
   }
 }
