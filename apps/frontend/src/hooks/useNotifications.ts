@@ -6,10 +6,11 @@ export function useNotifications(page = 1, limit = 10) {
   return useQuery({
     queryKey: ['notifications', 'list', { page, limit }],
     queryFn: async () => {
-      const response = await api.get<PaginatedResult<Notification>>('/notifications', {
-        params: { page, limit },
-      });
-      return response.data;
+      const response = await api.get<{ success: boolean; data: PaginatedResult<Notification> }>(
+        '/notifications',
+        { params: { page, limit } },
+      );
+      return response.data.data;
     },
   });
 }
@@ -18,8 +19,10 @@ export function useUnreadNotificationsCount() {
   return useQuery({
     queryKey: ['notifications', 'unreadCount'],
     queryFn: async () => {
-      const response = await api.get<{ count: number }>('/notifications/unread-count');
-      return response.data.count;
+      const response = await api.get<{ success: boolean; data: { count: number } }>(
+        '/notifications/unread-count',
+      );
+      return response.data.data.count;
     },
     refetchInterval: 60000, // Polling every 60s (REQ-24.7)
   });

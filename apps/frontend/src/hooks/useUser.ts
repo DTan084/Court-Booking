@@ -9,8 +9,8 @@ export function useUpdateProfile() {
 
   return useMutation({
     mutationFn: async (data: Partial<Pick<User, 'name' | 'phone' | 'avatarUrl'>>) => {
-      const response = await api.patch<User>('/users/me', data);
-      return response.data;
+      const response = await api.patch<{ success: boolean; data: User }>('/users/me', data);
+      return response.data.data;
     },
     onSuccess: (updatedUser) => {
       setUser(updatedUser);

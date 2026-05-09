@@ -47,8 +47,8 @@ export function useCreateCourt() {
 
   return useMutation({
     mutationFn: async (dto: CreateCourtDto) => {
-      const response = await api.post('/courts', dto);
-      return response.data;
+      const response = await api.post<{ success: boolean; data: any }>('/courts', dto);
+      return response.data.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
@@ -76,8 +76,8 @@ export function useUpdateCourt() {
 
   return useMutation({
     mutationFn: async ({ id, dto }: { id: string; dto: UpdateCourtDto }) => {
-      const response = await api.patch(`/courts/${id}`, dto);
-      return response.data;
+      const response = await api.patch<{ success: boolean; data: any }>(`/courts/${id}`, dto);
+      return response.data.data;
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
@@ -99,8 +99,8 @@ export function useDeleteCourt() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.delete(`/courts/${id}`);
-      return response.data;
+      const response = await api.delete<{ success: boolean; data: any }>(`/courts/${id}`);
+      return response.data.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
@@ -128,8 +128,11 @@ export function useUpsertTimeSlots() {
 
   return useMutation({
     mutationFn: async ({ courtId, dto }: { courtId: string; dto: UpsertTimeSlotsDto }) => {
-      const response = await api.put(`/courts/${courtId}/time-slots`, dto);
-      return response.data;
+      const response = await api.put<{ success: boolean; data: any }>(
+        `/courts/${courtId}/time-slots`,
+        dto,
+      );
+      return response.data.data;
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({

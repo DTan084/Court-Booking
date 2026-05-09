@@ -35,8 +35,8 @@ export function useDistricts() {
   return useQuery<string[]>({
     queryKey: ['courts', 'districts'],
     queryFn: async () => {
-      const response = await api.get<string[]>('/courts/districts');
-      return response.data;
+      const response = await api.get<{ success: boolean; data: string[] }>('/courts/districts');
+      return response.data.data;
     },
     staleTime: 60 * 60 * 1000, // 1 hour (districts don't change often)
   });

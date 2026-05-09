@@ -71,8 +71,11 @@ export function useCreateBooking() {
 
   return useMutation({
     mutationFn: async (dto: CreateBookingDto) => {
-      const response = await api.post('/bookings', dto);
-      return response.data;
+      const response = await api.post<{ success: boolean; data: BookingWithCourt }>(
+        '/bookings',
+        dto,
+      );
+      return response.data.data;
     },
     onSuccess: (data, variables) => {
       // Build date string from UTC parts of startTime (matches backend query format)
@@ -125,8 +128,10 @@ export function useCancelBooking() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.patch(`/bookings/${id}/cancel`);
-      return response.data;
+      const response = await api.patch<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}/cancel`,
+      );
+      return response.data.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
@@ -154,8 +159,10 @@ export function useBooking(id: string, options?: { refetchInterval?: number }) {
   return useQuery<BookingWithCourt>({
     queryKey: queryKeys.bookings.detail(id),
     queryFn: async () => {
-      const response = await api.get(`/bookings/${id}`);
-      return response.data;
+      const response = await api.get<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}`,
+      );
+      return response.data.data;
     },
     enabled: !!id,
     ...options,
@@ -170,8 +177,10 @@ export function useConfirmPayment() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/bookings/${id}/confirm-payment`);
-      return response.data;
+      const response = await api.post<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}/confirm-payment`,
+      );
+      return response.data.data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(data.id) });
