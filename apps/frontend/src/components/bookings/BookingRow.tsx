@@ -8,6 +8,9 @@ import { canCancelBooking } from '@/lib/booking-utils';
 import { CreditCard, MapPin, Calendar, Clock, DollarSign } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { BookingStatus } from '@/types';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { formatCountdown } from '@/lib/booking-utils';
 import type { Booking, Court, BookingStatus as BookingStatusType } from '@/types';
 
 // ==================== TYPES ====================
@@ -97,6 +100,21 @@ export function BookingRow({ booking }: BookingRowProps) {
                 {formatCurrency(booking.totalPrice)}
               </span>
             </div>
+
+            {/* Cancellation Deadline info (REQ-25.6) */}
+            {booking.status === BookingStatus.CONFIRMED && canCancel && (
+              <p className="text-xs text-green-600 font-medium">
+                Có thể hủy trước{' '}
+                {format(new Date(booking.latestCancellableTime), "HH:mm 'ngày' dd/MM", {
+                  locale: vi,
+                })}
+              </p>
+            )}
+            {booking.status === BookingStatus.CONFIRMED && !canCancel && (
+              <p className="text-xs text-muted-foreground italic">
+                Đã quá thời hạn hủy (24h sau đặt & 12h trước chơi)
+              </p>
+            )}
           </div>
 
           {/* Right: Status and Actions */}
@@ -114,14 +132,19 @@ export function BookingRow({ booking }: BookingRowProps) {
             {/* Action Buttons */}
             <div className="flex gap-2">
               {canPay && (
-                <Button
-                  size="sm"
-                  onClick={() => router.push(`/checkout/${booking.id}`)}
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  <CreditCard className="mr-1.5 h-4 w-4" />
-                  Thanh toán
-                </Button>
+                <div className="flex flex-col items-end gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/checkout/${booking.id}`)}
+                    className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 animate-pulse-subtle"
+                  >
+                    <CreditCard className="mr-1.5 h-4 w-4" />
+                    Thanh toán ngay
+                  </Button>
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">
+                    Hết hạn sau {formatCountdown(booking.paymentDeadline)}
+                  </p>
+                </div>
               )}
 
               {canCancel && (

@@ -16,7 +16,7 @@ interface BookingFiltersProps {
   }) => void;
 }
 
-type FilterTab = 'all' | 'confirmed' | 'cancelled';
+type FilterTab = 'all' | 'pending' | 'confirmed' | 'cancelled' | 'expired' | 'completed';
 
 // ==================== COMPONENT ====================
 
@@ -34,10 +34,16 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
     } = {};
 
     // Map tab to status
-    if (activeTab === 'confirmed') {
+    if (activeTab === 'pending') {
+      filters.status = BookingStatus.PENDING_PAYMENT;
+    } else if (activeTab === 'confirmed') {
       filters.status = BookingStatus.CONFIRMED;
     } else if (activeTab === 'cancelled') {
       filters.status = BookingStatus.CANCELLED;
+    } else if (activeTab === 'expired') {
+      filters.status = BookingStatus.EXPIRED;
+    } else if (activeTab === 'completed') {
+      filters.status = BookingStatus.COMPLETED;
     }
 
     // Add date filters if provided
@@ -58,11 +64,11 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
   return (
     <div className="space-y-4">
       {/* Status Tabs */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b overflow-x-auto no-scrollbar">
         <button
           onClick={() => handleTabClick('all')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors',
+            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
             activeTab === 'all'
               ? 'border-b-2 border-primary text-primary'
               : 'text-muted-foreground hover:text-foreground',
@@ -71,26 +77,59 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
           Tất cả
         </button>
         <button
+          onClick={() => handleTabClick('pending')}
+          className={cn(
+            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            activeTab === 'pending'
+              ? 'border-b-2 border-primary text-primary'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Chờ thanh toán
+        </button>
+        <button
           onClick={() => handleTabClick('confirmed')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors',
+            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
             activeTab === 'confirmed'
               ? 'border-b-2 border-primary text-primary'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          Sắp tới
+          Đã xác nhận
+        </button>
+        <button
+          onClick={() => handleTabClick('completed')}
+          className={cn(
+            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            activeTab === 'completed'
+              ? 'border-b-2 border-primary text-primary'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Hoàn thành
         </button>
         <button
           onClick={() => handleTabClick('cancelled')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors',
+            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
             activeTab === 'cancelled'
               ? 'border-b-2 border-primary text-primary'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
           Đã hủy
+        </button>
+        <button
+          onClick={() => handleTabClick('expired')}
+          className={cn(
+            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            activeTab === 'expired'
+              ? 'border-b-2 border-primary text-primary'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          Hết hạn
         </button>
       </div>
 
