@@ -14,6 +14,7 @@ export default function CourtsPage() {
   const [page, setPage] = useState(1);
   const [name, setName] = useState<string | undefined>(undefined);
   const [sportType, setSportType] = useState<SportType | undefined>(undefined);
+  const [district, setDistrict] = useState<string | undefined>(undefined);
 
   const limit = 12; // 12 courts per page
 
@@ -23,12 +24,18 @@ export default function CourtsPage() {
     limit,
     name,
     sportType,
+    district,
   });
 
   // Handle filter change
-  const handleFilterChange = (filters: { name?: string; sportType?: SportType }) => {
+  const handleFilterChange = (filters: {
+    name?: string;
+    sportType?: SportType;
+    district?: string;
+  }) => {
     setName(filters.name);
     setSportType(filters.sportType);
+    setDistrict(filters.district);
     // Reset to page 1 when filters change - use setTimeout to avoid setState in render
     if (page !== 1) {
       setPage(1);
@@ -42,7 +49,7 @@ export default function CourtsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const hasActiveFilters = name || sportType;
+  const hasActiveFilters = name || sportType || district;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -86,7 +93,9 @@ export default function CourtsPage() {
           {hasActiveFilters && (
             <div className="mt-4 text-center">
               <button
-                onClick={() => handleFilterChange({ name: undefined, sportType: undefined })}
+                onClick={() =>
+                  handleFilterChange({ name: undefined, sportType: undefined, district: undefined })
+                }
                 className="text-sm text-primary hover:underline"
               >
                 Xóa bộ lọc

@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useDistricts } from '@/hooks/useCourts';
 import type { SportType } from '@/types';
 
 interface CourtFiltersProps {
-  onFilterChange: (filters: { name?: string; sportType?: SportType }) => void;
+  onFilterChange: (filters: { name?: string; sportType?: SportType; district?: string }) => void;
 }
 
 // Sport type options
@@ -22,6 +22,9 @@ const sportTypeOptions: { value: SportType | ''; label: string }[] = [
 export function CourtFilters({ onFilterChange }: CourtFiltersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sportType, setSportType] = useState<SportType | ''>('');
+  const [district, setDistrict] = useState<string>('');
+
+  const { data: districts = [] } = useDistricts();
 
   // Debounce search term (400ms)
   useEffect(() => {
@@ -29,11 +32,12 @@ export function CourtFilters({ onFilterChange }: CourtFiltersProps) {
       onFilterChange({
         name: searchTerm || undefined,
         sportType: sportType || undefined,
+        district: district || undefined,
       });
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, sportType, onFilterChange]);
+  }, [searchTerm, sportType, district, onFilterChange]);
 
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -59,6 +63,22 @@ export function CourtFilters({ onFilterChange }: CourtFiltersProps) {
           {sportTypeOptions.map((option) => (
             <option key={option.value || 'all'} value={option.value}>
               {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* District Dropdown (REQ-21.3) */}
+      <div className="sm:w-48">
+        <select
+          value={district}
+          onChange={(e) => setDistrict(e.target.value)}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <option value="">Tất cả khu vực</option>
+          {districts.map((d) => (
+            <option key={d} value={d}>
+              {d}
             </option>
           ))}
         </select>
