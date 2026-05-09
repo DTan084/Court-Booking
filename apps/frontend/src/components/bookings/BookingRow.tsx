@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, Calendar, Clock, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CancelDialog } from './CancelDialog';
-import { formatCurrency, canCancelBooking, cn } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
+import { canCancelBooking } from '@/lib/booking-utils';
+import { CreditCard, MapPin, Calendar, Clock, DollarSign } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { BookingStatus } from '@/types';
 import type { Booking, Court, BookingStatus as BookingStatusType } from '@/types';
 
@@ -19,15 +21,21 @@ interface BookingRowProps {
 // ==================== STATUS CONFIG ====================
 
 const statusConfig: Record<BookingStatusType, { label: string; color: string }> = {
+  [BookingStatus.PENDING_PAYMENT]: {
+    label: 'Chờ thanh toán',
+    color: 'bg-amber-100 text-amber-700',
+  },
   [BookingStatus.CONFIRMED]: { label: 'Đã xác nhận', color: 'bg-green-100 text-green-700' },
   [BookingStatus.CANCELLED]: { label: 'Đã hủy', color: 'bg-gray-100 text-gray-700' },
   [BookingStatus.COMPLETED]: { label: 'Hoàn thành', color: 'bg-blue-100 text-blue-700' },
+  [BookingStatus.EXPIRED]: { label: 'Hết hạn', color: 'bg-red-100 text-red-700' },
 };
 
 // ==================== COMPONENT ====================
 
 export function BookingRow({ booking }: BookingRowProps) {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const router = useRouter();
 
   const startTime = new Date(booking.startTime);
   const endTime = new Date(booking.endTime);
@@ -48,9 +56,10 @@ export function BookingRow({ booking }: BookingRowProps) {
     minute: '2-digit',
   });
 
-  // Check if booking can be cancelled
-  const canCancel =
-    booking.status === BookingStatus.CONFIRMED && canCancelBooking(booking.startTime);
+  // Check if booking can be cancelled (REQ-19)
+  const canCancel = booking.status === BookingStatus.CONFIRMED && canCancelBooking(booking);
+
+  const canPay = booking.status === BookingStatus.PENDING_PAYMENT;
 
   return (
     <>
@@ -102,17 +111,30 @@ export function BookingRow({ booking }: BookingRowProps) {
               {statusInfo.label}
             </span>
 
-            {/* Cancel Button */}
-            {canCancel && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCancelDialogOpen(true)}
-                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-              >
-                Hủy đặt
-              </Button>
-            )}
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              {canPay && (
+                <Button
+                  size="sm"
+                  onClick={() => router.push(`/checkout/${booking.id}`)}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  <CreditCard className="mr-1.5 h-4 w-4" />
+                  Thanh toán
+                </Button>
+              )}
+
+              {canCancel && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCancelDialogOpen(true)}
+                  className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  Hủy đặt
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

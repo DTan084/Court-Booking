@@ -7,13 +7,11 @@ import { z } from 'zod';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCreateBooking } from '@/hooks/useBookings';
-import {
-  calculateBookingPrice,
-  formatCurrency,
-  formatDate,
-  buildLocalISO,
-  isSlotBooked,
-} from '@/lib/utils';
+import { calculateBookingPrice, formatCurrency, formatDate, isSlotBooked } from '@/lib/utils';
+import { getBookingTimeWarning } from '@/lib/booking-utils';
+import { DoubleConfirmationDialog } from '@/components/shared/double-confirmation-dialog';
+import { useRouter } from 'next/navigation';
+import { AlertTriangle } from 'lucide-react';
 import type { CourtTimeSlot, BookedRange } from '@/types';
 
 // ==================== TYPES & SCHEMA ====================
@@ -52,10 +50,13 @@ export function BookingForm({
   bookedRanges,
 }: BookingFormProps) {
   const { mutate: createBooking, isPending } = useCreateBooking();
+  const router = useRouter();
   const [priceBreakdown, setPriceBreakdown] = useState<{
     totalPrice: number;
     coveredSlots: CourtTimeSlot[];
   } | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [pendingData, setPendingData] = useState<BookingFormData | null>(null);
 
   // Use local day-of-week — consistent with how user sees the calendar
   const dayOfWeek = selectedDate.getDay();
@@ -96,18 +97,31 @@ export function BookingForm({
   }, [startHour, endHour, timeSlots, dayOfWeek]);
 
   const onSubmit = (data: BookingFormData) => {
-    if (!priceBreakdown) return;
+    setPendingData(data);
+    setIsConfirmOpen(true);
+  };
 
-    // Build ISO strings with local timezone offset so backend receives correct time
-    const startTime = buildLocalISO(selectedDate, data.startHour);
-    const endTime = buildLocalISO(selectedDate, data.endHour === 24 ? 0 : data.endHour);
+  const handleConfirmedSubmit = () => {
+    if (!pendingData || !priceBreakdown) return;
+
+    const startTime = buildLocalISO(selectedDate, pendingData.startHour);
+    const endTime = buildLocalISO(
+      selectedDate,
+      pendingData.endHour === 24 ? 0 : pendingData.endHour,
+    );
 
     createBooking(
       { courtId, startTime, endTime },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           onOpenChange(false);
           reset();
+          setIsConfirmOpen(false);
+          // REQ-20.7: Redirect to checkout
+          router.push(`/checkout/${data.id}`);
+        },
+        onError: () => {
+          setIsConfirmOpen(false);
         },
       },
     );
@@ -160,6 +174,16 @@ export function BookingForm({
           </div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Cancellation Policy Warning Banner (REQ-20.1) */}
+            {startHour !== undefined && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-800 leading-relaxed">
+                  <p className="font-bold mb-1">Chính sách hủy đặt sân:</p>
+                  <p>{getBookingTimeWarning(buildLocalISO(selectedDate, startHour))}</p>
+                </div>
+              </div>
+            )}
             {/* Start Hour */}
             <div>
               <label htmlFor="startHour" className="block text-sm font-medium text-gray-700">
@@ -252,6 +276,27 @@ export function BookingForm({
           </form>
         )}
       </div>
+
+      <DoubleConfirmationDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={handleConfirmedSubmit}
+        isLoading={isPending}
+        title="Xác nhận đặt sân"
+        description={
+          <span>
+            Bạn đang đặt sân <strong>{courtName}</strong> từ{' '}
+            <strong>{String(pendingData?.startHour).padStart(2, '0')}:00</strong> đến{' '}
+            <strong>{String(pendingData?.endHour).padStart(2, '0')}:00</strong> ngày{' '}
+            <strong>{formatDate(selectedDate)}</strong>.
+          </span>
+        }
+        warning={
+          pendingData
+            ? getBookingTimeWarning(buildLocalISO(selectedDate, pendingData.startHour))
+            : undefined
+        }
+      />
     </div>
   );
 }

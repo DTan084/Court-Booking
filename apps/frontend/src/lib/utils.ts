@@ -55,16 +55,6 @@ export function calculateBookingPrice(
 }
 
 /**
- * Kiểm tra booking có thể hủy không (còn hơn 2 giờ)
- */
-export function canCancelBooking(startTime: string): boolean {
-  const start = new Date(startTime);
-  const now = new Date();
-  const diffMs = start.getTime() - now.getTime();
-  return diffMs > 2 * 60 * 60 * 1000;
-}
-
-/**
  * Kiểm tra time slot có bị trùng với booking đã có không
  */
 export function isSlotBooked(
