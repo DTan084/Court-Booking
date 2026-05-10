@@ -44,7 +44,7 @@ export function CancelDialog({ open, onOpenChange, booking }: CancelDialogProps)
           <strong>{format(new Date(booking.startTime), 'HH:mm - dd/MM/yyyy')}</strong>?
         </span>
       }
-      warning={getBookingTimeWarning(booking.startTime)}
+      warning={getBookingTimeWarning(booking.startTime) ?? undefined}
     />
   );
 }

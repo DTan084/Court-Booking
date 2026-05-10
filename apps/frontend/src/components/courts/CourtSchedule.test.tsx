@@ -15,10 +15,9 @@ type UseScheduleResult = {
   isLoading: boolean;
 };
 
-// Helper to create mock return value - bypass strict UseQueryResult type in tests
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Helper to create mock return value - keep shape minimal for tested fields
 const mockScheduleReturn = (result: UseScheduleResult) =>
-  mockUseSchedule.mockReturnValue(result as any);
+  mockUseSchedule.mockReturnValue(result as unknown as ReturnType<typeof useSchedule>);
 
 describe('CourtSchedule', () => {
   const queryClient = new QueryClient({
@@ -35,6 +34,8 @@ describe('CourtSchedule', () => {
       startHour: 8,
       endHour: 10,
       price: 150000,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
     },
     {
       id: '2',
@@ -43,6 +44,8 @@ describe('CourtSchedule', () => {
       startHour: 10,
       endHour: 12,
       price: 200000,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
     },
   ];
 
@@ -128,6 +131,8 @@ describe('CourtSchedule', () => {
         startHour: 14,
         endHour: 16,
         price: 180000,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
       },
     ];
 

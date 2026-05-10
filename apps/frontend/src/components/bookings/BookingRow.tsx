@@ -114,9 +114,11 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
             {booking.status === BookingStatus.CONFIRMED && canCancel && (
               <p className="text-xs text-green-600 font-medium">
                 Có thể hủy trước{' '}
-                {format(new Date(booking.latestCancellableTime), "HH:mm 'ngày' dd/MM", {
-                  locale: vi,
-                })}
+                {booking.latestCancellableTime
+                  ? format(new Date(booking.latestCancellableTime), "HH:mm 'ngày' dd/MM", {
+                      locale: vi,
+                    })
+                  : '--'}
               </p>
             )}
             {booking.status === BookingStatus.CONFIRMED && !canCancel && (
@@ -151,7 +153,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
                     Thanh toán ngay
                   </Button>
                   <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">
-                    Hết hạn sau {formatCountdown(booking.paymentDeadline)}
+                    Hết hạn sau {formatCountdown(booking.paymentDeadline ?? '')}
                   </p>
                 </div>
               )}

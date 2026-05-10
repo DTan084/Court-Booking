@@ -44,6 +44,7 @@ describe('useCourts', () => {
           name: 'Court 1',
           sportType: SportType.BADMINTON,
           address: '123 Main St',
+          district: 'District 1',
           pricePerHour: 100000,
           status: CourtStatus.ACTIVE,
           deletedAt: null,

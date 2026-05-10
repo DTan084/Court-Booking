@@ -44,6 +44,8 @@ describe('useTimeSlots', () => {
         startHour: 8,
         endHour: 10,
         price: 100000,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
       },
       {
         id: '2',
@@ -52,6 +54,8 @@ describe('useTimeSlots', () => {
         startHour: 10,
         endHour: 12,
         price: 120000,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
       },
     ];
 

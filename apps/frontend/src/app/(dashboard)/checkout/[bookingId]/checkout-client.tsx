@@ -80,8 +80,7 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
     try {
       await confirmPayment.mutateAsync(bookingId);
       setIsConfirmOpen(false);
-    } catch (_error) {
-      // eslint-disable-line @typescript-eslint/no-unused-vars
+    } catch {
       // Error handled by mutation
       setIsConfirmOpen(false);
     }

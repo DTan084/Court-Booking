@@ -299,7 +299,8 @@ export function BookingForm({
         }
         warning={
           pendingData
-            ? getBookingTimeWarning(buildLocalISO(selectedDate, pendingData.startHour))
+            ? (getBookingTimeWarning(buildLocalISO(selectedDate, pendingData.startHour)) ??
+              undefined)
             : undefined
         }
       />

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys } from '@/lib/api';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
-import type { SportType, CourtStatus } from '@/types';
+import type { SportType, CourtStatus, Court } from '@/types';
 
 // ==================== TYPES ====================
 
@@ -47,7 +47,7 @@ export function useCreateCourt() {
 
   return useMutation({
     mutationFn: async (dto: CreateCourtDto) => {
-      const response = await api.post<{ success: boolean; data: any }>('/courts', dto);
+      const response = await api.post<{ success: boolean; data: Court }>('/courts', dto);
       return response.data.data;
     },
     onSuccess: () => {
@@ -76,7 +76,7 @@ export function useUpdateCourt() {
 
   return useMutation({
     mutationFn: async ({ id, dto }: { id: string; dto: UpdateCourtDto }) => {
-      const response = await api.patch<{ success: boolean; data: any }>(`/courts/${id}`, dto);
+      const response = await api.patch<{ success: boolean; data: Court }>(`/courts/${id}`, dto);
       return response.data.data;
     },
     onSuccess: (_data, variables) => {
@@ -99,7 +99,7 @@ export function useDeleteCourt() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.delete<{ success: boolean; data: any }>(`/courts/${id}`);
+      const response = await api.delete<{ success: boolean; data: Court }>(`/courts/${id}`);
       return response.data.data;
     },
     onSuccess: () => {
@@ -128,7 +128,7 @@ export function useUpsertTimeSlots() {
 
   return useMutation({
     mutationFn: async ({ courtId, dto }: { courtId: string; dto: UpsertTimeSlotsDto }) => {
-      const response = await api.put<{ success: boolean; data: any }>(
+      const response = await api.put<{ success: boolean; data: { slots: TimeSlotInput[] } }>(
         `/courts/${courtId}/time-slots`,
         dto,
       );
