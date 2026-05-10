@@ -42,13 +42,13 @@ export default function TimeSlotManagerPage({ params }: { params: { id: string }
           {court && (
             <p className="text-sm text-muted-foreground">
               {court.name} —{' '}
-              {court.sportType === 'badminton'
+              {court.sportType === 'BADMINTON'
                 ? 'Cầu lông'
-                : court.sportType === 'tennis'
+                : court.sportType === 'TENNIS'
                   ? 'Tennis'
-                  : court.sportType === 'football'
+                  : court.sportType === 'FOOTBALL'
                     ? 'Bóng đá'
-                    : court.sportType === 'basketball'
+                    : court.sportType === 'BASKETBALL'
                       ? 'Bóng rổ'
                       : 'Bóng chuyền'}
             </p>

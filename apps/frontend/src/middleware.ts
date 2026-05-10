@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { Role } from '@/types';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -29,7 +30,7 @@ export function middleware(request: NextRequest) {
   if (isAdminRoute && token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.role !== 'admin') {
+      if (payload.role !== Role.ADMIN) {
         return NextResponse.redirect(new URL('/', request.url));
       }
     } catch {

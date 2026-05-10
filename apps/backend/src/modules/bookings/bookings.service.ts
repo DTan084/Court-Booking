@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, Brackets } from 'typeorm';
 import { differenceInHours } from 'date-fns';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
@@ -36,14 +36,32 @@ export class BookingsService {
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
     const startDate = new Date(`${date}T00:00:00`);
     const endDate = new Date(`${date}T23:59:59.999`);
+    const now = new Date();
 
     const bookings = await this.bookingRepository
       .createQueryBuilder('booking')
-      .select(['booking.id', 'booking.startTime', 'booking.endTime', 'booking.status'])
+      .select([
+        'booking.id',
+        'booking.startTime',
+        'booking.endTime',
+        'booking.status',
+        'booking.paymentDeadline',
+      ])
       .where('booking.courtId = :courtId', { courtId })
       .andWhere('booking.startTime BETWEEN :startDate AND :endDate', { startDate, endDate })
-      // REQ-16.7: Only CONFIRMED blocks the slot. PENDING_PAYMENT does NOT block.
-      .andWhere('booking.status = :confirmedStatus', { confirmedStatus: BookingStatus.CONFIRMED })
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('booking.status = :confirmedStatus', {
+            confirmedStatus: BookingStatus.CONFIRMED,
+          }).orWhere(
+            'booking.status = :pendingStatus AND booking.paymentDeadline IS NOT NULL AND booking.paymentDeadline > :now',
+            {
+              pendingStatus: BookingStatus.PENDING_PAYMENT,
+              now,
+            },
+          );
+        }),
+      )
       .orderBy('booking.startTime', 'ASC')
       .getMany();
 
@@ -112,10 +130,23 @@ export class BookingsService {
       }
 
       // 3. Overlap Check — REQ-16.7: only CONFIRMED blocks slot
+      const overlapCheckTime = new Date();
       const overlappingBookings = await manager
         .createQueryBuilder(BookingEntity, 'booking')
         .where('booking.courtId = :courtId', { courtId })
-        .andWhere('booking.status = :status', { status: BookingStatus.CONFIRMED })
+        .andWhere(
+          new Brackets((qb) => {
+            qb.where('booking.status = :confirmedStatus', {
+              confirmedStatus: BookingStatus.CONFIRMED,
+            }).orWhere(
+              'booking.status = :pendingStatus AND booking.paymentDeadline IS NOT NULL AND booking.paymentDeadline > :now',
+              {
+                pendingStatus: BookingStatus.PENDING_PAYMENT,
+                now: overlapCheckTime,
+              },
+            );
+          }),
+        )
         .andWhere('booking.startTime < :endTime', { endTime: end })
         .andWhere('booking.endTime > :startTime', { startTime: start })
         .getMany();

@@ -11,24 +11,25 @@ import { CourtSchedule } from '@/components/courts/CourtSchedule';
 import { BookingForm } from '@/components/bookings/BookingForm';
 import { Button } from '@/components/ui/button';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
-import type { SportType, CourtStatus, BookedRange } from '@/types';
+import { CourtStatus } from '@/types';
+import type { SportType, BookedRange } from '@/types';
 
 // Sport type labels in Vietnamese
 const sportTypeLabels: Record<SportType, string> = {
-  badminton: 'Cầu lông',
-  tennis: 'Tennis',
-  football: 'Bóng đá',
-  basketball: 'Bóng rổ',
-  volleyball: 'Bóng chuyền',
+  BADMINTON: 'Cầu lông',
+  TENNIS: 'Tennis',
+  FOOTBALL: 'Bóng đá',
+  BASKETBALL: 'Bóng rổ',
+  VOLLEYBALL: 'Bóng chuyền',
 };
 
 // Sport type colors
 const sportTypeColors: Record<SportType, string> = {
-  badminton: 'bg-blue-100 text-blue-700',
-  tennis: 'bg-green-100 text-green-700',
-  football: 'bg-orange-100 text-orange-700',
-  basketball: 'bg-purple-100 text-purple-700',
-  volleyball: 'bg-pink-100 text-pink-700',
+  BADMINTON: 'bg-blue-100 text-blue-700',
+  TENNIS: 'bg-green-100 text-green-700',
+  FOOTBALL: 'bg-orange-100 text-orange-700',
+  BASKETBALL: 'bg-purple-100 text-purple-700',
+  VOLLEYBALL: 'bg-pink-100 text-pink-700',
 };
 
 // Status labels and colors
@@ -101,7 +102,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
   const sportLabel = sportTypeLabels[court.sportType];
   const sportColor = sportTypeColors[court.sportType];
   const statusInfo = statusConfig[court.status];
-  const isInactive = court.status === 'INACTIVE';
+  const isInactive = court.status === CourtStatus.INACTIVE;
 
   const handleBookingClick = () => {
     setIsBookingOpen(true);

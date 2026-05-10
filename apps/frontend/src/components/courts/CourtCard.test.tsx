@@ -1,15 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import { CourtCard } from './CourtCard';
-import type { Court, SportType, CourtStatus } from '@/types';
+import { CourtStatus } from '@/types';
+import type { Court, SportType } from '@/types';
 
 describe('CourtCard', () => {
   const mockCourt: Court = {
     id: '1',
     name: 'Sân Cầu Lông A1',
-    sportType: 'badminton' as SportType,
+    sportType: 'BADMINTON' as SportType,
     address: '123 Đường ABC, Quận 1, TP.HCM',
+    district: 'Quận 1',
     pricePerHour: 150000,
-    status: 'ACTIVE' as CourtStatus,
+    status: CourtStatus.ACTIVE,
     deletedAt: null,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
@@ -41,7 +43,7 @@ describe('CourtCard', () => {
   });
 
   it('should render status badge for inactive court', () => {
-    const inactiveCourt = { ...mockCourt, status: 'INACTIVE' as CourtStatus };
+    const inactiveCourt = { ...mockCourt, status: CourtStatus.INACTIVE };
     render(<CourtCard court={inactiveCourt} />);
     expect(screen.getByText('Tạm ngưng')).toBeInTheDocument();
   });

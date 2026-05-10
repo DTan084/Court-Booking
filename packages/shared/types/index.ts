@@ -57,8 +57,19 @@ export interface Court {
   district: string | null;
   description?: string;
   pricePerHour: number;
-  isActive: boolean;
-  status?: string;
+  status: CourtStatus;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourtTimeSlot {
+  id: string;
+  courtId: string;
+  dayOfWeek: number;
+  startHour: number;
+  endHour: number;
+  price: number;
   createdAt: string;
   updatedAt: string;
 }

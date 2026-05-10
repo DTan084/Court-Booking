@@ -18,19 +18,19 @@ import type { Court, SportType, CourtStatus } from '@/types';
 // ==================== CONSTANTS ====================
 
 const sportTypeLabels: Record<SportType, string> = {
-  badminton: 'Cầu lông',
-  tennis: 'Tennis',
-  football: 'Bóng đá',
-  basketball: 'Bóng rổ',
-  volleyball: 'Bóng chuyền',
+  BADMINTON: 'Cầu lông',
+  TENNIS: 'Tennis',
+  FOOTBALL: 'Bóng đá',
+  BASKETBALL: 'Bóng rổ',
+  VOLLEYBALL: 'Bóng chuyền',
 };
 
 const sportTypeColors: Record<SportType, string> = {
-  badminton: 'bg-blue-100 text-blue-700',
-  tennis: 'bg-green-100 text-green-700',
-  football: 'bg-orange-100 text-orange-700',
-  basketball: 'bg-purple-100 text-purple-700',
-  volleyball: 'bg-pink-100 text-pink-700',
+  BADMINTON: 'bg-blue-100 text-blue-700',
+  TENNIS: 'bg-green-100 text-green-700',
+  FOOTBALL: 'bg-orange-100 text-orange-700',
+  BASKETBALL: 'bg-purple-100 text-purple-700',
+  VOLLEYBALL: 'bg-pink-100 text-pink-700',
 };
 
 const statusConfig: Record<CourtStatus, { label: string; variant: 'success' | 'muted' }> = {

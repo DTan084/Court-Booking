@@ -43,7 +43,7 @@ export function CourtCard({ court }: CourtCardProps) {
       className={cn(
         'group block rounded-lg border bg-card p-6 shadow-sm transition-all',
         'hover:shadow-md hover:border-primary/50',
-        court.status === 'INACTIVE' && 'opacity-75',
+        court.status === CourtStatus.INACTIVE && 'opacity-75',
       )}
     >
       {/* Header: Name and Status */}
