@@ -69,7 +69,7 @@ export class BookingEntity {
   completedAt: Date | null;
 
   @Column({ type: 'timestamp with time zone', nullable: true, name: 'cancelled_at' })
-  cancelledAt: Date;
+  cancelledAt: Date | null;
 
   @Column({ type: 'boolean', name: 'payment_reminder_sent', default: false })
   paymentReminderSent: boolean;

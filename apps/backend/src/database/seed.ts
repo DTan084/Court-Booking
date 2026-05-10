@@ -21,7 +21,8 @@ async function runSeed() {
   const adminEmail = 'admin@courtbooking.com';
   const existingAdmin = await userRepository.findOne({ where: { email: adminEmail } });
   if (!existingAdmin) {
-    const passwordHash = await bcrypt.hash('Admin@123', 10);
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
     const admin = userRepository.create({
       name: 'Super Admin',
       email: adminEmail,

@@ -26,6 +26,25 @@ export class InitialSchema1777341156323 implements MigrationInterface {
     await queryRunner.query(
       `CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying(100) NOT NULL, "email" character varying(255) NOT NULL, "password_hash" character varying(255) NOT NULL, "role" "public"."users_role_enum" NOT NULL DEFAULT 'user', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`,
     );
+    await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS "court_time_slots" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "court_id" uuid NOT NULL,
+        "day_of_week" smallint NOT NULL,
+        "start_hour" smallint NOT NULL,
+        "end_hour" smallint NOT NULL,
+        "price" numeric(10,2) NOT NULL,
+        "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+        CONSTRAINT "PK_court_time_slots" PRIMARY KEY ("id"),
+        CONSTRAINT "FK_court_time_slots_court" FOREIGN KEY ("court_id")
+          REFERENCES "courts"("id") ON DELETE CASCADE
+      )
+    `);
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_court_time_slots_court_day"
+      ON "court_time_slots" ("court_id", "day_of_week")
+    `);
     await queryRunner.query(
       `ALTER TABLE "bookings" ADD CONSTRAINT "FK_64cd97487c5c42806458ab5520c" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
     );
@@ -41,6 +60,8 @@ export class InitialSchema1777341156323 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "refresh_tokens" DROP CONSTRAINT "FK_3ddc983c5f7bcf132fd8732c3f4"`,
     );
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_court_time_slots_court_day"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "court_time_slots"`);
     await queryRunner.query(
       `ALTER TABLE "bookings" DROP CONSTRAINT "FK_2bd7e9c03db9f51a4765974abb8"`,
     );

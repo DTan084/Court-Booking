@@ -44,7 +44,7 @@ export class CourtEntity {
   status: CourtStatus;
 
   @DeleteDateColumn({ name: 'deleted_at' })
-  deletedAt: Date;
+  deletedAt: Date | null;
 
   @OneToMany(() => BookingEntity, (booking) => booking.court)
   bookings: BookingEntity[];
