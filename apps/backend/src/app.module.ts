@@ -20,6 +20,7 @@ import { CourtTimeSlotEntity } from './database/entities/court-time-slot.entity'
 import { BookingEntity } from './database/entities/booking.entity';
 import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
 import { NotificationEntity } from './database/entities/notification.entity';
+import { CourtImageEntity } from './database/entities/court-image.entity';
 import { RedisModule } from './common/redis/redis.module';
 import { winstonConfig } from './config/winston.config';
 
@@ -48,6 +49,7 @@ import { winstonConfig } from './config/winston.config';
           BookingEntity,
           RefreshTokenEntity,
           NotificationEntity,
+          CourtImageEntity,
         ],
         synchronize: configService.get<boolean>('database.synchronize', false),
         logging: configService.get<boolean>('database.logging', false),

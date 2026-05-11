@@ -10,7 +10,8 @@ import {
 } from 'typeorm';
 import { BookingEntity } from './booking.entity';
 import { CourtTimeSlotEntity } from './court-time-slot.entity';
-import { SportType } from '@court-booking/shared';
+import { SportType, CourtType, FacilityFeature } from '@court-booking/shared';
+import { CourtImageEntity } from './court-image.entity';
 
 export enum CourtStatus {
   ACTIVE = 'ACTIVE',
@@ -36,6 +37,20 @@ export class CourtEntity {
   @Index()
   @Column({ type: 'varchar', length: 100, nullable: true })
   district: string | null;
+
+  @Index({ where: 'deleted_at IS NULL' })
+  @Column({ type: 'enum', enum: CourtType, default: CourtType.OUTDOOR, name: 'court_type' })
+  courtType: CourtType;
+
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @Index('idx_courts_features_gin')
+  @Column({ type: 'simple-array', nullable: true, default: '' })
+  features: FacilityFeature[];
+
+  @OneToMany(() => CourtImageEntity, (img) => img.court, { cascade: true, eager: false })
+  images: CourtImageEntity[];
 
   @Column({ type: 'decimal', precision: 10, scale: 2, name: 'price_per_hour' })
   pricePerHour: number;

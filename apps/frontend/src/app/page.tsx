@@ -3,6 +3,7 @@ import { ArrowRight, PlayCircle } from 'lucide-react';
 import { Navbar } from '@/components/shared/Navbar';
 import { SiteFooter } from '@/components/shared/SiteFooter';
 import { Button } from '@/components/ui/button';
+import { CourtStatus } from '@court-booking/shared';
 import { SportType, type Court, type PaginatedResult } from '@/types';
 
 type CourtsApiResponse = {
@@ -45,7 +46,7 @@ async function getFeaturedCourts() {
 
     const json = (await res.json()) as CourtsApiResponse;
     const all = json?.data?.data ?? [];
-    return all.filter((court) => court.status === 'ACTIVE').slice(0, 3);
+    return all.filter((court) => court.status === CourtStatus.ACTIVE).slice(0, 3);
   } catch {
     return [] as Court[];
   }

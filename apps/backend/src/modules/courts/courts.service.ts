@@ -3,12 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, ILike, DataSource } from 'typeorm';
 import Redis from 'ioredis';
 import { CourtEntity } from '../../database/entities/court.entity';
+import { CourtImageEntity } from '../../database/entities/court-image.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { GetCourtsDto } from './dto/get-courts.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
 import { GetCourtStatsDto } from './dto/get-court-stats.dto';
 import { UpsertTimeSlotsDto } from './dto/upsert-time-slots.dto';
+import { AddCourtImageDto } from './dto/add-court-image.dto';
+import { ReorderCourtImagesDto } from './dto/reorder-court-images.dto';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { BookingStatus } from '@court-booking/shared';
 
@@ -23,6 +26,8 @@ export class CourtsService {
     private readonly courtRepository: Repository<CourtEntity>,
     @InjectRepository(CourtTimeSlotEntity)
     private readonly timeSlotRepository: Repository<CourtTimeSlotEntity>,
+    @InjectRepository(CourtImageEntity)
+    private readonly courtImageRepository: Repository<CourtImageEntity>,
     private readonly dataSource: DataSource,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}

@@ -4,6 +4,7 @@ import { CourtEntity } from './entities/court.entity';
 import { CourtTimeSlotEntity } from './entities/court-time-slot.entity';
 import { BookingEntity } from './entities/booking.entity';
 import { RefreshTokenEntity } from './entities/refresh-token.entity';
+import { CourtImageEntity } from './entities/court-image.entity';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -21,6 +22,7 @@ export const dataSourceOptions: DataSourceOptions = {
   entities: [
     UserEntity,
     CourtEntity,
+    CourtImageEntity,
     CourtTimeSlotEntity,
     BookingEntity,
     RefreshTokenEntity,

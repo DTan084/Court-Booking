@@ -5,7 +5,8 @@ import { DataSource } from 'typeorm';
 import { CourtsService } from './courts.service';
 import { CourtEntity } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
-import { SportType } from '@court-booking/shared';
+import { CourtImageEntity } from '../../database/entities/court-image.entity';
+import { SportType, CourtType } from '@court-booking/shared';
 
 describe('CourtsService', () => {
   let service: CourtsService;
@@ -15,6 +16,8 @@ describe('CourtsService', () => {
     id: 'court-uuid',
     name: 'Sân Cầu Lông ABC',
     sportType: SportType.BADMINTON,
+    courtType: CourtType.INDOOR,
+    features: [],
     address: '123 Nguyễn Huệ',
     pricePerHour: 150000,
   };
@@ -32,6 +35,13 @@ describe('CourtsService', () => {
       find: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       save: jest.fn(),
+    };
+
+    const mockCourtImageRepo = {
+      create: jest.fn(),
+      save: jest.fn(),
+      findOne: jest.fn(),
+      remove: jest.fn(),
     };
 
     const mockDataSource = {
@@ -67,6 +77,10 @@ describe('CourtsService', () => {
           useValue: mockTimeSlotRepo,
         },
         {
+          provide: getRepositoryToken(CourtImageEntity),
+          useValue: mockCourtImageRepo,
+        },
+        {
           provide: DataSource,
           useValue: mockDataSource,
         },
@@ -90,6 +104,8 @@ describe('CourtsService', () => {
       const dto = {
         name: 'Sân Cầu Lông ABC',
         sportType: SportType.BADMINTON,
+        courtType: CourtType.INDOOR,
+        features: [],
         address: '123 Nguyễn Huệ',
         pricePerHour: 150000,
       };

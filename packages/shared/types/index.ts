@@ -36,6 +36,24 @@ export enum CourtStatus {
   INACTIVE = 'INACTIVE',
 }
 
+export enum CourtType {
+  INDOOR = 'INDOOR',
+  OUTDOOR = 'OUTDOOR',
+}
+
+export enum FacilityFeature {
+  PARKING = 'PARKING',
+  LOCKER_ROOM = 'LOCKER_ROOM',
+  SHOWER = 'SHOWER',
+  LIGHTING = 'LIGHTING',
+  AIR_CONDITIONING = 'AIR_CONDITIONING',
+  WIFI = 'WIFI',
+  CAFETERIA = 'CAFETERIA',
+  EQUIPMENT_RENTAL = 'EQUIPMENT_RENTAL',
+  FIRST_AID = 'FIRST_AID',
+  WHEELCHAIR_ACCESSIBLE = 'WHEELCHAIR_ACCESSIBLE',
+}
+
 // ── Base Types ─────────────────────────────────
 
 export interface User {
@@ -49,13 +67,23 @@ export interface User {
   updatedAt: string;
 }
 
+export interface CourtImage {
+  id: string;
+  url: string;
+  altText: string | null;
+  displayOrder: number;
+}
+
 export interface Court {
   id: string;
   name: string;
   sportType: SportType;
+  courtType: CourtType;
   address: string;
   district: string | null;
-  description?: string;
+  description: string | null;
+  features: FacilityFeature[];
+  images: CourtImage[];
   pricePerHour: number;
   status: CourtStatus;
   deletedAt: string | null;
