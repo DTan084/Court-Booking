@@ -62,112 +62,103 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <>
       {/* Status Tabs */}
-      <div className="flex gap-2 border-b overflow-x-auto no-scrollbar">
+      <div className="flex overflow-x-auto border-b border-slate-100 px-4 no-scrollbar">
         <button
           onClick={() => handleTabClick('all')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            'whitespace-nowrap px-6 py-4 text-[14px] font-semibold tracking-wide transition-colors',
             activeTab === 'all'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'border-b-2 border-orange-500 text-slate-900'
+              : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Tất cả
+          Tất cả (All)
         </button>
         <button
           onClick={() => handleTabClick('pending')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            'whitespace-nowrap px-6 py-4 text-[14px] font-semibold tracking-wide transition-colors',
             activeTab === 'pending'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'border-b-2 border-orange-500 text-slate-900'
+              : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Chờ thanh toán
+          Chờ thanh toán (Pending)
         </button>
         <button
           onClick={() => handleTabClick('confirmed')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            'whitespace-nowrap px-6 py-4 text-[14px] font-semibold tracking-wide transition-colors',
             activeTab === 'confirmed'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'border-b-2 border-orange-500 text-slate-900'
+              : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Đã xác nhận
+          Đã xác nhận (Confirmed)
         </button>
         <button
           onClick={() => handleTabClick('completed')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            'whitespace-nowrap px-6 py-4 text-[14px] font-semibold tracking-wide transition-colors',
             activeTab === 'completed'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'border-b-2 border-orange-500 text-slate-900'
+              : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Hoàn thành
+          Hoàn thành (Completed)
         </button>
         <button
           onClick={() => handleTabClick('cancelled')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            'whitespace-nowrap px-6 py-4 text-[14px] font-semibold tracking-wide transition-colors',
             activeTab === 'cancelled'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'border-b-2 border-orange-500 text-slate-900'
+              : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Đã hủy
+          Đã hủy (Cancelled)
         </button>
         <button
           onClick={() => handleTabClick('expired')}
           className={cn(
-            'px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap',
+            'whitespace-nowrap px-6 py-4 text-[14px] font-semibold tracking-wide transition-colors',
             activeTab === 'expired'
-              ? 'border-b-2 border-primary text-primary'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'border-b-2 border-orange-500 text-slate-900'
+              : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Hết hạn
+          Hết hạn (Expired)
         </button>
       </div>
 
       {/* Date Range Picker */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-foreground">Lọc theo ngày:</span>
-        </div>
-        <div className="flex flex-1 gap-3">
-          <div className="flex-1">
-            <label htmlFor="fromDate" className="sr-only">
-              Từ ngày
-            </label>
-            <input
-              id="fromDate"
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              placeholder="Từ ngày"
-            />
-          </div>
-          <div className="flex-1">
-            <label htmlFor="toDate" className="sr-only">
-              Đến ngày
-            </label>
-            <input
-              id="toDate"
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              placeholder="Đến ngày"
-            />
-          </div>
+      <div className="flex flex-wrap items-center gap-4 bg-slate-50/50 p-4">
+        <div className="flex max-w-sm flex-grow items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <Calendar className="h-4 w-4 text-slate-400" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Date range:
+          </span>
+          <input
+            id="fromDate"
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="w-full border-none p-0 text-sm focus:ring-0"
+            title="Từ ngày"
+          />
+          <span className="text-slate-300">|</span>
+          <input
+            id="toDate"
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="w-full border-none p-0 text-sm focus:ring-0"
+            title="Đến ngày"
+          />
         </div>
       </div>
-    </div>
+    </>
   );
 }

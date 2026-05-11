@@ -60,21 +60,21 @@ export default function BookingsPage() {
   }, [highlightedId, isLoading, data]);
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-8">
+    <div className="container mx-auto max-w-7xl px-4 py-8 lg:px-8">
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <Calendar className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Lịch đặt của tôi</h1>
-            <p className="text-sm text-muted-foreground">
-              Quản lý và theo dõi các lịch đặt sân của bạn
-            </p>
+        <div className="mb-10">
+          <div className="flex items-center gap-3 mb-2">
+            <Calendar className="h-8 w-8 text-orange-600" />
+            <h1 className="text-3xl font-bold text-slate-900">My Bookings</h1>
           </div>
+          <p className="text-slate-500">
+            Manage and track your court reservations across all venues.
+          </p>
         </div>
 
         {/* Filters */}
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-8">
           <BookingFilters onFilterChange={handleFilterChange} />
         </div>
 
