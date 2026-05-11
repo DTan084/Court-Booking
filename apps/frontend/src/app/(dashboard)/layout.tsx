@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { Navbar } from '@/components/shared/Navbar';
+import { SiteFooter } from '@/components/shared/SiteFooter';
 import { User } from '@/types';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -36,6 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container py-6">{children}</main>
+      <SiteFooter />
     </div>
   );
 }
