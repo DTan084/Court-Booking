@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -14,8 +14,8 @@ import Link from 'next/link';
 import axios from 'axios';
 
 const loginSchema = z.object({
-  email: z.string().email('Email không hợp lệ').trim().toLowerCase(),
-  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
+  email: z.string().email('Invalid email address').trim().toLowerCase(),
+  password: z.string().min(1, 'Please enter your password'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -38,45 +38,29 @@ export function LoginForm() {
     try {
       setIsLoading(true);
 
-      // Call login API - returns tokens wrapped in { success, data, meta }
       const loginResponse = await api.post('/auth/login', data);
-
-      // Backend wraps response: { success, data: { access_token, ... }, meta }
       const responseData = loginResponse.data.data || loginResponse.data;
-      if (!responseData) {
-        console.error('Response structure:', loginResponse.data);
-        throw new Error('Login response is empty');
-      }
+      if (!responseData) throw new Error('Login response is empty');
 
-      // Fetch user data using httpOnly cookie
       const userResponse = await api.get('/auth/me');
-
-      // Backend might also wrap /auth/me response
       const userData = userResponse.data.data || userResponse.data;
-
-      // Save user to store
       setUser(userData);
 
-      // Redirect to callbackUrl or home
-      toast.success('Đăng nhập thành công!');
+      toast.success('Signed in successfully');
       const params = new URLSearchParams(window.location.search);
       const callbackUrl = params.get('callbackUrl') || '/courts';
       router.push(callbackUrl);
     } catch (error: unknown) {
-      console.error('Login error:', error);
-
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         setError('root', {
-          message: 'Email hoặc mật khẩu không đúng',
+          message: 'Incorrect email or password',
         });
       } else {
         const errorMessage =
           (axios.isAxiosError(error) &&
             (error.response?.data as { error?: { message?: string } })?.error?.message) ||
-          (error instanceof Error ? error.message : 'Đã xảy ra lỗi, vui lòng thử lại');
-        setError('root', {
-          message: errorMessage,
-        });
+          (error instanceof Error ? error.message : 'Something went wrong, please try again');
+        setError('root', { message: errorMessage });
         toast.error(errorMessage);
       }
     } finally {
@@ -85,57 +69,63 @@ export function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-8">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Đăng nhập</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Chào mừng trở lại! Vui lòng đăng nhập để tiếp tục
-        </p>
+    <div className="w-full max-w-md">
+      <div className="mb-8">
+        <h1 className="text-4xl font-extrabold tracking-tight text-[#0b1c30]">Welcome back</h1>
+        <p className="mt-2 text-sm text-slate-600">Sign in to your CourtCommand account.</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {errors.root && (
-          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {errors.root.message}
           </div>
         )}
 
         <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
+          <label htmlFor="email" className="text-sm font-semibold text-slate-700">
+            Email address
           </label>
           <Input
             id="email"
             type="email"
-            placeholder="your@email.com"
+            placeholder="coach@courtcommand.com"
             {...register('email')}
             disabled={isLoading}
+            className="h-12 border-slate-300 bg-white focus-visible:ring-[#fd933d]"
           />
-          {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+          {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium">
-            Mật khẩu
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="password" className="text-sm font-semibold text-slate-700">
+              Password
+            </label>
+          </div>
           <Input
             id="password"
             type="password"
             placeholder="••••••••"
             {...register('password')}
             disabled={isLoading}
+            className="h-12 border-slate-300 bg-white focus-visible:ring-[#fd933d]"
           />
-          {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+          {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+        <Button
+          type="submit"
+          className="h-12 w-full bg-[#944a00] text-white hover:bg-[#7f3f00]"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Signing in...' : 'Sign In'}
         </Button>
 
-        <p className="text-center text-sm text-muted-foreground">
-          Chưa có tài khoản?{' '}
-          <Link href="/register" className="font-medium text-primary hover:underline">
-            Đăng ký ngay
+        <p className="text-center text-sm text-slate-600">
+          Don&apos;t have an account?{' '}
+          <Link href="/register" className="font-semibold text-[#944a00] hover:underline">
+            Sign up
           </Link>
         </p>
       </form>

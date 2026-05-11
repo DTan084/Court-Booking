@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
@@ -14,34 +14,29 @@ import axios from 'axios';
 
 const registerSchema = z
   .object({
-    name: z.string().min(2, 'Tên tối thiểu 2 ký tự'),
-    email: z.string().email('Email không hợp lệ').trim().toLowerCase(),
+    name: z.string().min(2, 'Name must be at least 2 characters'),
+    email: z.string().email('Invalid email address').trim().toLowerCase(),
     password: z
       .string()
-      .min(8, 'Mật khẩu tối thiểu 8 ký tự')
-      .regex(/[A-Z]/, 'Mật khẩu phải chứa ít nhất 1 chữ hoa')
-      .regex(/[0-9]/, 'Mật khẩu phải chứa ít nhất 1 chữ số'),
+      .min(8, 'Password must be at least 8 characters')
+      .regex(/[A-Z]/, 'Password must include at least 1 uppercase letter')
+      .regex(/[0-9]/, 'Password must include at least 1 number'),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: 'Mật khẩu xác nhận không khớp',
+    message: 'Passwords do not match',
     path: ['confirmPassword'],
   });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
-
 type PasswordStrength = 'weak' | 'medium' | 'strong';
 
 function calculatePasswordStrength(password: string): PasswordStrength {
   if (password.length === 0) return 'weak';
 
   let score = 0;
-
-  // Length check
   if (password.length >= 8) score++;
   if (password.length >= 12) score++;
-
-  // Complexity checks
   if (/[a-z]/.test(password)) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
@@ -72,24 +67,19 @@ export function RegisterForm() {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       setIsLoading(true);
-
-      // Call register API
       await api.post('/auth/register', {
         name: data.name,
         email: data.email,
         password: data.password,
       });
 
-      // Success - redirect to login
-      toast.success('Đăng ký thành công, mời đăng nhập');
+      toast.success('Registered successfully, please sign in');
       router.push('/login');
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && error.response?.status === 409) {
-        setError('email', {
-          message: 'Email đã được sử dụng',
-        });
+        setError('email', { message: 'Email is already in use' });
       } else {
-        toast.error('Đã xảy ra lỗi, vui lòng thử lại');
+        toast.error('Something went wrong, please try again');
       }
     } finally {
       setIsLoading(false);
@@ -97,44 +87,46 @@ export function RegisterForm() {
   };
 
   return (
-    <div className="w-full max-w-md space-y-8">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold tracking-tight">Đăng ký</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Tạo tài khoản mới để bắt đầu đặt sân</p>
+    <div className="w-full max-w-md">
+      <div className="mb-8">
+        <h1 className="text-4xl font-extrabold tracking-tight text-[#0b1c30]">Create account</h1>
+        <p className="mt-2 text-sm text-slate-600">Get started with CourtCommand today.</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="space-y-2">
-          <label htmlFor="name" className="text-sm font-medium">
-            Họ và tên
+          <label htmlFor="name" className="text-sm font-semibold text-slate-700">
+            Full name
           </label>
           <Input
             id="name"
             type="text"
-            placeholder="Nguyễn Văn A"
+            placeholder="Jane Doe"
             {...register('name')}
             disabled={isLoading}
+            className="h-12 border-slate-300 bg-white focus-visible:ring-[#fd933d]"
           />
-          {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+          {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
+          <label htmlFor="email" className="text-sm font-semibold text-slate-700">
+            Email address
           </label>
           <Input
             id="email"
             type="email"
-            placeholder="your@email.com"
+            placeholder="name@example.com"
             {...register('email')}
             disabled={isLoading}
+            className="h-12 border-slate-300 bg-white focus-visible:ring-[#fd933d]"
           />
-          {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+          {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium">
-            Mật khẩu
+          <label htmlFor="password" className="text-sm font-semibold text-slate-700">
+            Password
           </label>
           <Input
             id="password"
@@ -142,6 +134,7 @@ export function RegisterForm() {
             placeholder="••••••••"
             {...register('password')}
             disabled={isLoading}
+            className="h-12 border-slate-300 bg-white focus-visible:ring-[#fd933d]"
           />
           {password && (
             <div className="space-y-1">
@@ -151,51 +144,33 @@ export function RegisterForm() {
                     passwordStrength === 'weak'
                       ? 'bg-red-500'
                       : passwordStrength === 'medium'
-                        ? 'bg-yellow-500'
-                        : 'bg-green-500'
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
                   }`}
                 />
                 <div
                   className={`h-1 flex-1 rounded ${
-                    passwordStrength === 'medium'
-                      ? 'bg-yellow-500'
-                      : passwordStrength === 'strong'
-                        ? 'bg-green-500'
-                        : 'bg-gray-200'
+                    passwordStrength === 'medium' || passwordStrength === 'strong'
+                      ? passwordStrength === 'medium'
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
+                      : 'bg-slate-200'
                   }`}
                 />
                 <div
                   className={`h-1 flex-1 rounded ${
-                    passwordStrength === 'strong' ? 'bg-green-500' : 'bg-gray-200'
+                    passwordStrength === 'strong' ? 'bg-emerald-500' : 'bg-slate-200'
                   }`}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Độ mạnh:{' '}
-                <span
-                  className={
-                    passwordStrength === 'weak'
-                      ? 'text-red-500'
-                      : passwordStrength === 'medium'
-                        ? 'text-yellow-500'
-                        : 'text-green-500'
-                  }
-                >
-                  {passwordStrength === 'weak'
-                    ? 'Yếu'
-                    : passwordStrength === 'medium'
-                      ? 'Trung bình'
-                      : 'Mạnh'}
-                </span>
-              </p>
             </div>
           )}
-          {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+          {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="confirmPassword" className="text-sm font-medium">
-            Xác nhận mật khẩu
+          <label htmlFor="confirmPassword" className="text-sm font-semibold text-slate-700">
+            Confirm password
           </label>
           <Input
             id="confirmPassword"
@@ -203,20 +178,25 @@ export function RegisterForm() {
             placeholder="••••••••"
             {...register('confirmPassword')}
             disabled={isLoading}
+            className="h-12 border-slate-300 bg-white focus-visible:ring-[#fd933d]"
           />
           {errors.confirmPassword && (
-            <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>
+            <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>
           )}
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? 'Đang đăng ký...' : 'Đăng ký'}
+        <Button
+          type="submit"
+          className="h-12 w-full bg-[#944a00] text-white hover:bg-[#7f3f00]"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Creating account...' : 'Create Account'}
         </Button>
 
-        <p className="text-center text-sm text-muted-foreground">
-          Đã có tài khoản?{' '}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            Đăng nhập ngay
+        <p className="text-center text-sm text-slate-600">
+          Already have an account?{' '}
+          <Link href="/login" className="font-semibold text-[#944a00] hover:underline">
+            Log in
           </Link>
         </p>
       </form>
