@@ -1,90 +1,246 @@
-'use client';
+﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
-import { useDistricts } from '@/hooks/useCourts';
 import type { SportType } from '@/types';
 import { SportType as SportTypeEnum } from '@court-booking/shared';
 
+export type CourtsSort = 'popular' | 'price_asc' | 'price_desc' | 'name_asc';
+export type CourtTypeFilter = 'all' | 'indoor' | 'outdoor';
+
 interface CourtFiltersProps {
-  onFilterChange: (filters: { name?: string; sportType?: SportType; district?: string }) => void;
+  districtOptions?: string[];
+  onFilterChange: (filters: {
+    name?: string;
+    districts: string[];
+    sportTypes: SportType[];
+    courtType: CourtTypeFilter;
+    maxPrice: number;
+    availableOnly: boolean;
+    sortBy: CourtsSort;
+  }) => void;
+  children?: ReactNode;
 }
 
-// Sport type options
-const sportTypeOptions: { value: SportType | ''; label: string }[] = [
-  { value: '', label: 'Tất cả' },
-  { value: SportTypeEnum.BADMINTON, label: 'Cầu lông' },
+const sportTypeOptions: { value: SportType; label: string }[] = [
+  { value: SportTypeEnum.BADMINTON, label: 'Badminton' },
   { value: SportTypeEnum.TENNIS, label: 'Tennis' },
-  { value: SportTypeEnum.FOOTBALL, label: 'Bóng đá' },
-  { value: SportTypeEnum.BASKETBALL, label: 'Bóng rổ' },
-  { value: SportTypeEnum.VOLLEYBALL, label: 'Bóng chuyền' },
+  { value: SportTypeEnum.FOOTBALL, label: 'Football' },
+  { value: SportTypeEnum.BASKETBALL, label: 'Basketball' },
+  { value: SportTypeEnum.VOLLEYBALL, label: 'Volleyball' },
 ];
 
-export function CourtFilters({ onFilterChange }: CourtFiltersProps) {
+export function CourtFilters({
+  districtOptions = [],
+  onFilterChange,
+  children,
+}: CourtFiltersProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sportType, setSportType] = useState<SportType | ''>('');
-  const [district, setDistrict] = useState<string>('');
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [sportTypes, setSportTypes] = useState<SportType[]>([]);
+  const [courtType, setCourtType] = useState<CourtTypeFilter>('all');
+  const [maxPrice, setMaxPrice] = useState(1000000);
+  const [availableOnly, setAvailableOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<CourtsSort>('popular');
+  const [districtOpen, setDistrictOpen] = useState(false);
+  const [sportOpen, setSportOpen] = useState(false);
 
-  const { data: districts = [] } = useDistricts();
-
-  // Debounce search term (400ms)
   useEffect(() => {
     const timer = setTimeout(() => {
       onFilterChange({
         name: searchTerm || undefined,
-        sportType: sportType || undefined,
-        district: district || undefined,
+        districts,
+        sportTypes,
+        courtType,
+        maxPrice,
+        availableOnly,
+        sortBy,
       });
-    }, 400);
+    }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, sportType, district, onFilterChange]);
+  }, [
+    searchTerm,
+    districts,
+    sportTypes,
+    courtType,
+    maxPrice,
+    availableOnly,
+    sortBy,
+    onFilterChange,
+  ]);
+
+  const toggleSportType = (value: SportType) => {
+    setSportTypes((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
+    );
+  };
+
+  const toggleDistrict = (value: string) => {
+    setDistricts((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
+    );
+  };
+
+  const clearAll = () => {
+    setSearchTerm('');
+    setDistricts([]);
+    setSportTypes([]);
+    setCourtType('all');
+    setMaxPrice(1000000);
+    setAvailableOnly(false);
+    setSortBy('popular');
+  };
 
   return (
-    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-      {/* Search Input */}
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="mb-8 space-y-6">
+      <div className="grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_220px]">
         <Input
           type="text"
-          placeholder="Tìm kiếm theo tên sân..."
+          placeholder="Search venues..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
+          className="h-12 rounded-xl border-slate-300 bg-[#f8f9ff] px-4 focus-visible:ring-[#fd933d]"
         />
-      </div>
-
-      {/* Sport Type Dropdown */}
-      <div className="sm:w-48">
         <select
-          value={sportType}
-          onChange={(e) => setSportType(e.target.value as SportType | '')}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as CourtsSort)}
+          className="h-12 rounded-xl border border-slate-300 bg-[#f8f9ff] px-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#fd933d]"
         >
-          {sportTypeOptions.map((option) => (
-            <option key={option.value || 'all'} value={option.value}>
-              {option.label}
-            </option>
-          ))}
+          <option value="popular">Most Popular</option>
+          <option value="price_asc">Price: Low to High</option>
+          <option value="price_desc">Price: High to Low</option>
+          <option value="name_asc">Name A-Z</option>
         </select>
       </div>
 
-      {/* District Dropdown (REQ-21.3) */}
-      <div className="sm:w-48">
-        <select
-          value={district}
-          onChange={(e) => setDistrict(e.target.value)}
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <option value="">Tất cả khu vực</option>
-          {Array.isArray(districts) &&
-            districts.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-        </select>
+      <div className="flex flex-col gap-8 lg:flex-row">
+        <aside className="w-full shrink-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:w-72">
+          <div className="mb-6 flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">Filters</h3>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-sm font-semibold text-[#944a00] hover:underline"
+            >
+              Clear all
+            </button>
+          </div>
+
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => setDistrictOpen((v) => !v)}
+              className="mb-3 flex w-full items-center justify-between text-left text-xs font-bold uppercase tracking-wider text-slate-500"
+            >
+              Area / District
+              <ChevronDown className={`h-4 w-4 transition ${districtOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {districtOpen && (
+              <div className="max-h-40 space-y-2 overflow-y-auto pr-1">
+                {districtOptions.length === 0 && (
+                  <p className="text-xs text-slate-500">No district data</p>
+                )}
+                {districtOptions.map((district) => (
+                  <label key={district} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={districts.includes(district)}
+                      onChange={() => toggleDistrict(district)}
+                      className="rounded border-slate-300 text-[#944a00] focus:ring-[#944a00]"
+                    />
+                    {district}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mb-6 border-t border-slate-100 pt-5">
+            <button
+              type="button"
+              onClick={() => setSportOpen((v) => !v)}
+              className="mb-3 flex w-full items-center justify-between text-left text-xs font-bold uppercase tracking-wider text-slate-500"
+            >
+              Sport
+              <ChevronDown className={`h-4 w-4 transition ${sportOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {sportOpen && (
+              <div className="space-y-2">
+                {sportTypeOptions.map((option) => (
+                  <label
+                    key={option.value}
+                    className="flex items-center gap-2 text-sm text-slate-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sportTypes.includes(option.value)}
+                      onChange={() => toggleSportType(option.value)}
+                      className="rounded border-slate-300 text-[#944a00] focus:ring-[#944a00]"
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mb-6 border-t border-slate-100 pt-5">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Court Type
+            </h4>
+            <div className="flex gap-2">
+              {(['all', 'indoor', 'outdoor'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setCourtType(type)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold uppercase ${
+                    courtType === type
+                      ? 'border-[#944a00] bg-orange-50 text-[#944a00]'
+                      : 'border-slate-300 text-slate-600'
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-6 border-t border-slate-100 pt-5">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Price Per Hour
+            </h4>
+            <input
+              type="range"
+              min={50000}
+              max={1000000}
+              step={10000}
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(Number(e.target.value))}
+              className="w-full accent-[#944a00]"
+            />
+            <div className="mt-2 flex justify-between text-xs text-slate-500">
+              <span>50,000</span>
+              <span>{maxPrice.toLocaleString('vi-VN')}</span>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-5">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={availableOnly}
+                onChange={(e) => setAvailableOnly(e.target.checked)}
+                className="rounded border-slate-300 text-[#944a00] focus:ring-[#944a00]"
+              />
+              Available only
+            </label>
+          </div>
+        </aside>
+
+        <div className="flex-1">{children}</div>
       </div>
     </div>
   );
