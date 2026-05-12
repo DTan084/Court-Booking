@@ -1,4 +1,5 @@
-﻿import Link from 'next/link';
+import Image from 'next/image';
+import Link from 'next/link';
 import { ArrowRight, PlayCircle } from 'lucide-react';
 import { Navbar } from '@/components/shared/Navbar';
 import { SiteFooter } from '@/components/shared/SiteFooter';
@@ -34,16 +35,10 @@ const sportImageByType: Record<SportType, string> = {
 
 async function getFeaturedCourts() {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
   if (!apiUrl) return [] as Court[];
-
   try {
-    const res = await fetch(`${apiUrl}/api/v1/courts?page=1&limit=6`, {
-      cache: 'no-store',
-    });
-
+    const res = await fetch(`${apiUrl}/api/v1/courts?page=1&limit=6`, { cache: 'no-store' });
     if (!res.ok) return [] as Court[];
-
     const json = (await res.json()) as CourtsApiResponse;
     const all = json?.data?.data ?? [];
     return all.filter((court) => court.status === CourtStatus.ACTIVE).slice(0, 3);
@@ -54,17 +49,17 @@ async function getFeaturedCourts() {
 
 export default async function HomePage() {
   const courts = await getFeaturedCourts();
-
   return (
     <div className="min-h-screen bg-[#f8f9ff] text-[#0b1c30]">
       <Navbar />
-
       <main>
         <section className="relative h-[80vh] min-h-[680px] overflow-hidden bg-[#0e2034]">
-          <img
+          <Image
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAnMPRMm4UOHY1uKc2FiXwc_APn4xn1T8z2ACbQ5ePgMLiz-UXD3pCUzS0euhK6se5354dbvarAlXa8gYXjdXXZ2TIR1wAiIDkDrbZhpVSWlSxLL9J8hhUlfhg7BGE74i4atF3CbcQjJV75x3e5e9A6ESWsNqbtmrYyJw-R6E1AWAMNt7J-4LKKz0wY2cFP8HLSIoY5PBAtHisM1mvwjyJTBCktsj4v2pJcXO6jiemi_6PMy02vcayco_FhIaPHMrnUYTxYcdUAA"
             alt="Indoor court"
-            className="absolute inset-0 h-full w-full object-cover opacity-60"
+            fill
+            sizes="100vw"
+            className="object-cover opacity-60"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-[#131b2e] via-[#131b2eba] to-transparent" />
           <div className="relative z-10 mx-auto flex h-full w-full max-w-[1440px] items-center px-5 md:px-8">
@@ -73,8 +68,7 @@ export default async function HomePage() {
                 Digital Command Center
               </span>
               <h1 className="mb-6 text-5xl font-black leading-tight tracking-tight text-white md:text-7xl">
-                Command the Court.
-                <span className="block text-[#fd933d]">Elevate Your Game.</span>
+                Command the Court.<span className="block text-[#fd933d]">Elevate Your Game.</span>
               </h1>
               <p className="mb-10 max-w-xl text-lg leading-relaxed text-slate-200">
                 Elite management for professional facilities. Schedule matches, manage memberships,
@@ -100,7 +94,6 @@ export default async function HomePage() {
             </div>
           </div>
         </section>
-
         <section className="border-y border-slate-300 bg-[#eff4ff] py-14">
           <div className="mx-auto grid w-full max-w-[1440px] grid-cols-2 gap-8 px-5 text-center md:grid-cols-4 md:px-8">
             {[
@@ -118,7 +111,6 @@ export default async function HomePage() {
             ))}
           </div>
         </section>
-
         <section className="mx-auto w-full max-w-[1440px] px-5 py-16 md:px-8">
           <div className="mb-10 flex flex-wrap items-end justify-between gap-6">
             <div>
@@ -134,7 +126,6 @@ export default async function HomePage() {
               View All Facilities <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-
           {courts.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-600">
               Chưa có dữ liệu sân để hiển thị.
@@ -146,10 +137,12 @@ export default async function HomePage() {
                   key={court.id}
                   className="group relative aspect-[4/5] overflow-hidden rounded-xl"
                 >
-                  <img
+                  <Image
                     src={sportImageByType[court.sportType]}
                     alt={court.name}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-110"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="object-cover transition duration-500 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                   <div className="absolute bottom-0 p-6">
@@ -165,7 +158,6 @@ export default async function HomePage() {
           )}
         </section>
       </main>
-
       <SiteFooter />
     </div>
   );

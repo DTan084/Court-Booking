@@ -1,4 +1,5 @@
-﻿import { RegisterForm } from '@/components/auth/RegisterForm';
+import Image from 'next/image';
+import { RegisterForm } from '@/components/auth/RegisterForm';
 import { Navbar } from '@/components/shared/Navbar';
 import { SiteFooter } from '@/components/shared/SiteFooter';
 
@@ -9,10 +10,12 @@ export default function RegisterPage() {
       <main className="mx-auto flex w-full max-w-[1280px] flex-1 items-center px-4 py-10 md:px-8">
         <div className="grid w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid-cols-2">
           <div className="relative hidden min-h-[720px] lg:block">
-            <img
+            <Image
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKFmxWTsbj_rkQxLnGxLTppX1pP6xto_778YGxL_NROcxI2Uy28ywCSIdNHSQHGUJLceGuZfDSgPCnJOUAHD5Fjd84JQpVuPm5RfZs6dULWUQ16-LFOt1jamO6oeZZsMQcHXs6q7m3PQkxmDV9InqJSJDo5Rw97FMv9dSgi3b8CfZK8r2NH4444VT74ATUixGFteHRb7kZ4ec0f25i7fwL6SzyO70LaV4Ugl62bDve35a1bQXKcvAi6QYHHTDIS2a_ZY9L_lEo4g"
               alt="Tennis court"
-              className="absolute inset-0 h-full w-full object-cover"
+              fill
+              sizes="50vw"
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#131b2ecc] to-transparent" />
             <div className="absolute bottom-8 left-8 right-8 text-white">
