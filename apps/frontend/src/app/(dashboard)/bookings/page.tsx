@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { Suspense, useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Calendar } from 'lucide-react';
 import { useMyBookings } from '@/hooks/useBookings';
@@ -13,7 +13,7 @@ import type { BookingStatus } from '@/types';
 
 // ==================== COMPONENT ====================
 
-export default function BookingsPage() {
+function BookingsPageContent() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<BookingStatus | undefined>(undefined);
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
@@ -119,5 +119,13 @@ export default function BookingsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={<SkeletonBookingRow count={5} />}>
+      <BookingsPageContent />
+    </Suspense>
   );
 }

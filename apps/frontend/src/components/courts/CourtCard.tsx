@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Star } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { SportType, CourtStatus } from '@/types';
@@ -51,10 +52,12 @@ export function CourtCard({ court }: CourtCardProps) {
       )}
     >
       <div className="relative h-52 overflow-hidden">
-        <img
+        <Image
           src={court.images?.[0]?.url ?? sportImage[court.sportType]}
           alt={court.name}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
         <div className="absolute left-4 top-4 flex items-center gap-2">

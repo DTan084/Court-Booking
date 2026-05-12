@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import type { CourtImage, SportType } from '@/types';
@@ -37,15 +38,12 @@ export function CourtGallery({ images, courtName, sportType }: CourtGalleryProps
   const [activeIndex, setActiveIndex] = useState(0);
   const active = galleryImages[activeIndex] ?? galleryImages[0];
 
-  const goPrev = useCallback(
-    () =>
-      setActiveIndex((idx) => (idx - 1 + galleryImages.length) % Math.max(galleryImages.length, 1)),
-    [galleryImages.length],
-  );
-  const goNext = useCallback(
-    () => setActiveIndex((idx) => (idx + 1) % Math.max(galleryImages.length, 1)),
-    [galleryImages.length],
-  );
+  const goPrev = useCallback(() => {
+    setActiveIndex((idx) => (idx - 1 + galleryImages.length) % Math.max(galleryImages.length, 1));
+  }, [galleryImages.length]);
+  const goNext = useCallback(() => {
+    setActiveIndex((idx) => (idx + 1) % Math.max(galleryImages.length, 1));
+  }, [galleryImages.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,10 +59,12 @@ export function CourtGallery({ images, courtName, sportType }: CourtGalleryProps
     <>
       <div className="grid h-[440px] grid-cols-1 gap-2 overflow-hidden rounded-2xl md:grid-cols-3">
         <button type="button" className="relative md:col-span-2" onClick={() => setOpen(true)}>
-          <img
+          <Image
             src={galleryImages[0]?.url}
             alt={galleryImages[0]?.altText ?? courtName}
-            className="h-full w-full object-cover"
+            fill
+            sizes="(max-width: 768px) 100vw, 66vw"
+            className="object-cover"
           />
         </button>
         <div className="hidden grid-rows-2 gap-2 md:grid">
@@ -80,9 +80,11 @@ export function CourtGallery({ images, courtName, sportType }: CourtGalleryProps
               }}
             >
               {img ? (
-                <img
+                <Image
                   src={img.url}
                   alt={img.altText ?? courtName}
+                  width={480}
+                  height={280}
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -105,9 +107,11 @@ export function CourtGallery({ images, courtName, sportType }: CourtGalleryProps
         <DialogContent className="max-w-5xl">
           <DialogTitle>{courtName}</DialogTitle>
           <div className="relative">
-            <img
+            <Image
               src={active.url}
               alt={active.altText ?? courtName}
+              width={1400}
+              height={900}
               className="max-h-[70vh] w-full rounded-lg object-contain"
             />
             {galleryImages.length > 1 && (
@@ -139,9 +143,11 @@ export function CourtGallery({ images, courtName, sportType }: CourtGalleryProps
                 className={`h-16 w-24 overflow-hidden rounded border ${idx === activeIndex ? 'border-[#944a00]' : 'border-slate-200'}`}
                 onClick={() => setActiveIndex(idx)}
               >
-                <img
+                <Image
                   src={img.url}
                   alt={img.altText ?? courtName}
+                  width={160}
+                  height={96}
                   className="h-full w-full object-cover"
                 />
               </button>

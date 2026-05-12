@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import { Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { useCourt } from '@/hooks/useCourt';
 import {
@@ -35,7 +36,7 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
   return (
     <div className="space-y-6">
       <div className="rounded-lg border bg-white p-4">
-        <h3 className="mb-3 font-semibold">Thêm ảnh mới</h3>
+        <h3 className="mb-3 font-semibold">Them anh moi</h3>
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <input
             value={url}
@@ -57,16 +58,18 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
               setAltText('');
             }}
           >
-            Thêm ảnh
+            Them anh
           </Button>
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {images.map((img, idx) => (
           <div key={img.id} className="rounded-lg border bg-white p-3">
-            <img
+            <Image
               src={img.url}
               alt={img.altText ?? `Court image ${idx + 1}`}
+              width={400}
+              height={220}
               className="mb-3 h-36 w-full rounded object-cover"
             />
             <p className="mb-2 truncate text-xs text-slate-500">{img.url}</p>
@@ -97,9 +100,9 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
       <DoubleConfirmationDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="Bạn có chắc muốn xóa hình ảnh này?"
-        description="Hành động này không thể hoàn tác."
-        confirmText="Xóa ảnh"
+        title="Ban co chac muon xoa hinh anh nay?"
+        description="Hanh dong nay khong the hoan tac."
+        confirmText="Xoa anh"
         variant="destructive"
         onConfirm={() => {
           if (deleteId) deleteImage(deleteId);
