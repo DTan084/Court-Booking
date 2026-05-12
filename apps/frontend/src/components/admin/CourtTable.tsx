@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Pencil, Trash2, Clock } from 'lucide-react';
+import { Pencil, Trash2, Clock, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -115,6 +115,17 @@ export function CourtTable({ courts, onEdit, onDelete }: CourtTableProps) {
                     >
                       <Link href={`/admin/courts/${court.id}/time-slots`}>
                         <Clock className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      asChild
+                      aria-label={`Quản lý hình ảnh sân ${court.name}`}
+                      title="Quản lý hình ảnh"
+                    >
+                      <Link href={`/admin/courts/${court.id}/edit`}>
+                        <ImageIcon className="h-4 w-4" />
                       </Link>
                     </Button>
                     <Button

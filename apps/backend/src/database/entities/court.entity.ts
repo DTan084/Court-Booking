@@ -46,7 +46,7 @@ export class CourtEntity {
   description: string | null;
 
   @Index('idx_courts_features_gin')
-  @Column({ type: 'simple-array', nullable: true, default: '' })
+  @Column({ type: 'text', array: true, nullable: false, default: () => "'{}'" })
   features: FacilityFeature[];
 
   @OneToMany(() => CourtImageEntity, (img) => img.court, { cascade: true, eager: false })

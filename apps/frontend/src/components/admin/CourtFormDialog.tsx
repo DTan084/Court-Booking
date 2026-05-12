@@ -1,28 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { FacilityFeature, CourtType, SportType, CourtStatus } from '@court-booking/shared';
+import { FACILITY_FEATURE_LABELS } from '@/lib/court-features';
 import { Button } from '@/components/ui/button';
 import { useCreateCourt, useUpdateCourt } from '@/hooks/useAdminCourts';
-import { SportType, CourtStatus } from '@/types';
 import type { Court } from '@/types';
-
-// ==================== SCHEMA ====================
 
 const courtSchema = z.object({
   name: z.string().min(2, 'Tên sân tối thiểu 2 ký tự'),
-  sportType: z.nativeEnum(SportType, { required_error: 'Vui lòng chọn loại thể thao' }),
+  sportType: z.nativeEnum(SportType),
+  courtType: z.nativeEnum(CourtType),
   address: z.string().min(5, 'Địa chỉ tối thiểu 5 ký tự'),
-  pricePerHour: z.number({ invalid_type_error: 'Giá phải là số' }).positive('Giá phải lớn hơn 0'),
+  pricePerHour: z.number().positive('Giá phải lớn hơn 0'),
+  description: z.string().max(5000).optional(),
+  features: z.array(z.nativeEnum(FacilityFeature)).optional().default([]),
   status: z.nativeEnum(CourtStatus).optional(),
 });
 
 type CourtFormData = z.infer<typeof courtSchema>;
-
-// ==================== TYPES ====================
 
 interface CourtFormDialogProps {
   open: boolean;
@@ -30,8 +31,6 @@ interface CourtFormDialogProps {
   court?: Court;
   mode: 'create' | 'edit';
 }
-
-// ==================== CONSTANTS ====================
 
 const sportTypeOptions = [
   { value: SportType.BADMINTON, label: 'Cầu lông' },
@@ -41,234 +40,183 @@ const sportTypeOptions = [
   { value: SportType.VOLLEYBALL, label: 'Bóng chuyền' },
 ];
 
-const statusOptions = [
-  { value: CourtStatus.ACTIVE, label: 'Hoạt động' },
-  { value: CourtStatus.INACTIVE, label: 'Tạm ngưng' },
-];
-
-// ==================== COMPONENT ====================
-
 export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDialogProps) {
   const { mutate: createCourt, isPending: isCreating } = useCreateCourt();
   const { mutate: updateCourt, isPending: isUpdating } = useUpdateCourt();
   const isPending = isCreating || isUpdating;
-
+  const [preview, setPreview] = useState(false);
   const {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<CourtFormData>({
     resolver: zodResolver(courtSchema),
     defaultValues: {
       name: '',
       sportType: SportType.BADMINTON,
+      courtType: CourtType.OUTDOOR,
       address: '',
       pricePerHour: 0,
+      description: '',
+      features: [],
       status: CourtStatus.ACTIVE,
     },
   });
 
-  // Populate form when editing
+  const features = watch('features') ?? [];
+  const description = watch('description') ?? '';
+
   useEffect(() => {
-    if (open && court && mode === 'edit') {
+    if (!open) return;
+    if (court && mode === 'edit') {
       reset({
         name: court.name,
         sportType: court.sportType,
+        courtType: court.courtType,
         address: court.address,
         pricePerHour: court.pricePerHour,
+        description: court.description ?? '',
+        features: court.features ?? [],
         status: court.status,
       });
-    } else if (open && mode === 'create') {
+    } else {
       reset({
         name: '',
         sportType: SportType.BADMINTON,
+        courtType: CourtType.OUTDOOR,
         address: '',
         pricePerHour: 0,
+        description: '',
+        features: [],
         status: CourtStatus.ACTIVE,
       });
     }
   }, [open, court, mode, reset]);
 
-  const onSubmit = (data: CourtFormData) => {
-    if (mode === 'create') {
-      createCourt(
-        {
-          name: data.name,
-          sportType: data.sportType,
-          address: data.address,
-          pricePerHour: data.pricePerHour,
-        },
-        {
-          onSuccess: () => {
-            onOpenChange(false);
-            reset();
-          },
-        },
-      );
-    } else if (court) {
-      updateCourt(
-        { id: court.id, dto: data },
-        {
-          onSuccess: () => {
-            onOpenChange(false);
-            reset();
-          },
-        },
-      );
-    }
+  const toggleFeature = (feature: FacilityFeature) => {
+    const next = features.includes(feature)
+      ? features.filter((f) => f !== feature)
+      : [...features, feature];
+    setValue('features', next);
   };
 
-  const handleClose = () => {
-    if (!isPending) {
-      onOpenChange(false);
-      reset();
+  const onSubmit = (data: CourtFormData) => {
+    if (mode === 'create') {
+      createCourt(data, { onSuccess: () => onOpenChange(false) });
+      return;
+    }
+    if (court) {
+      updateCourt({ id: court.id, dto: data }, { onSuccess: () => onOpenChange(false) });
     }
   };
 
   if (!open) return null;
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="court-form-title"
     >
-      <div className="relative w-full max-w-lg rounded-lg bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
+      <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
-          <h2 id="court-form-title" className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold">
             {mode === 'create' ? 'Tạo sân mới' : 'Chỉnh sửa sân'}
           </h2>
           <button
-            onClick={handleClose}
+            onClick={() => onOpenChange(false)}
             disabled={isPending}
-            className="rounded-lg p-1 hover:bg-gray-100 disabled:opacity-50"
-            aria-label="Đóng"
+            className="rounded-lg p-1 hover:bg-gray-100"
           >
             <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
-
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Name */}
-          <div>
-            <label htmlFor="court-name" className="block text-sm font-medium text-gray-700">
-              Tên sân <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="court-name"
-              type="text"
-              {...register('name')}
-              placeholder="Ví dụ: Sân cầu lông Hà Nội"
-              disabled={isPending}
-              aria-describedby={errors.name ? 'court-name-error' : undefined}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            />
-            {errors.name && (
-              <p id="court-name-error" className="mt-1 text-sm text-red-600" role="alert">
-                {errors.name.message}
-              </p>
-            )}
-          </div>
-
-          {/* Sport Type */}
-          <div>
-            <label htmlFor="court-sport-type" className="block text-sm font-medium text-gray-700">
-              Loại thể thao <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="court-sport-type"
-              {...register('sportType')}
-              disabled={isPending}
-              aria-describedby={errors.sportType ? 'court-sport-type-error' : undefined}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            >
+          <input
+            {...register('name')}
+            placeholder="Tên sân"
+            className="w-full rounded-md border px-3 py-2"
+          />
+          {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <select {...register('sportType')} className="rounded-md border px-3 py-2">
               {sportTypeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
               ))}
             </select>
-            {errors.sportType && (
-              <p id="court-sport-type-error" className="mt-1 text-sm text-red-600" role="alert">
-                {errors.sportType.message}
-              </p>
-            )}
+            <select {...register('courtType')} className="rounded-md border px-3 py-2">
+              <option value={CourtType.INDOOR}>Trong nhà</option>
+              <option value={CourtType.OUTDOOR}>Ngoài trời</option>
+            </select>
           </div>
-
-          {/* Address */}
+          <input
+            {...register('address')}
+            placeholder="Địa chỉ"
+            className="w-full rounded-md border px-3 py-2"
+          />
+          <input
+            type="number"
+            {...register('pricePerHour', { valueAsNumber: true })}
+            placeholder="Giá/giờ"
+            className="w-full rounded-md border px-3 py-2"
+          />
           <div>
-            <label htmlFor="court-address" className="block text-sm font-medium text-gray-700">
-              Địa chỉ <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="court-address"
-              type="text"
-              {...register('address')}
-              placeholder="Ví dụ: 123 Đường ABC, Quận 1, TP.HCM"
-              disabled={isPending}
-              aria-describedby={errors.address ? 'court-address-error' : undefined}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            />
-            {errors.address && (
-              <p id="court-address-error" className="mt-1 text-sm text-red-600" role="alert">
-                {errors.address.message}
-              </p>
-            )}
-          </div>
-
-          {/* Price Per Hour */}
-          <div>
-            <label htmlFor="court-price" className="block text-sm font-medium text-gray-700">
-              Giá tham khảo (VND/giờ) <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="court-price"
-              type="number"
-              min={0}
-              step={1000}
-              {...register('pricePerHour', { valueAsNumber: true })}
-              placeholder="150000"
-              disabled={isPending}
-              aria-describedby={errors.pricePerHour ? 'court-price-error' : undefined}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            />
-            {errors.pricePerHour && (
-              <p id="court-price-error" className="mt-1 text-sm text-red-600" role="alert">
-                {errors.pricePerHour.message}
-              </p>
-            )}
-          </div>
-
-          {/* Status (edit only) */}
-          {mode === 'edit' && (
-            <div>
-              <label htmlFor="court-status" className="block text-sm font-medium text-gray-700">
-                Trạng thái
-              </label>
-              <select
-                id="court-status"
-                {...register('status')}
-                disabled={isPending}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium">Mô tả sân</span>
+              <button
+                type="button"
+                className="text-sm text-[#944a00]"
+                onClick={() => setPreview((v) => !v)}
               >
-                {statusOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                {preview ? 'Nhập' : 'Xem trước'}
+              </button>
             </div>
+            {!preview ? (
+              <textarea
+                {...register('description')}
+                rows={5}
+                placeholder="Nhập mô tả sân (hỗ trợ Markdown)..."
+                className="w-full rounded-md border px-3 py-2"
+              />
+            ) : (
+              <div className="prose min-h-[120px] rounded-md border p-3">
+                <ReactMarkdown>{description || '_Chưa có nội dung_'}</ReactMarkdown>
+              </div>
+            )}
+            <p className="mt-1 text-xs text-slate-500">{description.length}/5000</p>
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-medium">Tiện ích sân</p>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.values(FacilityFeature).map((feature) => (
+                <label key={feature} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={features.includes(feature)}
+                    onChange={() => toggleFeature(feature)}
+                  />
+                  <span>
+                    {FACILITY_FEATURE_LABELS[feature].icon} {FACILITY_FEATURE_LABELS[feature].label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+          {mode === 'edit' && (
+            <select {...register('status')} className="w-full rounded-md border px-3 py-2">
+              <option value={CourtStatus.ACTIVE}>Hoạt động</option>
+              <option value={CourtStatus.INACTIVE}>Tạm ngưng</option>
+            </select>
           )}
-
-          {/* Actions */}
           <div className="flex gap-3 pt-2">
             <Button
               type="button"
               variant="outline"
-              onClick={handleClose}
+              onClick={() => onOpenChange(false)}
               disabled={isPending}
               className="flex-1"
             >

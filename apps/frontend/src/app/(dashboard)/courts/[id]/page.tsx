@@ -9,25 +9,20 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
-  ShieldCheck,
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import { useCourt } from '@/hooks/useCourt';
 import { useTimeSlots } from '@/hooks/useTimeSlots';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useCreateBooking } from '@/hooks/useBookings';
 import { Button } from '@/components/ui/button';
+import { CourtGallery } from '@/components/courts/CourtGallery';
+import { CourtTypeBadge } from '@/components/courts/CourtTypeBadge';
+import { FacilityFeatureTags } from '@/components/courts/FacilityFeatureTags';
 import { buildLocalISO, cn, formatCurrency, formatDate, isSlotBooked } from '@/lib/utils';
 import { CourtStatus } from '@/types';
-import type { SportType, BookedRange, CourtTimeSlot } from '@/types';
-
-const sportTypeLabels: Record<SportType, string> = {
-  BADMINTON: 'Badminton',
-  TENNIS: 'Tennis',
-  FOOTBALL: 'Football',
-  BASKETBALL: 'Basketball',
-  VOLLEYBALL: 'Volleyball',
-};
+import type { BookedRange, CourtTimeSlot } from '@/types';
 
 function getDaySlots(timeSlots: CourtTimeSlot[], selectedDate: Date) {
   const dayOfWeek = selectedDate.getDay();
@@ -183,31 +178,11 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
     <div className="mx-auto w-full max-w-[1440px] px-4 py-8 md:px-8 md:py-10">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <section className="space-y-6 lg:col-span-8">
-          <div className="grid h-[440px] grid-cols-1 gap-2 overflow-hidden rounded-2xl md:grid-cols-3">
-            <div className="relative md:col-span-2">
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBx1TSQ96QiXngH7tf-dEnwN2R_pjMhwAqhgqxkyLmvBRouW0VbbFRHxouuGGUgZgIKZjX8Vk8yxh1wH8f5MX2JhXY-Wfv0-j4Pk4iFA_22KPEGg9iiGmUDuLfhWfMsjn4Hp-58lJH1oQOtUdk3gUfMGcJIDpYjd5l7Dw6ICXIswqkM0IjYlYGjNcMXTI98jUZnSu7OVf6w73PDx_PIaxDgbyqbGwCTVBwcucEokKtxw6uHdYYsNChJ4F4BM7tdipk4QiyC0sAdw"
-                alt={court.name}
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-              <div className="absolute bottom-4 left-4 rounded-full bg-[#fd933d] px-3 py-1 text-xs font-bold uppercase tracking-widest text-[#301400]">
-                {sportTypeLabels[court.sportType]}
-              </div>
-            </div>
-            <div className="hidden grid-rows-2 gap-2 md:grid">
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqYPUQ8CqCuWxcSKVgB6UQVcfTbOxzWkMenDLLHEEDOgTP81QD54nNPrcTapGQsm3d6wOTFW-5ITp-7t2Xs-7EUGYw01QNT6u4AEpMpHk8_emcs2hToy7NWzMU4Z3s8V6e8pXed7FElz4TNTSdMj_WLBKTQxopru4SSVJTByt1OmvmY-XY3TL9SaGNw2kcoP5mFFfwYqmFl7MWjqv8rhIkdgfOFq-sPvuhfPaRRgGKbEAnWslQAMHz0gyV0-wNm1DQE6ClakrNXQ"
-                alt="Court detail"
-                className="h-full w-full object-cover"
-              />
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuDGqlwmHB0HODaMHvOJ9O1E_46sCdHUN4IjulyUWIce4BDOGswQ7tirMieW5ml17MpEflg4BbcDIreYGmlxkeSkCs9PEQZptE7VTNp2-qCfL65IWL8lZ9JLuVrboDpPIA0QRBHuWO2_tnzM3QhgKRbbGP6yJBfHhET6cO5wiboCqM0DyhFkOttkMIYZjXNvLnW7B5r70XOuu0p6u9vBt94SO0byciN_vizyXUH_wtEpCPlm9JJ0yom_rmdfREBK_K3V8ogfLt3w"
-                alt="Court detail"
-                className="h-full w-full object-cover"
-              />
-            </div>
-          </div>
+          <CourtGallery
+            images={court.images ?? []}
+            courtName={court.name}
+            sportType={court.sportType}
+          />
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
@@ -215,6 +190,9 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
                 <h1 className="text-4xl font-extrabold tracking-tight text-[#0b1c30]">
                   {court.name}
                 </h1>
+                <div className="mt-2 flex items-center gap-2">
+                  <CourtTypeBadge courtType={court.courtType} />
+                </div>
                 <p className="mt-2 flex items-center gap-2 text-slate-600">
                   <MapPin className="h-4 w-4" />
                   {court.address}
@@ -239,25 +217,17 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
             )}
 
             <h2 className="mb-4 text-xl font-bold text-[#0b1c30]">Facility Features</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {['Pro Lighting', 'Free Parking', 'Gear Rental', 'Climate Control'].map((f) => (
-                <div
-                  key={f}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-[#f8f9ff] p-3"
-                >
-                  <ShieldCheck className="h-4 w-4 text-[#944a00]" />
-                  <span className="text-sm font-medium text-slate-700">{f}</span>
-                </div>
-              ))}
-            </div>
+            <FacilityFeatureTags features={court.features ?? []} />
 
             <div className="mt-6 border-t border-slate-100 pt-5">
               <h2 className="mb-3 text-xl font-bold text-[#0b1c30]">About This Court</h2>
-              <p className="leading-relaxed text-slate-600">
-                {court.description?.trim()
-                  ? court.description
-                  : 'This court is maintained for high-performance training and competitive matches, with stable lighting, quality surface conditions, and on-site support amenities.'}
-              </p>
+              {court.description?.trim() ? (
+                <div className="prose prose-slate max-w-none text-slate-600">
+                  <ReactMarkdown>{court.description}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="text-slate-400">Chưa có mô tả cho sân này</p>
+              )}
             </div>
           </div>
         </section>

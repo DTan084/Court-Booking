@@ -1,13 +1,17 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import type { SportType } from '@/types';
-import { SportType as SportTypeEnum } from '@court-booking/shared';
+import { FACILITY_FEATURE_LABELS } from '@/lib/court-features';
+import type { SportType, CourtType, FacilityFeature } from '@/types';
+import {
+  SportType as SportTypeEnum,
+  CourtType as CourtTypeEnum,
+  FacilityFeature as FacilityFeatureEnum,
+} from '@court-booking/shared';
 
 export type CourtsSort = 'popular' | 'price_asc' | 'price_desc' | 'name_asc';
-export type CourtTypeFilter = 'all' | 'indoor' | 'outdoor';
 
 interface CourtFiltersProps {
   districtOptions?: string[];
@@ -15,7 +19,8 @@ interface CourtFiltersProps {
     name?: string;
     districts: string[];
     sportTypes: SportType[];
-    courtType: CourtTypeFilter;
+    courtType?: CourtType;
+    features: FacilityFeature[];
     maxPrice: number;
     availableOnly: boolean;
     sortBy: CourtsSort;
@@ -31,6 +36,12 @@ const sportTypeOptions: { value: SportType; label: string }[] = [
   { value: SportTypeEnum.VOLLEYBALL, label: 'Volleyball' },
 ];
 
+const courtTypeOptions: Array<{ value?: CourtType; label: string }> = [
+  { label: 'Tất cả' },
+  { value: CourtTypeEnum.INDOOR, label: 'Trong nhà' },
+  { value: CourtTypeEnum.OUTDOOR, label: 'Ngoài trời' },
+];
+
 export function CourtFilters({
   districtOptions = [],
   onFilterChange,
@@ -39,12 +50,14 @@ export function CourtFilters({
   const [searchTerm, setSearchTerm] = useState('');
   const [districts, setDistricts] = useState<string[]>([]);
   const [sportTypes, setSportTypes] = useState<SportType[]>([]);
-  const [courtType, setCourtType] = useState<CourtTypeFilter>('all');
+  const [courtType, setCourtType] = useState<CourtType | undefined>(undefined);
+  const [features, setFeatures] = useState<FacilityFeature[]>([]);
   const [maxPrice, setMaxPrice] = useState(1000000);
   const [availableOnly, setAvailableOnly] = useState(false);
   const [sortBy, setSortBy] = useState<CourtsSort>('popular');
   const [districtOpen, setDistrictOpen] = useState(false);
   const [sportOpen, setSportOpen] = useState(false);
+  const [featureOpen, setFeatureOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -53,41 +66,44 @@ export function CourtFilters({
         districts,
         sportTypes,
         courtType,
+        features,
         maxPrice,
         availableOnly,
         sortBy,
       });
     }, 250);
-
     return () => clearTimeout(timer);
   }, [
     searchTerm,
     districts,
     sportTypes,
     courtType,
+    features,
     maxPrice,
     availableOnly,
     sortBy,
     onFilterChange,
   ]);
 
-  const toggleSportType = (value: SportType) => {
+  const toggleSportType = (value: SportType) =>
     setSportTypes((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
     );
-  };
-
-  const toggleDistrict = (value: string) => {
+  const toggleDistrict = (value: string) =>
     setDistricts((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
     );
-  };
+  const toggleFeature = (value: FacilityFeature) =>
+    setFeatures((prev) =>
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
+    );
 
   const clearAll = () => {
     setSearchTerm('');
     setDistricts([]);
     setSportTypes([]);
-    setCourtType('all');
+    setCourtType(undefined);
+    setFeatures([]);
     setMaxPrice(1000000);
     setAvailableOnly(false);
     setSortBy('popular');
@@ -127,14 +143,13 @@ export function CourtFilters({
               Clear all
             </button>
           </div>
-
           <div className="mb-6">
             <button
               type="button"
               onClick={() => setDistrictOpen((v) => !v)}
               className="mb-3 flex w-full items-center justify-between text-left text-xs font-bold uppercase tracking-wider text-slate-500"
             >
-              Area / District
+              Area / District{' '}
               <ChevronDown className={`h-4 w-4 transition ${districtOpen ? 'rotate-180' : ''}`} />
             </button>
             {districtOpen && (
@@ -156,14 +171,13 @@ export function CourtFilters({
               </div>
             )}
           </div>
-
           <div className="mb-6 border-t border-slate-100 pt-5">
             <button
               type="button"
               onClick={() => setSportOpen((v) => !v)}
               className="mb-3 flex w-full items-center justify-between text-left text-xs font-bold uppercase tracking-wider text-slate-500"
             >
-              Sport
+              Sport{' '}
               <ChevronDown className={`h-4 w-4 transition ${sportOpen ? 'rotate-180' : ''}`} />
             </button>
             {sportOpen && (
@@ -185,29 +199,51 @@ export function CourtFilters({
               </div>
             )}
           </div>
-
           <div className="mb-6 border-t border-slate-100 pt-5">
             <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
               Court Type
             </h4>
-            <div className="flex gap-2">
-              {(['all', 'indoor', 'outdoor'] as const).map((type) => (
+            <div className="flex flex-wrap gap-2">
+              {courtTypeOptions.map((type) => (
                 <button
-                  key={type}
+                  key={type.label}
                   type="button"
-                  onClick={() => setCourtType(type)}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold uppercase ${
-                    courtType === type
-                      ? 'border-[#944a00] bg-orange-50 text-[#944a00]'
-                      : 'border-slate-300 text-slate-600'
-                  }`}
+                  onClick={() => setCourtType(type.value)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${courtType === type.value ? 'border-[#944a00] bg-orange-50 text-[#944a00]' : 'border-slate-300 text-slate-600'}`}
                 >
-                  {type}
+                  {type.label}
                 </button>
               ))}
             </div>
           </div>
-
+          <div className="mb-6 border-t border-slate-100 pt-5">
+            <button
+              type="button"
+              onClick={() => setFeatureOpen((v) => !v)}
+              className="mb-3 flex w-full items-center justify-between text-left text-xs font-bold uppercase tracking-wider text-slate-500"
+            >
+              Tiện ích{' '}
+              <ChevronDown className={`h-4 w-4 transition ${featureOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {featureOpen && (
+              <div className="space-y-2">
+                {Object.values(FacilityFeatureEnum).map((feature) => (
+                  <label key={feature} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={features.includes(feature)}
+                      onChange={() => toggleFeature(feature)}
+                      className="rounded border-slate-300 text-[#944a00] focus:ring-[#944a00]"
+                    />
+                    <span>
+                      {FACILITY_FEATURE_LABELS[feature].icon}{' '}
+                      {FACILITY_FEATURE_LABELS[feature].label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="mb-6 border-t border-slate-100 pt-5">
             <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
               Price Per Hour
@@ -226,7 +262,6 @@ export function CourtFilters({
               <span>{maxPrice.toLocaleString('vi-VN')}</span>
             </div>
           </div>
-
           <div className="border-t border-slate-100 pt-5">
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
@@ -239,7 +274,6 @@ export function CourtFilters({
             </label>
           </div>
         </aside>
-
         <div className="flex-1">{children}</div>
       </div>
     </div>

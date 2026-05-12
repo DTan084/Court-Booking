@@ -2,23 +2,42 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys } from '@/lib/api';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
-import type { SportType, CourtStatus, Court } from '@/types';
+import type {
+  SportType,
+  CourtStatus,
+  Court,
+  CourtType,
+  FacilityFeature,
+  CourtImage,
+} from '@/types';
 
 // ==================== TYPES ====================
 
 export interface CreateCourtDto {
   name: string;
   sportType: SportType;
+  courtType: CourtType;
   address: string;
   pricePerHour: number;
+  description?: string;
+  features?: FacilityFeature[];
 }
 
 export interface UpdateCourtDto {
   name?: string;
   sportType?: SportType;
+  courtType?: CourtType;
   address?: string;
   pricePerHour?: number;
+  description?: string;
+  features?: FacilityFeature[];
   status?: CourtStatus;
+}
+
+export interface AddCourtImageDto {
+  url: string;
+  altText?: string;
+  displayOrder?: number;
 }
 
 export interface TimeSlotInput {
@@ -143,6 +162,52 @@ export function useUpsertTimeSlots() {
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const message = error.response?.data?.error?.message || error.response?.data?.message || '';
       toast.error(message || 'Không thể cập nhật khung giờ, vui lòng thử lại');
+    },
+  });
+}
+
+export function useAddCourtImage(courtId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: AddCourtImageDto) => {
+      const response = await api.post<{ success: boolean; data: CourtImage }>(
+        `/courts/${courtId}/images`,
+        dto,
+      );
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
+      toast.success('Thêm ảnh thành công');
+    },
+  });
+}
+
+export function useDeleteCourtImage(courtId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (imageId: string) => {
+      await api.delete(`/courts/${courtId}/images/${imageId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
+      toast.success('Xóa ảnh thành công');
+    },
+  });
+}
+
+export function useReorderCourtImages(courtId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (images: Array<{ imageId: string; displayOrder: number }>) => {
+      const response = await api.patch<{ success: boolean; data: CourtImage[] }>(
+        `/courts/${courtId}/images/reorder`,
+        { images },
+      );
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
     },
   });
 }

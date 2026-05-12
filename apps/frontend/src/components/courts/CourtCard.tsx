@@ -1,8 +1,10 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 import { MapPin, Star } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { SportType, CourtStatus } from '@/types';
 import type { Court } from '@/types';
+import { CourtTypeBadge } from './CourtTypeBadge';
+import { FacilityFeatureTags } from './FacilityFeatureTags';
 
 interface CourtCardProps {
   court: Court;
@@ -50,19 +52,22 @@ export function CourtCard({ court }: CourtCardProps) {
     >
       <div className="relative h-52 overflow-hidden">
         <img
-          src={sportImage[court.sportType]}
+          src={court.images?.[0]?.url ?? sportImage[court.sportType]}
           alt={court.name}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-        <span
-          className={cn(
-            'absolute left-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white',
-            sportAccent[court.sportType],
-          )}
-        >
-          {sportTypeLabels[court.sportType]}
-        </span>
+        <div className="absolute left-4 top-4 flex items-center gap-2">
+          <span
+            className={cn(
+              'rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white',
+              sportAccent[court.sportType],
+            )}
+          >
+            {sportTypeLabels[court.sportType]}
+          </span>
+          <CourtTypeBadge courtType={court.courtType} />
+        </div>
         {inactive && (
           <span className="absolute right-4 top-4 rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
             Inactive
@@ -79,10 +84,18 @@ export function CourtCard({ court }: CourtCardProps) {
           </div>
         </div>
 
-        <div className="mb-4 flex items-start gap-2 text-sm text-slate-600">
+        <div className="mb-3 flex items-start gap-2 text-sm text-slate-600">
           <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
           <p className="line-clamp-2">{court.address}</p>
         </div>
+        {court.description?.trim() && (
+          <p className="mb-3 line-clamp-2 text-sm text-slate-600">
+            {court.description.length > 120
+              ? `${court.description.slice(0, 120).trim()}...`
+              : court.description}
+          </p>
+        )}
+        <FacilityFeatureTags features={court.features ?? []} maxVisible={3} className="mb-4" />
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-4">
           <div className="min-w-0">

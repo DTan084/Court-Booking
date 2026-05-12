@@ -43,7 +43,8 @@ export class CourtsService {
   }
 
   async findAll(query: GetCourtsDto) {
-    const { page, limit, name, sportType, address, district } = query;
+    const { page, limit, name, sportType, courtType, features, address, district, location } =
+      query;
 
     // Generate cache key based on query params
     const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
@@ -56,28 +57,36 @@ export class CourtsService {
 
     const skip = (page - 1) * limit;
 
-    const where: any = { deletedAt: IsNull() };
+    const qb = this.courtRepository
+      .createQueryBuilder('court')
+      .where('court.deleted_at IS NULL')
+      .skip(skip)
+      .take(limit)
+      .orderBy('court.created_at', 'DESC');
 
     if (name) {
-      where.name = ILike(`%${name}%`);
+      qb.andWhere('court.name ILIKE :name', { name: `%${name}%` });
     }
     if (sportType) {
-      where.sportType = sportType;
+      qb.andWhere('court.sport_type = :sportType', { sportType });
+    }
+    if (courtType) {
+      qb.andWhere('court.court_type = :courtType', { courtType });
     }
     if (address) {
-      where.address = ILike(`%${address}%`);
+      qb.andWhere('court.address ILIKE :address', { address: `%${address}%` });
     }
     if (district) {
-      // REQ-21.3: case-insensitive exact match
-      where.district = ILike(district);
+      qb.andWhere('court.district ILIKE :district', { district });
+    }
+    if (location) {
+      qb.andWhere('court.address ILIKE :location', { location: `%${location}%` });
+    }
+    if (features?.length) {
+      qb.andWhere('court.features @> :features', { features });
     }
 
-    const [data, total] = await this.courtRepository.findAndCount({
-      where,
-      take: limit,
-      skip,
-      order: { createdAt: 'DESC' },
-    });
+    const [data, total] = await qb.getManyAndCount();
 
     const result = {
       data,
@@ -105,6 +114,8 @@ export class CourtsService {
 
     const court = await this.courtRepository.findOne({
       where: { id, deletedAt: IsNull() },
+      relations: ['images'],
+      order: { images: { displayOrder: 'ASC' } },
     });
 
     if (!court) {
@@ -260,6 +271,48 @@ export class CourtsService {
     await this.invalidateCourtCache(courtId);
 
     return this.getTimeSlots(courtId);
+  }
+
+  async addImage(courtId: string, dto: AddCourtImageDto): Promise<CourtImageEntity> {
+    await this.findOne(courtId);
+    const image = this.courtImageRepository.create({ ...dto, courtId });
+    const saved = await this.courtImageRepository.save(image);
+    await this.invalidateCourtCache(courtId);
+    await this.invalidateCourtsListCache();
+    return saved;
+  }
+
+  async removeImage(courtId: string, imageId: string): Promise<void> {
+    await this.findOne(courtId);
+    const image = await this.courtImageRepository.findOne({ where: { id: imageId, courtId } });
+    if (!image) {
+      throw new NotFoundException(`Image with ID ${imageId} not found`);
+    }
+    await this.courtImageRepository.remove(image);
+    await this.invalidateCourtCache(courtId);
+    await this.invalidateCourtsListCache();
+  }
+
+  async reorderImages(courtId: string, dto: ReorderCourtImagesDto): Promise<CourtImageEntity[]> {
+    await this.findOne(courtId);
+    await this.dataSource.transaction(async (manager) => {
+      for (const item of dto.images) {
+        const result = await manager.update(
+          CourtImageEntity,
+          { id: item.imageId, courtId },
+          { displayOrder: item.displayOrder },
+        );
+        if (!result.affected) {
+          throw new NotFoundException(`Image with ID ${item.imageId} not found`);
+        }
+      }
+    });
+    await this.invalidateCourtCache(courtId);
+    await this.invalidateCourtsListCache();
+    return this.courtImageRepository.find({
+      where: { courtId },
+      order: { displayOrder: 'ASC' },
+    });
   }
 
   // ── Cache Management ───────────────────────────────────────────────────────

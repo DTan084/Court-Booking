@@ -28,6 +28,8 @@ import { GetCourtsDto, getCourtsSchema } from './dto/get-courts.dto';
 import { UpdateCourtDto, updateCourtSchema } from './dto/update-court.dto';
 import { GetCourtStatsDto, getCourtStatsSchema } from './dto/get-court-stats.dto';
 import { UpsertTimeSlotsDto, upsertTimeSlotsSchema } from './dto/upsert-time-slots.dto';
+import { AddCourtImageDto, addCourtImageSchema } from './dto/add-court-image.dto';
+import { ReorderCourtImagesDto, reorderCourtImagesSchema } from './dto/reorder-court-images.dto';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -220,5 +222,38 @@ export class CourtsController {
     @Body(new ZodValidationPipe(upsertTimeSlotsSchema)) body: UpsertTimeSlotsDto,
   ) {
     return this.courtsService.upsertTimeSlots(id, body);
+  }
+
+  @Post(':id/images')
+  @ApiOperation({ summary: 'Add court image (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UsePipes(new ZodValidationPipe(addCourtImageSchema))
+  async addImage(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AddCourtImageDto) {
+    return this.courtsService.addImage(id, dto);
+  }
+
+  @Delete(':id/images/:imageId')
+  @ApiOperation({ summary: 'Delete court image (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async removeImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+  ) {
+    await this.courtsService.removeImage(id, imageId);
+    return { message: 'Image deleted successfully', imageId };
+  }
+
+  @Patch(':id/images/reorder')
+  @ApiOperation({ summary: 'Reorder court images (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UsePipes(new ZodValidationPipe(reorderCourtImagesSchema))
+  async reorderImages(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReorderCourtImagesDto) {
+    return this.courtsService.reorderImages(id, dto);
   }
 }

@@ -7,7 +7,9 @@ export const createCourtSchema = z.object({
     errorMap: () => ({ message: 'Invalid sport type' }),
   }),
   courtType: z.nativeEnum(CourtType, {
-    errorMap: () => ({ message: 'Loại sân không hợp lệ' }),
+    errorMap: () => ({
+      message: 'Loại sân không hợp lệ, chỉ chấp nhận INDOOR hoặc OUTDOOR',
+    }),
   }),
   address: z.string().min(5, 'Address must be at least 5 characters long'),
   pricePerHour: z.number().min(0, 'Price must be positive'),
@@ -17,7 +19,7 @@ export const createCourtSchema = z.object({
     .optional()
     .default([])
     .transform((arr) => [...new Set(arr)]),
-  district: z.string().max(100).optional(), // REQ-21.8
+  district: z.string().max(100).optional(),
 });
 
 export type CreateCourtDto = z.infer<typeof createCourtSchema>;
