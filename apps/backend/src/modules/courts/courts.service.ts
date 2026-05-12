@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, ILike, DataSource } from 'typeorm';
+import { Repository, IsNull, DataSource } from 'typeorm';
 import Redis from 'ioredis';
 import { CourtEntity } from '../../database/entities/court.entity';
 import { CourtImageEntity } from '../../database/entities/court-image.entity';
@@ -32,6 +32,31 @@ export class CourtsService {
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
+  private async safeCacheGet(key: string): Promise<string | null> {
+    try {
+      return await this.redis.get(key);
+    } catch {
+      return null;
+    }
+  }
+
+  private async safeCacheSet(key: string, ttlSeconds: number, value: string): Promise<void> {
+    try {
+      await this.redis.setex(key, ttlSeconds, value);
+    } catch {
+      // no-op: cache failure must not break API response
+    }
+  }
+
+  private async safeCacheDel(...keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    try {
+      await this.redis.del(...keys);
+    } catch {
+      // no-op
+    }
+  }
+
   async create(createCourtDto: CreateCourtDto): Promise<CourtEntity> {
     const court = this.courtRepository.create(createCourtDto);
     const savedCourt = await this.courtRepository.save(court);
@@ -50,7 +75,7 @@ export class CourtsService {
     const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
 
     // Try to get from cache
-    const cached = await this.redis.get(cacheKey);
+    const cached = await this.safeCacheGet(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -59,25 +84,28 @@ export class CourtsService {
 
     const qb = this.courtRepository
       .createQueryBuilder('court')
-      .where('court.deleted_at IS NULL')
+      .leftJoinAndSelect('court.images', 'images')
+      .where('court.deletedAt IS NULL')
       .skip(skip)
       .take(limit)
-      .orderBy('court.created_at', 'DESC');
+      .orderBy('court.createdAt', 'DESC');
 
     if (name) {
       qb.andWhere('court.name ILIKE :name', { name: `%${name}%` });
     }
-    if (sportType) {
-      qb.andWhere('court.sport_type = :sportType', { sportType });
+    if (sportType?.length) {
+      qb.andWhere('court.sportType IN (:...sportType)', { sportType });
     }
     if (courtType) {
-      qb.andWhere('court.court_type = :courtType', { courtType });
+      qb.andWhere('court.courtType = :courtType', { courtType });
     }
     if (address) {
       qb.andWhere('court.address ILIKE :address', { address: `%${address}%` });
     }
-    if (district) {
-      qb.andWhere('court.district ILIKE :district', { district });
+    if (district?.length) {
+      qb.andWhere('LOWER(court.district) IN (:...district)', {
+        district: district.map((d) => d.toLowerCase()),
+      });
     }
     if (location) {
       qb.andWhere('court.address ILIKE :location', { location: `%${location}%` });
@@ -99,7 +127,7 @@ export class CourtsService {
     };
 
     // Cache the result
-    await this.redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(result));
+    await this.safeCacheSet(cacheKey, this.CACHE_TTL, JSON.stringify(result));
 
     return result;
   }
@@ -107,7 +135,7 @@ export class CourtsService {
   async findOne(id: string): Promise<CourtEntity> {
     // Try to get from cache
     const cacheKey = `${this.COURT_CACHE_PREFIX}${id}`;
-    const cached = await this.redis.get(cacheKey);
+    const cached = await this.safeCacheGet(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
@@ -123,7 +151,7 @@ export class CourtsService {
     }
 
     // Cache the court
-    await this.redis.setex(cacheKey, this.CACHE_TTL, JSON.stringify(court));
+    await this.safeCacheSet(cacheKey, this.CACHE_TTL, JSON.stringify(court));
 
     return court;
   }
@@ -319,14 +347,16 @@ export class CourtsService {
 
   private async invalidateCourtCache(courtId: string): Promise<void> {
     const cacheKey = `${this.COURT_CACHE_PREFIX}${courtId}`;
-    await this.redis.del(cacheKey);
+    await this.safeCacheDel(cacheKey);
   }
 
   private async invalidateCourtsListCache(): Promise<void> {
     const pattern = `${this.COURTS_LIST_PREFIX}*`;
-    const keys = await this.redis.keys(pattern);
-    if (keys.length > 0) {
-      await this.redis.del(...keys);
+    try {
+      const keys = await this.redis.keys(pattern);
+      await this.safeCacheDel(...keys);
+    } catch {
+      // no-op
     }
   }
 }

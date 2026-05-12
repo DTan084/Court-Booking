@@ -92,11 +92,14 @@ export function CourtCard({ court }: CourtCardProps) {
           <p className="line-clamp-2">{court.address}</p>
         </div>
         {court.description?.trim() && (
-          <p className="mb-3 line-clamp-2 text-sm text-slate-600">
+          <p className="mb-1 line-clamp-2 text-sm text-slate-600">
             {court.description.length > 120
               ? `${court.description.slice(0, 120).trim()}...`
               : court.description}
           </p>
+        )}
+        {court.description?.trim() && (
+          <span className="mb-3 inline-block text-xs font-semibold text-[#944a00]">Xem thêm</span>
         )}
         <FacilityFeatureTags features={court.features ?? []} maxVisible={3} className="mb-4" />
 

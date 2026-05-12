@@ -35,7 +35,7 @@ export interface UpdateCourtDto {
 }
 
 export interface AddCourtImageDto {
-  url: string;
+  file: File;
   altText?: string;
   displayOrder?: number;
 }
@@ -170,9 +170,20 @@ export function useAddCourtImage(courtId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (dto: AddCourtImageDto) => {
+      const formData = new FormData();
+      formData.append('file', dto.file);
+      if (dto.altText) {
+        formData.append('altText', dto.altText);
+      }
+      if (dto.displayOrder !== undefined) {
+        formData.append('displayOrder', String(dto.displayOrder));
+      }
       const response = await api.post<{ success: boolean; data: CourtImage }>(
         `/courts/${courtId}/images`,
-        dto,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        },
       );
       return response.data.data;
     },

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { SportType, CourtType, FacilityFeature } from '@court-booking/shared';
 
+const facilityFeatureValues = new Set<string>(Object.values(FacilityFeature));
+
 export const createCourtSchema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters long').max(150),
   sportType: z.nativeEnum(SportType, {
@@ -15,10 +17,19 @@ export const createCourtSchema = z.object({
   pricePerHour: z.number().min(0, 'Price must be positive'),
   description: z.string().max(5000, 'Mô tả sân không được vượt quá 5000 ký tự').optional(),
   features: z
-    .array(z.nativeEnum(FacilityFeature))
+    .array(z.string())
     .optional()
     .default([])
-    .transform((arr) => [...new Set(arr)]),
+    .superRefine((values, ctx) => {
+      const invalid = values.filter((value) => !facilityFeatureValues.has(value));
+      if (invalid.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Tiện ích không hợp lệ: ${[...new Set(invalid)].join(', ')}`,
+        });
+      }
+    })
+    .transform((values) => [...new Set(values)] as FacilityFeature[]),
   district: z.string().max(100).optional(),
 });
 

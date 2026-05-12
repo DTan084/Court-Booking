@@ -6,10 +6,10 @@ export interface GetCourtsParams {
   page: number;
   limit: number;
   name?: string;
-  sportType?: SportType;
+  sportType?: SportType[];
   courtType?: CourtType;
   features?: FacilityFeature[];
-  district?: string;
+  district?: string[];
   location?: string;
   [key: string]: unknown;
 }
@@ -20,7 +20,23 @@ export function useCourts(params: GetCourtsParams) {
     queryFn: async () => {
       const response = await api.get<{ success: boolean; data: PaginatedResult<Court> }>(
         '/courts',
-        { params },
+        {
+          params,
+          paramsSerializer: {
+            serialize: (input) => {
+              const search = new URLSearchParams();
+              Object.entries(input).forEach(([key, value]) => {
+                if (value === undefined || value === null) return;
+                if (Array.isArray(value)) {
+                  value.forEach((item) => search.append(key, String(item)));
+                  return;
+                }
+                search.append(key, String(value));
+              });
+              return search.toString();
+            },
+          },
+        },
       );
       // Backend wraps response: { success, data: { data, total, page, ... } }
       return response.data.data;

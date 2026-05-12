@@ -2,7 +2,7 @@ import { Processor, Process } from '@nestjs/bull';
 import { Job } from 'bull';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, In } from 'typeorm';
+import { Repository, LessThan } from 'typeorm';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { BookingStatus, NotificationType } from '@court-booking/shared';
 import { NotificationsService } from '../notifications/notifications.service';

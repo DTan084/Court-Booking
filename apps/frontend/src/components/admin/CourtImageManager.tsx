@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
@@ -17,31 +17,46 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
   const { mutate: addImage, isPending: isAdding } = useAddCourtImage(courtId);
   const { mutate: deleteImage } = useDeleteCourtImage(courtId);
   const { mutate: reorder } = useReorderCourtImages(courtId);
-  const [url, setUrl] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [altText, setAltText] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+
   const images = useMemo(
     () => [...(court?.images ?? [])].sort((a, b) => a.displayOrder - b.displayOrder),
     [court?.images],
   );
+
+  const submitReorder = (nextImages: typeof images) => {
+    reorder(nextImages.map((img, idx) => ({ imageId: img.id, displayOrder: idx })));
+  };
 
   const onMove = (index: number, dir: -1 | 1) => {
     const nextIndex = index + dir;
     if (nextIndex < 0 || nextIndex >= images.length) return;
     const reordered = [...images];
     [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
-    reorder(reordered.map((img, idx) => ({ imageId: img.id, displayOrder: idx })));
+    submitReorder(reordered);
+  };
+
+  const onDropImage = (dropIndex: number) => {
+    if (dragIndex === null || dragIndex === dropIndex) return;
+    const reordered = [...images];
+    const [dragged] = reordered.splice(dragIndex, 1);
+    reordered.splice(dropIndex, 0, dragged);
+    submitReorder(reordered);
+    setDragIndex(null);
   };
 
   return (
     <div className="space-y-6">
       <div className="rounded-lg border bg-white p-4">
-        <h3 className="mb-3 font-semibold">Them anh moi</h3>
+        <h3 className="mb-3 font-semibold">Thêm ảnh mới</h3>
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Image URL"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="rounded-md border px-3 py-2"
           />
           <input
@@ -51,20 +66,28 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
             className="rounded-md border px-3 py-2"
           />
           <Button
-            disabled={!url || isAdding}
+            disabled={!file || isAdding}
             onClick={() => {
-              addImage({ url, altText: altText || undefined, displayOrder: images.length });
-              setUrl('');
+              if (!file) return;
+              addImage({ file, altText: altText || undefined, displayOrder: images.length });
+              setFile(null);
               setAltText('');
             }}
           >
-            Them anh
+            Thêm ảnh
           </Button>
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {images.map((img, idx) => (
-          <div key={img.id} className="rounded-lg border bg-white p-3">
+          <div
+            key={img.id}
+            className="rounded-lg border bg-white p-3"
+            draggable
+            onDragStart={() => setDragIndex(idx)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => onDropImage(idx)}
+          >
             <Image
               src={img.url}
               alt={img.altText ?? `Court image ${idx + 1}`}
@@ -73,6 +96,7 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
               className="mb-3 h-36 w-full rounded object-cover"
             />
             <p className="mb-2 truncate text-xs text-slate-500">{img.url}</p>
+            <p className="mb-3 text-xs text-slate-400">Kéo thả để sắp xếp</p>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -100,9 +124,9 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
       <DoubleConfirmationDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="Ban co chac muon xoa hinh anh nay?"
-        description="Hanh dong nay khong the hoan tac."
-        confirmText="Xoa anh"
+        title="Bạn có chắc muốn xóa hình ảnh này?"
+        description="Hành động này không thể hoàn tác."
+        confirmText="Xóa ảnh"
         variant="destructive"
         onConfirm={() => {
           if (deleteId) deleteImage(deleteId);

@@ -10,7 +10,7 @@ import { Pagination } from '@/components/shared/Pagination';
 import { useCourts, useDistricts } from '@/hooks/useCourts';
 import type { CourtType, FacilityFeature, SportType } from '@/types';
 
-const PER_PAGE = 6;
+const PER_PAGE = 2;
 
 export default function CourtsPage() {
   const [page, setPage] = useState(1);
@@ -27,10 +27,10 @@ export default function CourtsPage() {
       page,
       limit: PER_PAGE,
       name,
-      district: districts[0],
-      sportType: sportTypes[0],
+      district: districts.length > 0 ? districts : undefined,
+      sportType: sportTypes.length > 0 ? sportTypes : undefined,
       courtType,
-      features,
+      features: features.length > 0 ? features : undefined,
     }),
     [page, name, districts, sportTypes, courtType, features],
   );

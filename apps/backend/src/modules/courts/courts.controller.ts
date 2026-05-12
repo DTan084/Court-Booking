@@ -13,6 +13,10 @@ import {
   Patch,
   Put,
   ParseUUIDPipe,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +34,11 @@ import { GetCourtStatsDto, getCourtStatsSchema } from './dto/get-court-stats.dto
 import { UpsertTimeSlotsDto, upsertTimeSlotsSchema } from './dto/upsert-time-slots.dto';
 import { AddCourtImageDto, addCourtImageSchema } from './dto/add-court-image.dto';
 import { ReorderCourtImagesDto, reorderCourtImagesSchema } from './dto/reorder-court-images.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import type { Request } from 'express';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -229,8 +238,49 @@ export class CourtsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  @UsePipes(new ZodValidationPipe(addCourtImageSchema))
-  async addImage(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AddCourtImageDto) {
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (_req: any, _file: any, cb: any) => {
+          const targetDir = join(process.cwd(), 'uploads', 'courts');
+          if (!existsSync(targetDir)) {
+            mkdirSync(targetDir, { recursive: true });
+          }
+          cb(null, targetDir);
+        },
+        filename: (_req: any, file: any, cb: any) => {
+          const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (_req: any, file: any, cb: any) => {
+        if (!file.mimetype.startsWith('image/')) {
+          cb(new BadRequestException('File upload phải là hình ảnh'), false);
+          return;
+        }
+        cb(null, true);
+      },
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  async addImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: any,
+    @Body() body: { altText?: string; displayOrder?: string },
+    @Req() req: Request,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn file ảnh để upload');
+    }
+
+    const dto: AddCourtImageDto = addCourtImageSchema.parse({
+      url: `${req.protocol}://${req.get('host')}/uploads/courts/${file.filename}`,
+      altText: body.altText,
+      displayOrder:
+        body.displayOrder !== undefined && body.displayOrder !== ''
+          ? Number(body.displayOrder)
+          : undefined,
+    });
     return this.courtsService.addImage(id, dto);
   }
 

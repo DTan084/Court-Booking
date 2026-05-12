@@ -1,4 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -11,24 +11,36 @@ import { SportType, CourtType } from '@court-booking/shared';
 describe('CourtsService', () => {
   let service: CourtsService;
   let repository: any;
+  let qb: any;
 
   const mockCourt = {
     id: 'court-uuid',
-    name: 'Sân Cầu Lông ABC',
+    name: 'San Cau Long ABC',
     sportType: SportType.BADMINTON,
     courtType: CourtType.INDOOR,
     features: [],
-    address: '123 Nguyễn Huệ',
+    address: '123 Nguyen Hue',
     pricePerHour: 150000,
   };
 
   beforeEach(async () => {
+    qb = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn().mockResolvedValue([[mockCourt], 1]),
+    };
+
     const mockRepo = {
       create: jest.fn().mockReturnValue(mockCourt),
       save: jest.fn().mockResolvedValue(mockCourt),
-      findAndCount: jest.fn().mockResolvedValue([[mockCourt], 1]),
       findOne: jest.fn().mockResolvedValue(mockCourt),
       softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
     };
 
     const mockTimeSlotRepo = {
@@ -102,11 +114,11 @@ describe('CourtsService', () => {
   describe('create', () => {
     it('should successfully create a court', async () => {
       const dto = {
-        name: 'Sân Cầu Lông ABC',
+        name: 'San Cau Long ABC',
         sportType: SportType.BADMINTON,
         courtType: CourtType.INDOOR,
         features: [],
-        address: '123 Nguyễn Huệ',
+        address: '123 Nguyen Hue',
         pricePerHour: 150000,
       };
       const result = await service.create(dto);
@@ -154,8 +166,6 @@ describe('CourtsService', () => {
   describe('findAll', () => {
     it('should return paginated result of courts', async () => {
       const query = { page: 1, limit: 10 };
-      repository.findAndCount.mockResolvedValue([[mockCourt], 1]);
-
       const result = await service.findAll(query);
 
       expect(result).toEqual({
@@ -167,27 +177,18 @@ describe('CourtsService', () => {
           totalPages: 1,
         },
       });
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: { deletedAt: expect.anything() },
-        take: 10,
-        skip: 0,
-        order: { createdAt: 'DESC' },
-      });
+      expect(repository.createQueryBuilder).toHaveBeenCalledWith('court');
+      expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('court.images', 'images');
     });
 
     it('should filter by sportType', async () => {
-      const query = { page: 1, limit: 5, sportType: SportType.TENNIS };
-      repository.findAndCount.mockResolvedValue([[], 0]);
+      const query = { page: 1, limit: 5, sportType: [SportType.TENNIS] };
 
       await service.findAll(query);
 
-      expect(repository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            sportType: SportType.TENNIS,
-          }),
-        }),
-      );
+      expect(qb.andWhere).toHaveBeenCalledWith('court.sportType IN (:...sportType)', {
+        sportType: [SportType.TENNIS],
+      });
     });
   });
 });
