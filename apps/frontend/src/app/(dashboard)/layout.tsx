@@ -16,6 +16,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Use ref to ensure we only attempt hydration once per mount, not on every render
   const hasFetched = useRef(false);
   const isCheckoutRoute = pathname.startsWith('/checkout/');
+  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
 
   useEffect(() => {
     // Skip if already have user or already attempted
@@ -30,7 +31,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setUser(userData);
       })
       .catch(() => {
-        // Silently fail — user is not logged in, middleware will redirect if needed
+        // Silently fail â€” user is not logged in, middleware will redirect if needed
         clearUser();
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -39,7 +40,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className={isCheckoutRoute ? 'w-full' : 'container py-6'}>{children}</main>
+      <main className={isCheckoutRoute || isAdminRoute ? 'w-full' : 'container py-6'}>
+        {children}
+      </main>
       <SiteFooter />
     </div>
   );

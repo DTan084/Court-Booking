@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useCourts } from './useCourts';
 import { api } from '@/lib/api';
 import type { PaginatedResult, Court } from '@/types';
-import { SportType, CourtStatus } from '@/types';
+import { SportType, CourtStatus, CourtType } from '@/types';
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -43,8 +43,12 @@ describe('useCourts', () => {
           id: '1',
           name: 'Court 1',
           sportType: SportType.BADMINTON,
+          courtType: CourtType.INDOOR,
           address: '123 Main St',
           district: 'District 1',
+          description: null,
+          features: [],
+          images: [],
           pricePerHour: 100000,
           status: CourtStatus.ACTIVE,
           deletedAt: null,
@@ -89,7 +93,7 @@ describe('useCourts', () => {
       page: 1,
       limit: 12,
       name: 'Tennis',
-      sportType: SportType.TENNIS,
+      sportType: [SportType.TENNIS],
     };
 
     const { result } = renderHook(() => useCourts(params), { wrapper });
@@ -101,8 +105,6 @@ describe('useCourts', () => {
 
   it('should have correct staleTime configuration', () => {
     const { result } = renderHook(() => useCourts({ page: 1, limit: 12 }), { wrapper });
-
-    // The hook should be configured with 5 minutes staleTime
     expect(result.current).toBeDefined();
   });
 });
