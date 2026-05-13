@@ -6,13 +6,19 @@ import { Button } from '@/components/ui/button';
 import { useCourts } from '@/hooks/useCourts';
 import { useCreateAdminBooking } from '@/hooks/useBookings';
 import { useSchedule } from '@/hooks/useSchedule';
-import { formatDate } from '@/lib/utils';
+import { useTimeSlots } from '@/hooks/useTimeSlots';
+import { formatCurrency, formatDate } from '@/lib/utils';
+
+type SelectedSlot = {
+  startHour: number;
+  endHour: number;
+  price: number;
+};
 
 export default function AdminNewBookingPage() {
   const [courtId, setCourtId] = useState('');
   const [date, setDate] = useState(formatDate(new Date()));
-  const [startHour, setStartHour] = useState('');
-  const [endHour, setEndHour] = useState('');
+  const [selected, setSelected] = useState<SelectedSlot | null>(null);
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [note, setNote] = useState('');
@@ -20,25 +26,37 @@ export default function AdminNewBookingPage() {
   const { data: courtsData } = useCourts({ page: 1, limit: 100 });
   const courts = courtsData?.data ?? [];
   const { data: schedule } = useSchedule(courtId, date);
+  const { data: timeSlots } = useTimeSlots(courtId);
   const { mutate: createAdminBooking, isPending } = useCreateAdminBooking();
 
-  const blockedHours = useMemo(() => {
-    if (!schedule) return new Set<number>();
-    const set = new Set<number>();
-    for (const b of schedule) {
-      const start = new Date(b.startTime).getHours();
-      const end = new Date(b.endTime).getHours();
-      for (let hour = start; hour < end; hour += 1) set.add(hour);
-    }
-    return set;
+  const bookedRanges = useMemo(() => {
+    if (!schedule) return [];
+    return schedule.map((b) => ({
+      start: new Date(b.startTime).getHours(),
+      end: new Date(b.endTime).getHours(),
+    }));
   }, [schedule]);
 
+  const availableSlots = useMemo(() => {
+    if (!timeSlots) return [];
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+    const slots = timeSlots.filter((s) => s.dayOfWeek === dayOfWeek);
+    return slots.filter((slot) => {
+      const overlap = bookedRanges.some(
+        (range) => slot.startHour < range.end && slot.endHour > range.start,
+      );
+      return !overlap;
+    });
+  }, [timeSlots, date, bookedRanges]);
+
   const submit = () => {
-    if (!courtId || !startHour || !endHour) return;
+    if (!courtId || !selected) return;
     createAdminBooking({
       courtId,
-      startTime: new Date(`${date}T${startHour}:00`).toISOString(),
-      endTime: new Date(`${date}T${endHour}:00`).toISOString(),
+      startTime: new Date(
+        `${date}T${String(selected.startHour).padStart(2, '0')}:00:00`,
+      ).toISOString(),
+      endTime: new Date(`${date}T${String(selected.endHour).padStart(2, '0')}:00:00`).toISOString(),
       guestName: guestName || undefined,
       guestPhone: guestPhone || undefined,
       note: note || undefined,
@@ -50,11 +68,14 @@ export default function AdminNewBookingPage() {
       title="Manual Booking"
       subtitle="Create booking on behalf of walk-in or phone customer"
     >
-      <div className="mx-auto max-w-3xl space-y-4 rounded-xl border border-slate-200 bg-white p-6">
+      <div className="mx-auto max-w-4xl space-y-4 rounded-xl border border-slate-200 bg-white p-6">
         <div className="grid gap-4 md:grid-cols-2">
           <select
             value={courtId}
-            onChange={(e) => setCourtId(e.target.value)}
+            onChange={(e) => {
+              setCourtId(e.target.value);
+              setSelected(null);
+            }}
             className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
           >
             <option value="">Select court</option>
@@ -67,19 +88,10 @@ export default function AdminNewBookingPage() {
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-          />
-          <input
-            placeholder="Start hour (e.g. 09:00)"
-            value={startHour}
-            onChange={(e) => setStartHour(e.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-          />
-          <input
-            placeholder="End hour (e.g. 10:00)"
-            value={endHour}
-            onChange={(e) => setEndHour(e.target.value)}
+            onChange={(e) => {
+              setDate(e.target.value);
+              setSelected(null);
+            }}
             className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
           />
           <input
@@ -101,20 +113,64 @@ export default function AdminNewBookingPage() {
           onChange={(e) => setNote(e.target.value)}
           placeholder="Internal note..."
           className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-          rows={4}
+          rows={3}
         />
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-          <p className="mb-2 font-semibold text-slate-800">Booked hours on selected date:</p>
-          {blockedHours.size === 0
-            ? 'No blocked slots'
-            : Array.from(blockedHours)
-                .sort((a, b) => a - b)
-                .map((h) => `${String(h).padStart(2, '0')}:00`)
-                .join(', ')}
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <p className="mb-3 text-sm font-semibold text-slate-800">
+            Available slots on selected date
+          </p>
+          {availableSlots.length === 0 ? (
+            <p className="text-sm text-slate-500">No available slot</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {availableSlots.map((slot) => {
+                const active =
+                  selected?.startHour === slot.startHour && selected?.endHour === slot.endHour;
+                return (
+                  <button
+                    key={`${slot.id}-${slot.startHour}-${slot.endHour}`}
+                    type="button"
+                    onClick={() =>
+                      setSelected({
+                        startHour: slot.startHour,
+                        endHour: slot.endHour,
+                        price: Number(slot.price),
+                      })
+                    }
+                    className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                      active
+                        ? 'border-[#944a00] bg-orange-50 text-[#944a00]'
+                        : 'border-slate-300 bg-white text-slate-700 hover:border-orange-400'
+                    }`}
+                  >
+                    <p className="font-semibold">
+                      {String(slot.startHour).padStart(2, '0')}:00 -{' '}
+                      {String(slot.endHour).padStart(2, '0')}:00
+                    </p>
+                    <p className="text-xs">{formatCurrency(Number(slot.price))}</p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <Button onClick={submit} disabled={isPending} className="bg-[#944a00] hover:bg-[#7f3f00]">
+        {selected && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700">
+            <p>
+              Selected: {String(selected.startHour).padStart(2, '0')}:00 -{' '}
+              {String(selected.endHour).padStart(2, '0')}:00
+            </p>
+            <p>Price: {formatCurrency(selected.price)}</p>
+          </div>
+        )}
+
+        <Button
+          onClick={submit}
+          disabled={isPending || !courtId || !selected}
+          className="bg-[#944a00] hover:bg-[#7f3f00]"
+        >
           {isPending ? 'Creating...' : 'Create Admin Booking'}
         </Button>
       </div>

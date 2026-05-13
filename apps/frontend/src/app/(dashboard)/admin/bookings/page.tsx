@@ -24,7 +24,7 @@ export default function AdminBookingsPage() {
     [status, source],
   );
   const { data } = useAdminBookings(query);
-  const rows = data?.data ?? [];
+  const rows = useMemo(() => data?.data ?? [], [data]);
 
   const filteredRows = useMemo(() => {
     const key = keyword.trim().toLowerCase();

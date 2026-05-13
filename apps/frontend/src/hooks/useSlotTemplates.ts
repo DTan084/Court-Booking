@@ -64,7 +64,7 @@ export function useApplySlotTemplate() {
       toDate?: string;
     }) => {
       const response = await api.post(
-        `/admin/slot-templates/apply/${dto.templateId}/courts/${dto.courtId}`,
+        `/admin/courts/${dto.courtId}/apply-template/${dto.templateId}`,
         {
           fromDate: dto.fromDate,
           toDate: dto.toDate,

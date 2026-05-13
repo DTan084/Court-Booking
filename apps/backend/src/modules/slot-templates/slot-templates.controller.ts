@@ -30,11 +30,6 @@ const replaceItemsSchema = z.object({
   items: z.array(itemSchema),
 });
 
-const applySchema = z.object({
-  fromDate: z.string().optional(),
-  toDate: z.string().optional(),
-});
-
 @Controller('admin/slot-templates')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -75,14 +70,5 @@ export class SlotTemplatesController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
-  }
-
-  @Post('/apply/:templateId/courts/:courtId')
-  apply(
-    @Param('templateId') templateId: string,
-    @Param('courtId') courtId: string,
-    @Body(new ZodValidationPipe(applySchema)) body: z.infer<typeof applySchema>,
-  ) {
-    return this.service.applyTemplate(courtId, templateId, body);
   }
 }
