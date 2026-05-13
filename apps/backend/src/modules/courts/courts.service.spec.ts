@@ -8,7 +8,8 @@ import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.ent
 import { CourtImageEntity } from '../../database/entities/court-image.entity';
 import { CourtFeatureEntity } from '../../database/entities/court-feature.entity';
 import { FeatureEntity } from '../../database/entities/feature.entity';
-import { SportType, CourtType } from '@court-booking/shared';
+import { SportTypeEntity } from '../../database/entities/sport-type.entity';
+import { CourtType } from '@court-booking/shared';
 
 describe('CourtsService', () => {
   let service: CourtsService;
@@ -18,11 +19,10 @@ describe('CourtsService', () => {
   const mockCourt = {
     id: 'court-uuid',
     name: 'San Cau Long ABC',
-    sportType: SportType.BADMINTON,
     courtType: CourtType.INDOOR,
-    features: [],
     address: '123 Nguyen Hue',
     pricePerHour: 150000,
+    sportTypeId: 'sport-type-id',
   };
 
   beforeEach(async () => {
@@ -85,6 +85,21 @@ describe('CourtsService', () => {
       createQueryBuilder: jest.fn(),
     };
 
+    const mockSportTypeRepo = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 'sport-type-id',
+        name: 'Badminton',
+      }),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({
+          id: 'sport-type-id',
+          name: 'Badminton',
+        }),
+        getMany: jest.fn().mockResolvedValue([{ id: 'sport-type-id', name: 'Tennis' }]),
+      }),
+    };
+
     const mockRedis = {
       get: jest.fn().mockResolvedValue(null),
       setex: jest.fn().mockResolvedValue('OK'),
@@ -116,6 +131,10 @@ describe('CourtsService', () => {
           useValue: mockFeatureRepo,
         },
         {
+          provide: getRepositoryToken(SportTypeEntity),
+          useValue: mockSportTypeRepo,
+        },
+        {
           provide: DataSource,
           useValue: mockDataSource,
         },
@@ -138,15 +157,16 @@ describe('CourtsService', () => {
     it('should successfully create a court', async () => {
       const dto = {
         name: 'San Cau Long ABC',
-        sportType: SportType.BADMINTON,
+        sportTypeId: 'sport-type-id',
         courtType: CourtType.INDOOR,
-        features: [],
         address: '123 Nguyen Hue',
         pricePerHour: 150000,
       };
       const result = await service.create(dto);
       expect(result).toEqual(mockCourt);
-      expect(repository.create).toHaveBeenCalledWith(dto);
+      expect(repository.create).toHaveBeenCalledWith({
+        ...dto,
+      });
       expect(repository.save).toHaveBeenCalled();
     });
   });
@@ -204,13 +224,13 @@ describe('CourtsService', () => {
       expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('court.images', 'images');
     });
 
-    it('should filter by sportType', async () => {
-      const query = { page: 1, limit: 5, sportType: [SportType.TENNIS] };
+    it('should filter by sportTypeId', async () => {
+      const query = { page: 1, limit: 5, sportTypeId: ['sport-type-id'] };
 
       await service.findAll(query);
 
-      expect(qb.andWhere).toHaveBeenCalledWith('court.sportType IN (:...sportType)', {
-        sportType: [SportType.TENNIS],
+      expect(qb.andWhere).toHaveBeenCalledWith('court.sportTypeId IN (:...sportTypeId)', {
+        sportTypeId: ['sport-type-id'],
       });
     });
   });

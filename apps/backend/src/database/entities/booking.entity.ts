@@ -7,6 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
+  Check,
 } from 'typeorm';
 import { UserEntity } from './user.entity';
 import { CourtEntity } from './court.entity';
@@ -14,6 +15,11 @@ import { BookingStatus, BookingSource, CancelledBy } from '@court-booking/shared
 
 @Entity('bookings')
 @Index(['courtId', 'startTime', 'status'])
+@Index('UQ_bookings_transaction_id_not_null', ['transactionId'], {
+  unique: true,
+  where: `"transaction_id" IS NOT NULL`,
+})
+@Check(`"user_id" IS NOT NULL OR "guest_name" IS NOT NULL`)
 export class BookingEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -80,7 +86,7 @@ export class BookingEntity {
   })
   bookingSource: BookingSource;
 
-  @Column({ type: 'varchar', length: 20, name: 'transaction_id', nullable: true, unique: true })
+  @Column({ type: 'varchar', length: 20, name: 'transaction_id', nullable: true })
   transactionId: string | null;
 
   @Column({ type: 'timestamp with time zone', name: 'checked_in_at', nullable: true })

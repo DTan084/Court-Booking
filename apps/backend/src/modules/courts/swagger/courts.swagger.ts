@@ -7,10 +7,10 @@ export class CreateCourtBody {
   name: string;
 
   @ApiProperty({
-    example: 'BADMINTON',
-    enum: ['BADMINTON', 'TENNIS', 'FOOTBALL', 'BASKETBALL', 'VOLLEYBALL', 'PICKLEBALL'],
+    example: '3faffe20-5fd1-47f5-87d9-bcc9869422b6',
+    description: 'Sport type id (required)',
   })
-  sportType: string;
+  sportTypeId: string;
 
   @ApiProperty({ example: '123 Nguyễn Huệ, Quận 1, TP.HCM' })
   address: string;
@@ -26,12 +26,8 @@ export class UpdateCourtBody {
   @ApiProperty({ example: 'Sân Cầu Lông ABC (Updated)', required: false })
   name?: string;
 
-  @ApiProperty({
-    example: 'BADMINTON',
-    enum: ['BADMINTON', 'TENNIS', 'FOOTBALL', 'BASKETBALL', 'VOLLEYBALL', 'PICKLEBALL'],
-    required: false,
-  })
-  sportType?: string;
+  @ApiProperty({ example: '3faffe20-5fd1-47f5-87d9-bcc9869422b6', required: false })
+  sportTypeId?: string;
 
   @ApiProperty({ example: '456 Lê Lợi, Quận 1, TP.HCM', required: false })
   address?: string;
@@ -71,8 +67,8 @@ export class CourtData {
   @ApiProperty({ example: 'Sân Cầu Lông ABC' })
   name: string;
 
-  @ApiProperty({ example: 'BADMINTON' })
-  sportType: string;
+  @ApiProperty({ example: '3faffe20-5fd1-47f5-87d9-bcc9869422b6' })
+  sportTypeId: string;
 
   @ApiProperty({ example: '123 Nguyễn Huệ, Quận 1, TP.HCM' })
   address: string;

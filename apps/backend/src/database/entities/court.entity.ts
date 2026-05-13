@@ -6,12 +6,15 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
   Index,
 } from 'typeorm';
 import { BookingEntity } from './booking.entity';
 import { CourtTimeSlotEntity } from './court-time-slot.entity';
-import { SportType, CourtType, FacilityFeature } from '@court-booking/shared';
+import { CourtType } from '@court-booking/shared';
 import { CourtImageEntity } from './court-image.entity';
+import { SportTypeEntity } from './sport-type.entity';
 
 export enum CourtStatus {
   ACTIVE = 'ACTIVE',
@@ -27,13 +30,13 @@ export class CourtEntity {
   @Column({ type: 'varchar', length: 150 })
   name: string;
 
-  @Index()
-  @Column({ type: 'enum', enum: SportType })
-  sportType: SportType;
-
   @Index('idx_courts_sport_type_id')
-  @Column({ type: 'uuid', name: 'sport_type_id', nullable: true })
-  sportTypeId: string | null;
+  @Column({ type: 'uuid', name: 'sport_type_id' })
+  sportTypeId: string;
+
+  @ManyToOne(() => SportTypeEntity)
+  @JoinColumn({ name: 'sport_type_id' })
+  sportTypeRef: SportTypeEntity;
 
   @Column({ type: 'text' })
   address: string;
@@ -48,10 +51,6 @@ export class CourtEntity {
 
   @Column({ type: 'text', nullable: true })
   description: string | null;
-
-  @Index('idx_courts_features_gin')
-  @Column({ type: 'text', array: true, nullable: false, default: () => "'{}'" })
-  features: FacilityFeature[];
 
   @OneToMany(() => CourtImageEntity, (img) => img.court, { cascade: true, eager: false })
   images: CourtImageEntity[];

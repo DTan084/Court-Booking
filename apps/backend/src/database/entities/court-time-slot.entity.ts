@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { CourtEntity } from './court.entity';
+import { SlotTemplateEntity } from './slot-template.entity';
 
 export enum DayOfWeek {
   MONDAY = 1,
@@ -50,6 +51,10 @@ export class CourtTimeSlotEntity {
 
   @Column({ type: 'uuid', name: 'template_id', nullable: true })
   templateId: string | null;
+
+  @ManyToOne(() => SlotTemplateEntity, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'template_id' })
+  template: SlotTemplateEntity | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

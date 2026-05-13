@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, DataSource, In } from 'typeorm';
 import Redis from 'ioredis';
@@ -7,6 +7,7 @@ import { CourtImageEntity } from '../../database/entities/court-image.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { CourtFeatureEntity } from '../../database/entities/court-feature.entity';
 import { FeatureEntity } from '../../database/entities/feature.entity';
+import { SportTypeEntity } from '../../database/entities/sport-type.entity';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { GetCourtsDto } from './dto/get-courts.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
@@ -34,9 +35,19 @@ export class CourtsService {
     private readonly courtFeatureRepository: Repository<CourtFeatureEntity>,
     @InjectRepository(FeatureEntity)
     private readonly featureRepository: Repository<FeatureEntity>,
+    @InjectRepository(SportTypeEntity)
+    private readonly sportTypeRepository: Repository<SportTypeEntity>,
     private readonly dataSource: DataSource,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
+
+  private async resolveSportTypeId(sportTypeId: string): Promise<string> {
+    const existingById = await this.sportTypeRepository.findOne({ where: { id: sportTypeId } });
+    if (!existingById) {
+      throw new BadRequestException('Invalid sportTypeId');
+    }
+    return sportTypeId;
+  }
 
   private async safeCacheGet(key: string): Promise<string | null> {
     try {
@@ -64,7 +75,11 @@ export class CourtsService {
   }
 
   async create(createCourtDto: CreateCourtDto): Promise<CourtEntity> {
-    const court = this.courtRepository.create(createCourtDto);
+    const sportTypeId = await this.resolveSportTypeId(createCourtDto.sportTypeId);
+    const court = this.courtRepository.create({
+      ...createCourtDto,
+      sportTypeId,
+    });
     const savedCourt = await this.courtRepository.save(court);
 
     // Invalidate courts list cache
@@ -74,18 +89,8 @@ export class CourtsService {
   }
 
   async findAll(query: GetCourtsDto) {
-    const {
-      page,
-      limit,
-      name,
-      sportType,
-      courtType,
-      features,
-      address,
-      district,
-      location,
-      featureIds,
-    } = query;
+    const { page, limit, name, sportTypeId, courtType, address, district, location, featureIds } =
+      query;
 
     // Generate cache key based on query params
     const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
@@ -110,8 +115,8 @@ export class CourtsService {
     if (name) {
       qb.andWhere('court.name ILIKE :name', { name: `%${name}%` });
     }
-    if (sportType?.length) {
-      qb.andWhere('court.sportType IN (:...sportType)', { sportType });
+    if (sportTypeId?.length) {
+      qb.andWhere('court.sportTypeId IN (:...sportTypeId)', { sportTypeId });
     }
     if (courtType) {
       qb.andWhere('court.courtType = :courtType', { courtType });
@@ -126,9 +131,6 @@ export class CourtsService {
     }
     if (location) {
       qb.andWhere('court.address ILIKE :location', { location: `%${location}%` });
-    }
-    if (features?.length) {
-      qb.andWhere('court.features @> :features', { features });
     }
     if (featureIds?.length) {
       qb.andWhere(
@@ -212,7 +214,12 @@ export class CourtsService {
 
   async update(id: string, updateCourtDto: UpdateCourtDto): Promise<CourtEntity> {
     const court = await this.findOne(id);
-    Object.assign(court, updateCourtDto);
+    let normalized = updateCourtDto;
+    if (updateCourtDto.sportTypeId) {
+      const resolvedSportTypeId = await this.resolveSportTypeId(updateCourtDto.sportTypeId);
+      normalized = { ...updateCourtDto, sportTypeId: resolvedSportTypeId };
+    }
+    Object.assign(court, normalized);
     const updated = await this.courtRepository.save(court);
 
     // Invalidate cache

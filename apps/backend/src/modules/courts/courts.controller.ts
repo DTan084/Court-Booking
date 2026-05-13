@@ -43,7 +43,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { Role, SportType } from '@court-booking/shared';
+import { Role } from '@court-booking/shared';
 import { BookingsService } from '../bookings/bookings.service';
 import { getScheduleSchema, GetScheduleDto } from '../bookings/dto/get-schedule.dto';
 import { ApiErrorResponse } from '../../common/swagger/api-response.swagger';
@@ -87,7 +87,7 @@ export class CourtsController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'name', required: false, type: String })
-  @ApiQuery({ name: 'sportType', required: false, enum: SportType })
+  @ApiQuery({ name: 'sportTypeId', required: false, type: String })
   @ApiQuery({ name: 'address', required: false, type: String })
   @ApiQuery({
     name: 'district',

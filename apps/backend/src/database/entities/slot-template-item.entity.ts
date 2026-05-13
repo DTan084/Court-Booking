@@ -1,6 +1,7 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('slot_template_items')
+@Index(['templateId', 'dayOfWeek', 'startHour'], { unique: true })
 export class SlotTemplateItemEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
