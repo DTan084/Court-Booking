@@ -58,6 +58,13 @@ export class CourtEntity {
   @Column({ type: 'enum', enum: CourtStatus, default: CourtStatus.ACTIVE })
   status: CourtStatus;
 
+  @Index('idx_courts_is_featured')
+  @Column({ type: 'boolean', name: 'is_featured', default: false })
+  isFeatured: boolean;
+
+  @Column({ type: 'integer', name: 'max_players', nullable: true })
+  maxPlayers: number | null;
+
   @DeleteDateColumn({ name: 'deleted_at' })
   deletedAt: Date | null;
 

@@ -23,6 +23,18 @@ export enum NotificationType {
   BOOKING_CANCELLED = 'BOOKING_CANCELLED',
 }
 
+export enum BookingSource {
+  ONLINE = 'ONLINE',
+  ADMIN = 'ADMIN',
+  WALK_IN = 'WALK_IN',
+}
+
+export enum CancelledBy {
+  USER = 'USER',
+  SYSTEM = 'SYSTEM',
+  ADMIN = 'ADMIN',
+}
+
 export enum SportType {
   BADMINTON = 'BADMINTON',
   TENNIS = 'TENNIS',
@@ -74,6 +86,24 @@ export interface CourtImage {
   displayOrder: number;
 }
 
+export interface SportTypeModel {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  isActive: boolean;
+  displayOrder: number;
+  createdAt: string;
+}
+
+export interface Feature {
+  id: string;
+  name: string;
+  icon: string | null;
+  category: string | null;
+  createdAt: string;
+}
+
 export interface Court {
   id: string;
   name: string;
@@ -83,6 +113,11 @@ export interface Court {
   district: string | null;
   description: string | null;
   features: FacilityFeature[];
+  sportTypeName?: string;
+  sportTypeData?: SportTypeModel;
+  featureItems?: Feature[];
+  isFeatured?: boolean;
+  maxPlayers?: number | null;
   images: CourtImage[];
   pricePerHour: number;
   status: CourtStatus;
@@ -113,6 +148,17 @@ export interface Booking {
   totalPrice: number;
   paymentDeadline: string | null;
   paidAt: string | null;
+  bookingSource?: BookingSource;
+  transactionId?: string | null;
+  note?: string | null;
+  checkedInAt?: string | null;
+  cancelledBy?: CancelledBy | null;
+  cancelledReason?: string | null;
+  cancellationNote?: string | null;
+  refundedAt?: string | null;
+  refundAmount?: number | null;
+  guestName?: string | null;
+  guestPhone?: string | null;
   cancelledAt: string | null;
   cancellationDeadline: string | null; // createdAt + 24h
   latestCancellableTime: string | null; // startTime - 12h

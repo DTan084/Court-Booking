@@ -42,7 +42,7 @@ export class BookingJobsProcessor {
       await this.bookingRepo.save(booking);
 
       await this.notificationsService.create({
-        userId: booking.userId,
+        userId: booking.userId!,
         type: NotificationType.BOOKING_EXPIRED,
         title: 'Đặt sân đã hết hạn',
         message: `Lịch đặt sân ${booking.court?.name || ''} của bạn đã bị hủy do quá hạn thanh toán 30 phút.`,
@@ -96,7 +96,7 @@ export class BookingJobsProcessor {
 
     for (const booking of pendingReminders) {
       await this.notificationsService.create({
-        userId: booking.userId,
+        userId: booking.userId!,
         type: NotificationType.PAYMENT_REMINDER,
         title: 'Nhắc nhở thanh toán',
         message: `Lịch đặt sân ${booking.court?.name || ''} của bạn sẽ hết hạn sau ít phút. Vui lòng thanh toán ngay để giữ chỗ!`,
@@ -125,7 +125,7 @@ export class BookingJobsProcessor {
         minute: '2-digit',
       });
       await this.notificationsService.create({
-        userId: booking.userId,
+        userId: booking.userId!,
         type: NotificationType.BOOKING_REMINDER,
         title: 'Nhắc nhở lịch chơi',
         message: `Bạn có lịch chơi tại sân ${booking.court?.name || ''} vào lúc ${startTimeStr}. Đừng quên nhé!`,

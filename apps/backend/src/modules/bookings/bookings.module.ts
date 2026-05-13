@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BookingsController } from './bookings.controller';
+import { AdminBookingsController } from './admin-bookings.controller';
 import { BookingsService } from './bookings.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BookingJobsProcessor } from './booking-jobs.processor';
@@ -28,7 +29,7 @@ import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.ent
     BullModule.registerQueue({ name: 'booking-jobs' }),
     NotificationsModule,
   ],
-  controllers: [BookingsController],
+  controllers: [BookingsController, AdminBookingsController],
   providers: [BookingsService, BookingJobsProcessor, BookingJobsScheduler],
   exports: [BookingsService],
 })

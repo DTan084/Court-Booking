@@ -140,6 +140,18 @@ export class CourtsController {
     return this.courtsService.update(id, updateCourtDto);
   }
 
+  @Patch(':id/featured')
+  @ApiOperation({ summary: 'Toggle featured status for a court (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async updateFeatured(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { isFeatured: boolean },
+  ) {
+    return this.courtsService.updateFeatured(id, body.isFeatured);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Soft delete a court (Admin only)' })
   @ApiBearerAuth()

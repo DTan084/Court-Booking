@@ -10,6 +10,7 @@ export const createBookingSchema = z
     endTime: z
       .string()
       .datetime({ offset: true, message: 'Invalid end time format (must be ISO 8601)' }),
+    note: z.string().max(500, 'Ghi chú không được vượt quá 500 ký tự').optional(),
   })
   .refine((data) => new Date(data.startTime) < new Date(data.endTime), {
     message: 'Start time must be before end time',

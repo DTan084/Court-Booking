@@ -11,7 +11,7 @@ import { differenceInHours } from 'date-fns';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
-import { BookingStatus, NotificationType } from '@court-booking/shared';
+import { BookingStatus, BookingSource, CancelledBy, NotificationType } from '@court-booking/shared';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
@@ -32,6 +32,22 @@ export class BookingsService {
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private async generateUniqueTransactionId(manager: any): Promise<string> {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    for (let i = 0; i < 20; i += 1) {
+      const suffix = Array.from({ length: 4 })
+        .map(() => alphabet[Math.floor(Math.random() * alphabet.length)])
+        .join('');
+      const transactionId = `TRX-${suffix}`;
+      const existed = await manager.findOne(BookingEntity, {
+        where: { transactionId },
+        select: { id: true },
+      });
+      if (!existed) return transactionId;
+    }
+    throw new ConflictException('Không thể tạo mã giao dịch duy nhất, vui lòng thử lại');
+  }
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
     const startDate = new Date(`${date}T00:00:00`);
@@ -170,6 +186,8 @@ export class BookingsService {
         totalPrice,
         status: BookingStatus.PENDING_PAYMENT,
         paymentDeadline,
+        bookingSource: BookingSource.ONLINE,
+        note: createBookingDto.note ?? null,
       });
 
       return manager.save(booking);
@@ -219,6 +237,8 @@ export class BookingsService {
       // REQ-17.3: PENDING_PAYMENT → CONFIRMED
       booking.status = BookingStatus.CONFIRMED;
       booking.paidAt = new Date();
+      booking.transactionId =
+        booking.transactionId ?? (await this.generateUniqueTransactionId(manager));
       return manager.save(booking);
     });
 
@@ -231,7 +251,7 @@ export class BookingsService {
 
     this.notificationsService
       .create({
-        userId: savedBooking.userId,
+        userId: savedBooking.userId!,
         type: NotificationType.BOOKING_CONFIRMED,
         title: 'Đặt sân thành công',
         message: `Bạn đã đặt thành công sân ${savedBooking.court?.name || 'thể thao'} lúc ${startTimeStr} ngày ${startDateStr}.`,
@@ -300,6 +320,7 @@ export class BookingsService {
 
       booking.status = BookingStatus.CANCELLED;
       booking.cancelledAt = now;
+      booking.cancelledBy = CancelledBy.USER;
       return manager.save(booking);
     });
 
@@ -312,7 +333,7 @@ export class BookingsService {
 
     this.notificationsService
       .create({
-        userId: savedBooking.userId,
+        userId: savedBooking.userId!,
         type: NotificationType.BOOKING_CANCELLED,
         title: 'Đặt sân đã bị hủy',
         message: `Lịch đặt sân ${savedBooking.court?.name || ''} lúc ${startTimeStr} ngày ${startDateStr} của bạn đã được hủy thành công.`,
@@ -397,5 +418,164 @@ export class BookingsService {
       cancellationDeadline: cancellationDeadline.toISOString(),
       latestCancellableTime: latestCancellableTime.toISOString(),
     };
+  }
+
+  async createAdminBooking(payload: {
+    courtId: string;
+    startTime: string;
+    endTime: string;
+    userId?: string | null;
+    guestName?: string;
+    guestPhone?: string;
+    note?: string;
+    paymentMethod?: string;
+  }): Promise<BookingEntity> {
+    const { courtId, startTime, endTime, userId, guestName, guestPhone, note, paymentMethod } =
+      payload;
+    if (!userId && !guestName?.trim()) {
+      throw new BadRequestException('Phải cung cấp user_id hoặc guest_name');
+    }
+
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    if (start >= end) throw new BadRequestException('Invalid booking duration');
+
+    return this.dataSource.transaction(async (manager) => {
+      const court = await manager.findOne(CourtEntity, {
+        where: { id: courtId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!court) throw new NotFoundException('Court not found');
+
+      const overlapping = await manager
+        .createQueryBuilder(BookingEntity, 'booking')
+        .where('booking.courtId = :courtId', { courtId })
+        .andWhere('booking.startTime < :endTime', { endTime: end })
+        .andWhere('booking.endTime > :startTime', { startTime: start })
+        .andWhere(
+          new Brackets((qb) => {
+            qb.where('booking.status = :confirmed', { confirmed: BookingStatus.CONFIRMED }).orWhere(
+              'booking.status = :pending AND booking.paymentDeadline IS NOT NULL AND booking.paymentDeadline > :now',
+              { pending: BookingStatus.PENDING_PAYMENT, now: new Date() },
+            );
+          }),
+        )
+        .getCount();
+
+      if (overlapping > 0) {
+        throw new ConflictException('Sân đã được đặt trong khung giờ này');
+      }
+
+      const slots = await this.timeSlotRepository.find({
+        where: { courtId, dayOfWeek: start.getDay() },
+        order: { startHour: 'ASC' },
+      });
+      const covered = this.findCoveringSlots(slots, start.getHours(), end.getHours() || 24);
+      if (!covered)
+        throw new BadRequestException(
+          'Requested time range is not covered by available time slots',
+        );
+      const totalPrice = covered.reduce((sum, slot) => sum + Number(slot.price), 0);
+
+      const booking = manager.create(BookingEntity, {
+        courtId,
+        userId: userId ?? null,
+        startTime: start,
+        endTime: end,
+        totalPrice,
+        status: BookingStatus.CONFIRMED,
+        paidAt: new Date(),
+        paymentDeadline: null,
+        paymentMethod: paymentMethod ?? null,
+        bookingSource: BookingSource.ADMIN,
+        guestName: guestName ?? null,
+        guestPhone: guestPhone ?? null,
+        note: note ?? null,
+        transactionId: await this.generateUniqueTransactionId(manager),
+      });
+      const saved = await manager.save(booking);
+
+      if (saved.userId) {
+        this.notificationsService
+          .create({
+            userId: saved.userId,
+            type: NotificationType.BOOKING_CONFIRMED,
+            title: 'Đặt sân thành công',
+            message: 'Lịch đặt sân của bạn đã được nhân viên xác nhận.',
+            bookingId: saved.id,
+          })
+          .catch(console.error);
+      }
+
+      return saved;
+    });
+  }
+
+  async getAdminBookings(query: {
+    page?: number;
+    limit?: number;
+    status?: BookingStatus;
+    bookingSource?: BookingSource;
+    courtId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const qb = this.bookingRepository
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.court', 'court')
+      .orderBy('booking.startTime', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+    if (query.status) qb.andWhere('booking.status = :status', { status: query.status });
+    if (query.bookingSource)
+      qb.andWhere('booking.bookingSource = :bookingSource', { bookingSource: query.bookingSource });
+    if (query.courtId) qb.andWhere('booking.courtId = :courtId', { courtId: query.courtId });
+    if (query.dateFrom)
+      qb.andWhere('booking.startTime >= :dateFrom', { dateFrom: new Date(query.dateFrom) });
+    if (query.dateTo)
+      qb.andWhere('booking.startTime <= :dateTo', { dateTo: new Date(query.dateTo) });
+    const [data, total] = await qb.getManyAndCount();
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async checkInBooking(bookingId: string): Promise<BookingEntity> {
+    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      throw new BadRequestException('Chỉ có thể check-in booking đã xác nhận');
+    }
+    booking.checkedInAt = new Date();
+    return this.bookingRepository.save(booking);
+  }
+
+  async adminCancelBooking(
+    bookingId: string,
+    payload: { cancelledReason?: string; cancellationNote?: string },
+  ) {
+    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.status === BookingStatus.COMPLETED) {
+      throw new BadRequestException('Không thể hủy booking đã hoàn thành');
+    }
+    booking.status = BookingStatus.CANCELLED;
+    booking.cancelledAt = new Date();
+    booking.cancelledBy = CancelledBy.ADMIN;
+    booking.cancelledReason = payload.cancelledReason ?? null;
+    booking.cancellationNote = payload.cancellationNote ?? null;
+    return this.bookingRepository.save(booking);
+  }
+
+  async refundBooking(bookingId: string, refundAmount: number): Promise<BookingEntity> {
+    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.refundedAt) throw new ConflictException('Booking này đã được hoàn tiền');
+    if (refundAmount > Number(booking.totalPrice)) {
+      throw new BadRequestException('Số tiền hoàn trả không được vượt quá tổng giá trị booking');
+    }
+    booking.refundedAt = new Date();
+    booking.refundAmount = refundAmount;
+    return this.bookingRepository.save(booking);
   }
 }

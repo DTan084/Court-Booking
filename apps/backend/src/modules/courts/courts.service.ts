@@ -88,7 +88,8 @@ export class CourtsService {
       .where('court.deletedAt IS NULL')
       .skip(skip)
       .take(limit)
-      .orderBy('court.createdAt', 'DESC');
+      .orderBy('court.isFeatured', 'DESC')
+      .addOrderBy('court.createdAt', 'DESC');
 
     if (name) {
       qb.andWhere('court.name ILIKE :name', { name: `%${name}%` });
@@ -165,6 +166,15 @@ export class CourtsService {
     await this.invalidateCourtCache(id);
     await this.invalidateCourtsListCache();
 
+    return updated;
+  }
+
+  async updateFeatured(id: string, isFeatured: boolean): Promise<CourtEntity> {
+    const court = await this.findOne(id);
+    court.isFeatured = isFeatured;
+    const updated = await this.courtRepository.save(court);
+    await this.invalidateCourtCache(id);
+    await this.invalidateCourtsListCache();
     return updated;
   }
 

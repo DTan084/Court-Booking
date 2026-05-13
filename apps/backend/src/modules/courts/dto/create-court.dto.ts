@@ -31,6 +31,13 @@ export const createCourtSchema = z.object({
     })
     .transform((values) => [...new Set(values)] as FacilityFeature[]),
   district: z.string().max(100).optional(),
+  isFeatured: z.boolean().optional(),
+  maxPlayers: z
+    .number()
+    .int()
+    .min(1, 'Số người tối đa phải lớn hơn hoặc bằng 1')
+    .optional()
+    .nullable(),
 });
 
 export type CreateCourtDto = z.infer<typeof createCourtSchema>;
