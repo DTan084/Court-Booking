@@ -20,7 +20,7 @@ export default function AdminCourtsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   const { data, isLoading } = useCourts({ page: 1, limit: 50 });
-  const courts = data?.data ?? [];
+  const courts = useMemo(() => data?.data ?? [], [data]);
 
   const filteredCourts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
