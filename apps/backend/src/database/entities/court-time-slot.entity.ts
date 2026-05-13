@@ -48,6 +48,9 @@ export class CourtTimeSlotEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
+  @Column({ type: 'uuid', name: 'template_id', nullable: true })
+  templateId: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

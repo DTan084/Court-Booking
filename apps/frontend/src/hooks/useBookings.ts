@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { api, queryKeys } from '@/lib/api';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
-import type { Booking, Court, PaginatedResult, BookingStatus } from '@/types';
+import type { Booking, Court, PaginatedResult, BookingStatus, BookingSource } from '@/types';
 
 // ==================== TYPES ====================
 
@@ -19,6 +19,17 @@ export interface CreateBookingDto {
   courtId: string;
   startTime: string; // ISO 8601
   endTime: string; // ISO 8601
+}
+
+export interface CreateAdminBookingDto {
+  courtId: string;
+  startTime: string;
+  endTime: string;
+  userId?: string | null;
+  guestName?: string;
+  guestPhone?: string;
+  note?: string;
+  paymentMethod?: string;
 }
 
 export type BookingWithCourt = Booking & { court: Court };
@@ -198,6 +209,39 @@ export function useConfirmPayment() {
       } else {
         toast.error('Không thể xác nhận thanh toán, vui lòng thử lại');
       }
+    },
+  });
+}
+
+export function useAdminBookings(params: {
+  page: number;
+  limit: number;
+  status?: BookingStatus;
+  bookingSource?: BookingSource;
+  courtId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  return useQuery<PaginatedResult<BookingWithCourt>>({
+    queryKey: queryKeys.adminBookings.list(params),
+    queryFn: async () => {
+      const response = await api.get('/admin/bookings', { params });
+      return response.data.data;
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCreateAdminBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: CreateAdminBookingDto) => {
+      const response = await api.post('/admin/bookings', dto);
+      return response.data.data as BookingWithCourt;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      toast.success('Đã tạo booking hộ');
     },
   });
 }

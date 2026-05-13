@@ -8,6 +8,8 @@ import { CourtImageEntity } from './entities/court-image.entity';
 import { SportTypeEntity } from './entities/sport-type.entity';
 import { FeatureEntity } from './entities/feature.entity';
 import { CourtFeatureEntity } from './entities/court-feature.entity';
+import { SlotTemplateEntity } from './entities/slot-template.entity';
+import { SlotTemplateItemEntity } from './entities/slot-template-item.entity';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -32,6 +34,8 @@ export const dataSourceOptions: DataSourceOptions = {
     SportTypeEntity,
     FeatureEntity,
     CourtFeatureEntity,
+    SlotTemplateEntity,
+    SlotTemplateItemEntity,
     path.join(__dirname, 'entities/notification.entity{.ts,.js}'),
   ],
   // Use .js in production (compiled), .ts in development

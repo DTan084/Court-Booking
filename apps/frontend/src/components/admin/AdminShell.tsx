@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   BarChart3,
   CalendarDays,
+  CopyPlus,
   Dumbbell,
   DollarSign,
   LayoutDashboard,
@@ -17,6 +18,7 @@ const items = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/courts', label: 'Courts', icon: Dumbbell },
   { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
+  { href: '/admin/slot-templates', label: 'Slot Templates', icon: CopyPlus },
   { href: '/admin/revenue', label: 'Revenue', icon: DollarSign },
   { href: '/admin/customers', label: 'Customers', icon: Users },
   { href: '/admin/stats', label: 'Analytics', icon: BarChart3 },

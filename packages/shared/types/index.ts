@@ -104,6 +104,24 @@ export interface Feature {
   createdAt: string;
 }
 
+export interface SlotTemplateItem {
+  id: string;
+  templateId: string;
+  dayOfWeek: number;
+  startHour: string;
+  endHour: string;
+  price: number;
+}
+
+export interface SlotTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  items?: SlotTemplateItem[];
+}
+
 export interface Court {
   id: string;
   name: string;

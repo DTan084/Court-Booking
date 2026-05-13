@@ -24,10 +24,13 @@ import { CourtImageEntity } from './database/entities/court-image.entity';
 import { SportTypeEntity } from './database/entities/sport-type.entity';
 import { FeatureEntity } from './database/entities/feature.entity';
 import { CourtFeatureEntity } from './database/entities/court-feature.entity';
+import { SlotTemplateEntity } from './database/entities/slot-template.entity';
+import { SlotTemplateItemEntity } from './database/entities/slot-template-item.entity';
 import { RedisModule } from './common/redis/redis.module';
 import { winstonConfig } from './config/winston.config';
 import { SportTypesModule } from './modules/sport-types/sport-types.module';
 import { FeaturesModule } from './modules/features/features.module';
+import { SlotTemplatesModule } from './modules/slot-templates/slot-templates.module';
 
 @Module({
   imports: [
@@ -58,6 +61,8 @@ import { FeaturesModule } from './modules/features/features.module';
           SportTypeEntity,
           FeatureEntity,
           CourtFeatureEntity,
+          SlotTemplateEntity,
+          SlotTemplateItemEntity,
         ],
         synchronize: configService.get<boolean>('database.synchronize', false),
         logging: configService.get<boolean>('database.logging', false),
@@ -79,6 +84,7 @@ import { FeaturesModule } from './modules/features/features.module';
     NotificationsModule,
     SportTypesModule,
     FeaturesModule,
+    SlotTemplatesModule,
   ],
   controllers: [AppController],
   providers: [],
