@@ -9,6 +9,7 @@ export interface GetCourtsParams {
   sportType?: SportType[];
   courtType?: CourtType;
   features?: FacilityFeature[];
+  featureIds?: string[];
   district?: string[];
   location?: string;
   [key: string]: unknown;

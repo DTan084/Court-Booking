@@ -22,7 +22,7 @@ import { CourtTypeBadge } from '@/components/courts/CourtTypeBadge';
 import { FacilityFeatureTags } from '@/components/courts/FacilityFeatureTags';
 import { buildLocalISO, cn, formatCurrency, formatDate, isSlotBooked } from '@/lib/utils';
 import { CourtStatus } from '@/types';
-import type { BookedRange, CourtTimeSlot } from '@/types';
+import type { BookedRange, CourtTimeSlot, FacilityFeature, Feature } from '@/types';
 
 function getDaySlots(timeSlots: CourtTimeSlot[], selectedDate: Date) {
   const dayOfWeek = selectedDate.getDay();
@@ -91,6 +91,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
   }
 
   if (!court || !timeSlots) return null;
+  const displayFeatures: Array<FacilityFeature | Feature> = court.featureItems ?? court.features;
 
   const isInactive = court.status === CourtStatus.INACTIVE;
   const daySlots = getDaySlots(timeSlots, selectedDate);
@@ -217,7 +218,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
             )}
 
             <h2 className="mb-4 text-xl font-bold text-[#0b1c30]">Facility Features</h2>
-            <FacilityFeatureTags features={court.features ?? []} />
+            <FacilityFeatureTags features={displayFeatures} />
 
             <div className="mt-6 border-t border-slate-100 pt-5">
               <h2 className="mb-3 text-xl font-bold text-[#0b1c30]">About This Court</h2>

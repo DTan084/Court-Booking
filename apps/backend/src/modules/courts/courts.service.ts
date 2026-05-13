@@ -170,7 +170,7 @@ export class CourtsService {
     const result = {
       data: data.map((court) => ({
         ...court,
-        features: featureByCourt.get(court.id) ?? [],
+        featureItems: featureByCourt.get(court.id) ?? [],
       })),
       meta: {
         total,

@@ -8,7 +8,7 @@ import { SkeletonCard } from '@/components/shared/SkeletonCard';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Pagination } from '@/components/shared/Pagination';
 import { useCourts, useDistricts } from '@/hooks/useCourts';
-import type { CourtType, FacilityFeature, SportType } from '@/types';
+import type { CourtType, SportType } from '@/types';
 
 const PER_PAGE = 2;
 
@@ -18,7 +18,7 @@ export default function CourtsPage() {
   const [districts, setDistricts] = useState<string[]>([]);
   const [sportTypes, setSportTypes] = useState<SportType[]>([]);
   const [courtType, setCourtType] = useState<CourtType | undefined>(undefined);
-  const [features, setFeatures] = useState<FacilityFeature[]>([]);
+  const [featureIds, setFeatureIds] = useState<string[]>([]);
   const [maxPrice, setMaxPrice] = useState(1000000);
   const [sortBy, setSortBy] = useState<CourtsSort>('popular');
 
@@ -30,9 +30,9 @@ export default function CourtsPage() {
       district: districts.length > 0 ? districts : undefined,
       sportType: sportTypes.length > 0 ? sportTypes : undefined,
       courtType,
-      features: features.length > 0 ? features : undefined,
+      featureIds: featureIds.length > 0 ? featureIds : undefined,
     }),
-    [page, name, districts, sportTypes, courtType, features],
+    [page, name, districts, sportTypes, courtType, featureIds],
   );
 
   const { data, isLoading, error } = useCourts(queryParams);
@@ -56,7 +56,7 @@ export default function CourtsPage() {
       districts: string[];
       sportTypes: SportType[];
       courtType?: CourtType;
-      features: FacilityFeature[];
+      featureIds: string[];
       maxPrice: number;
       availableOnly: boolean;
       sortBy: CourtsSort;
@@ -65,7 +65,7 @@ export default function CourtsPage() {
       setDistricts(filters.districts);
       setSportTypes(filters.sportTypes);
       setCourtType(filters.courtType);
-      setFeatures(filters.features);
+      setFeatureIds(filters.featureIds);
       setMaxPrice(filters.maxPrice);
       setSortBy(filters.sortBy);
       setPage(1);
@@ -79,10 +79,10 @@ export default function CourtsPage() {
       districts.length > 0 ||
       sportTypes.length > 0 ||
       !!courtType ||
-      features.length > 0 ||
+      featureIds.length > 0 ||
       maxPrice < 1000000 ||
       sortBy !== 'popular',
-    [name, districts, sportTypes, courtType, features, maxPrice, sortBy],
+    [name, districts, sportTypes, courtType, featureIds, maxPrice, sortBy],
   );
 
   return (

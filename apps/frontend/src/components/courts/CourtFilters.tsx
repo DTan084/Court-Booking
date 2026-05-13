@@ -3,13 +3,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { FACILITY_FEATURE_LABELS } from '@/lib/court-features';
-import type { SportType, CourtType, FacilityFeature } from '@/types';
-import {
-  SportType as SportTypeEnum,
-  CourtType as CourtTypeEnum,
-  FacilityFeature as FacilityFeatureEnum,
-} from '@court-booking/shared';
+import { useFeatures } from '@/hooks/useFeatures';
+import type { SportType, CourtType } from '@/types';
+import { SportType as SportTypeEnum, CourtType as CourtTypeEnum } from '@court-booking/shared';
 
 export type CourtsSort = 'popular' | 'price_asc' | 'price_desc' | 'name_asc';
 
@@ -20,7 +16,7 @@ interface CourtFiltersProps {
     districts: string[];
     sportTypes: SportType[];
     courtType?: CourtType;
-    features: FacilityFeature[];
+    featureIds: string[];
     maxPrice: number;
     availableOnly: boolean;
     sortBy: CourtsSort;
@@ -51,13 +47,14 @@ export function CourtFilters({
   const [districts, setDistricts] = useState<string[]>([]);
   const [sportTypes, setSportTypes] = useState<SportType[]>([]);
   const [courtType, setCourtType] = useState<CourtType | undefined>(undefined);
-  const [features, setFeatures] = useState<FacilityFeature[]>([]);
+  const [featureIds, setFeatureIds] = useState<string[]>([]);
   const [maxPrice, setMaxPrice] = useState(1000000);
   const [availableOnly, setAvailableOnly] = useState(false);
   const [sortBy, setSortBy] = useState<CourtsSort>('popular');
   const [districtOpen, setDistrictOpen] = useState(false);
   const [sportOpen, setSportOpen] = useState(false);
   const [featureOpen, setFeatureOpen] = useState(false);
+  const { data: features = [] } = useFeatures();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -66,7 +63,7 @@ export function CourtFilters({
         districts,
         sportTypes,
         courtType,
-        features,
+        featureIds,
         maxPrice,
         availableOnly,
         sortBy,
@@ -78,7 +75,7 @@ export function CourtFilters({
     districts,
     sportTypes,
     courtType,
-    features,
+    featureIds,
     maxPrice,
     availableOnly,
     sortBy,
@@ -93,8 +90,8 @@ export function CourtFilters({
     setDistricts((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
     );
-  const toggleFeature = (value: FacilityFeature) =>
-    setFeatures((prev) =>
+  const toggleFeature = (value: string) =>
+    setFeatureIds((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
     );
 
@@ -103,7 +100,7 @@ export function CourtFilters({
     setDistricts([]);
     setSportTypes([]);
     setCourtType(undefined);
-    setFeatures([]);
+    setFeatureIds([]);
     setMaxPrice(1000000);
     setAvailableOnly(false);
     setSortBy('popular');
@@ -227,17 +224,19 @@ export function CourtFilters({
             </button>
             {featureOpen && (
               <div className="space-y-2">
-                {Object.values(FacilityFeatureEnum).map((feature) => (
-                  <label key={feature} className="flex items-center gap-2 text-sm text-slate-700">
+                {features.map((feature) => (
+                  <label
+                    key={feature.id}
+                    className="flex items-center gap-2 text-sm text-slate-700"
+                  >
                     <input
                       type="checkbox"
-                      checked={features.includes(feature)}
-                      onChange={() => toggleFeature(feature)}
+                      checked={featureIds.includes(feature.id)}
+                      onChange={() => toggleFeature(feature.id)}
                       className="rounded border-slate-300 text-[#944a00] focus:ring-[#944a00]"
                     />
                     <span>
-                      {FACILITY_FEATURE_LABELS[feature].icon}{' '}
-                      {FACILITY_FEATURE_LABELS[feature].label}
+                      {feature.icon ?? '🏟️'} {feature.name}
                     </span>
                   </label>
                 ))}

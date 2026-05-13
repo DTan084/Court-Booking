@@ -192,7 +192,7 @@ describe('CourtsService', () => {
       const result = await service.findAll(query);
 
       expect(result).toEqual({
-        data: [mockCourt],
+        data: [{ ...mockCourt, featureItems: [] }],
         meta: {
           total: 1,
           page: 1,

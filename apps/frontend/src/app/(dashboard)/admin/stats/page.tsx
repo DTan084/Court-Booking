@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { BarChart3, BookOpen, ChevronDown, Clock, TrendingUp } from 'lucide-react';
+import { BookOpen, ChevronDown, Clock, TrendingUp } from 'lucide-react';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { MetricCard } from '@/components/admin/MetricCard';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';

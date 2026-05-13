@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { MapPin, Star } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { SportType, CourtStatus } from '@/types';
-import type { Court } from '@/types';
+import type { Court, Feature, FacilityFeature } from '@/types';
 import { CourtTypeBadge } from './CourtTypeBadge';
 import { FacilityFeatureTags } from './FacilityFeatureTags';
 
@@ -42,6 +42,7 @@ const sportImage: Record<SportType, string> = {
 
 export function CourtCard({ court }: CourtCardProps) {
   const inactive = court.status === CourtStatus.INACTIVE;
+  const displayFeatures: Array<FacilityFeature | Feature> = court.featureItems ?? court.features;
 
   return (
     <Link
@@ -101,7 +102,7 @@ export function CourtCard({ court }: CourtCardProps) {
         {court.description?.trim() && (
           <span className="mb-3 inline-block text-xs font-semibold text-[#944a00]">Xem thêm</span>
         )}
-        <FacilityFeatureTags features={court.features ?? []} maxVisible={3} className="mb-4" />
+        <FacilityFeatureTags features={displayFeatures} maxVisible={3} className="mb-4" />
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-4">
           <div className="min-w-0">

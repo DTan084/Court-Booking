@@ -2,9 +2,10 @@ import { FacilityFeature } from '@court-booking/shared';
 import { FACILITY_FEATURE_LABELS } from '@/lib/court-features';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import type { Feature } from '@/types';
 
 interface FacilityFeatureTagsProps {
-  features: FacilityFeature[];
+  features: Array<FacilityFeature | Feature>;
   maxVisible?: number;
   className?: string;
 }
@@ -18,9 +19,14 @@ export function FacilityFeatureTags({ features, maxVisible, className }: Facilit
   return (
     <div className={cn('flex flex-wrap gap-2', className)}>
       {displayFeatures.map((feature) => {
-        const { label, icon } = FACILITY_FEATURE_LABELS[feature];
+        const mapped =
+          typeof feature === 'string'
+            ? FACILITY_FEATURE_LABELS[feature]
+            : { label: feature.name, icon: feature.icon ?? '🏟️' };
+        const { label, icon } = mapped;
+        const key = typeof feature === 'string' ? feature : feature.id;
         return (
-          <Badge key={feature} variant="secondary" className="bg-slate-100 text-slate-700">
+          <Badge key={key} variant="secondary" className="bg-slate-100 text-slate-700">
             <span className="mr-1">{icon}</span>
             {label}
           </Badge>
