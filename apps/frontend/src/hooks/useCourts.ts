@@ -1,14 +1,13 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { api, queryKeys } from '@/lib/api';
-import type { PaginatedResult, Court, SportType, CourtType, FacilityFeature } from '@/types';
+import type { PaginatedResult, Court, CourtType } from '@/types';
 
 export interface GetCourtsParams {
   page: number;
   limit: number;
   name?: string;
-  sportType?: SportType[];
+  sportTypeId?: string[];
   courtType?: CourtType;
-  features?: FacilityFeature[];
   featureIds?: string[];
   district?: string[];
   location?: string;

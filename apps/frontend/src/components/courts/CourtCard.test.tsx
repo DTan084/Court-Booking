@@ -1,18 +1,18 @@
 import { render, screen } from '@testing-library/react';
 import { CourtCard } from './CourtCard';
 import { CourtStatus, CourtType } from '@/types';
-import type { Court, SportType } from '@/types';
+import type { Court } from '@/types';
 
 describe('CourtCard', () => {
   const mockCourt: Court = {
     id: '1',
     name: 'San Cau Long A1',
-    sportType: 'BADMINTON' as SportType,
+    sportTypeId: 'sport-type-1',
     courtType: CourtType.INDOOR,
     address: '123 Duong ABC, Quan 1, TP.HCM',
     district: 'Quan 1',
     description: null,
-    features: [],
+    featureItems: [],
     images: [],
     pricePerHour: 150000,
     status: CourtStatus.ACTIVE,
@@ -26,11 +26,6 @@ describe('CourtCard', () => {
     expect(screen.getByText('San Cau Long A1')).toBeInTheDocument();
   });
 
-  it('should render sport type badge', () => {
-    render(<CourtCard court={mockCourt} />);
-    expect(screen.getByText('Cau long')).toBeInTheDocument();
-  });
-
   it('should render address', () => {
     render(<CourtCard court={mockCourt} />);
     expect(screen.getByText('123 Duong ABC, Quan 1, TP.HCM')).toBeInTheDocument();
@@ -41,15 +36,10 @@ describe('CourtCard', () => {
     expect(screen.getByText(/150\.000/)).toBeInTheDocument();
   });
 
-  it('should render status badge for active court', () => {
-    render(<CourtCard court={mockCourt} />);
-    expect(screen.getByText('Hoat dong')).toBeInTheDocument();
-  });
-
   it('should render status badge for inactive court', () => {
     const inactiveCourt = { ...mockCourt, status: CourtStatus.INACTIVE };
     render(<CourtCard court={inactiveCourt} />);
-    expect(screen.getByText('Tam ngung')).toBeInTheDocument();
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
   });
 
   it('should have link to court detail page', () => {

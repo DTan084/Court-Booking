@@ -2,35 +2,26 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, queryKeys } from '@/lib/api';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
-import type {
-  SportType,
-  CourtStatus,
-  Court,
-  CourtType,
-  FacilityFeature,
-  CourtImage,
-} from '@/types';
+import type { CourtStatus, Court, CourtType, CourtImage } from '@/types';
 
 // ==================== TYPES ====================
 
 export interface CreateCourtDto {
   name: string;
-  sportType: SportType;
+  sportTypeId: string;
   courtType: CourtType;
   address: string;
   pricePerHour: number;
   description?: string;
-  features?: FacilityFeature[];
 }
 
 export interface UpdateCourtDto {
   name?: string;
-  sportType?: SportType;
+  sportTypeId?: string;
   courtType?: CourtType;
   address?: string;
   pricePerHour?: number;
   description?: string;
-  features?: FacilityFeature[];
   status?: CourtStatus;
 }
 
@@ -49,6 +40,11 @@ export interface TimeSlotInput {
 
 export interface UpsertTimeSlotsDto {
   slots: TimeSlotInput[];
+}
+
+export interface SyncCourtFeaturesDto {
+  courtId: string;
+  featureIds: string[];
 }
 
 type ApiErrorPayload = {
@@ -219,6 +215,23 @@ export function useReorderCourtImages(courtId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
+    },
+  });
+}
+
+export function useSyncCourtFeatures() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ courtId, featureIds }: SyncCourtFeaturesDto) => {
+      const response = await api.put<{ success: boolean; data: unknown }>(
+        `/courts/${courtId}/features`,
+        { featureIds },
+      );
+      return response.data.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(variables.courtId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
     },
   });
 }

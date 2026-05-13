@@ -22,7 +22,7 @@ import { CourtTypeBadge } from '@/components/courts/CourtTypeBadge';
 import { FacilityFeatureTags } from '@/components/courts/FacilityFeatureTags';
 import { buildLocalISO, cn, formatCurrency, formatDate, isSlotBooked } from '@/lib/utils';
 import { CourtStatus } from '@/types';
-import type { BookedRange, CourtTimeSlot, FacilityFeature, Feature } from '@/types';
+import type { BookedRange, CourtTimeSlot, Feature } from '@/types';
 
 function getDaySlots(timeSlots: CourtTimeSlot[], selectedDate: Date) {
   const dayOfWeek = selectedDate.getDay();
@@ -91,7 +91,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
   }
 
   if (!court || !timeSlots) return null;
-  const displayFeatures: Array<FacilityFeature | Feature> = court.featureItems ?? court.features;
+  const displayFeatures: Array<Feature> = (court.featureItems ?? []) as Feature[];
 
   const isInactive = court.status === CourtStatus.INACTIVE;
   const daySlots = getDaySlots(timeSlots, selectedDate);
@@ -179,11 +179,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
     <div className="mx-auto w-full max-w-[1440px] px-4 py-8 md:px-8 md:py-10">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <section className="space-y-6 lg:col-span-8">
-          <CourtGallery
-            images={court.images ?? []}
-            courtName={court.name}
-            sportType={court.sportType}
-          />
+          <CourtGallery images={court.images ?? []} courtName={court.name} />
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-4">

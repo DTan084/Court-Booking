@@ -2,8 +2,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, Star } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
-import { SportType, CourtStatus } from '@/types';
-import type { Court, Feature, FacilityFeature } from '@/types';
+import { CourtStatus } from '@/types';
+import type { Court, Feature } from '@/types';
 import { CourtTypeBadge } from './CourtTypeBadge';
 import { FacilityFeatureTags } from './FacilityFeatureTags';
 
@@ -11,38 +11,12 @@ interface CourtCardProps {
   court: Court;
 }
 
-const sportTypeLabels: Record<SportType, string> = {
-  [SportType.BADMINTON]: 'Badminton',
-  [SportType.TENNIS]: 'Tennis',
-  [SportType.FOOTBALL]: 'Football',
-  [SportType.BASKETBALL]: 'Basketball',
-  [SportType.VOLLEYBALL]: 'Volleyball',
-};
-
-const sportAccent: Record<SportType, string> = {
-  [SportType.BADMINTON]: 'bg-cyan-600',
-  [SportType.TENNIS]: 'bg-emerald-600',
-  [SportType.FOOTBALL]: 'bg-orange-600',
-  [SportType.BASKETBALL]: 'bg-indigo-600',
-  [SportType.VOLLEYBALL]: 'bg-pink-600',
-};
-
-const sportImage: Record<SportType, string> = {
-  [SportType.TENNIS]:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDx4mHP7b49FZfVX9NSatd2ArWaFmBkiNox37LbWiyTMgf5YNuuTO9TftycpR9QG68ixXDCIlVCDQvomxhKc8sZJCEVyvQ-Eesbd_B5kUPvjLtfno6ufX4Cw0ij1lngysbQJCqcddm0k6SZ9LS8kHl-6I7gcQWtskwnbjXEzHgSv5oSW2seLdV1MpuN1cIRB37-ggyk45_bzyUx4YaLmAOU8d6FA7zux9wudy51NbaWBVMoQv39uYmLsliakP4U3GcxcBRoUL5zRg',
-  [SportType.BADMINTON]:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDO8UsuSBkKf_J4vteMK1dgZ7QxXnKdN-vbD_b3J2CzoNPLp4F3rWrDVo8Og7_nEHBAH5UQq542-lXA_XIWoTUFbFpJ-Vu4yG1MLA4TiB2XZfuSCXxDKsebykLBsFBD6IWvG9jCkbxw1N5qel9ipjzs8n8RVCoQrrq8bckiTMTirMPuJHxRIyg_1vxDSAqBf32d49M-Px8GhWtpw1M5JiHMscQhdUNjg793kOrKtsDTg6gF3cgIjPJW6u5KTn4z0nCZpzuPmqqWvw',
-  [SportType.BASKETBALL]:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuAjkfmUnbCbfzASe1q2YHdngPC3QwzO3-naO-dF8ujG5k8twk2gtxImgxio398TsPi9p13lidj3HTG1MSvWcKSjdn1_e3DuCsjGv0_1lcFE43bTZ1P1N4kbsLDiXWzwGSzC4HsMsUNGzGObLF5uLuAfEx7hIp0t6-MWBlGgqFgX3zOjvZO0drQEShzlwgiDC5oL7DV8629mW43ef3NOLEEu-UxAD6br8IcrRtmUUYH7EUxK4rAYMcnRxDrduAMenly0Nmp3cbhVig',
-  [SportType.FOOTBALL]:
-    'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
-  [SportType.VOLLEYBALL]:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDA6VwQDETQZMqIJwKbLnWNSS4hEhPK4NJc6oBcbCL1E7F_AksgE3VhaBzEv5BlTPpE_5I_EaQFETwpXAFLK43OUxdHC92M-2LozK8PiFzA0fttla1l_uVAkGU_qEN8a4aWWNe_m2Q6Ct7MqfqK2EfOggvoxGE6bHjfZ4cn1ZDcvz6SUfBIouPwfxkD2fmMxtvcwcHmjA5MS8OlRGuYSiBrq9g55z_4_KX83T9EkzsRJuP2n6L_ySOMroF7Ma1VXWJdlZUGTQXAhg',
-};
+const placeholderImage =
+  'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?auto=format&fit=crop&w=1200&q=80';
 
 export function CourtCard({ court }: CourtCardProps) {
   const inactive = court.status === CourtStatus.INACTIVE;
-  const displayFeatures: Array<FacilityFeature | Feature> = court.featureItems ?? court.features;
+  const displayFeatures: Array<Feature> = (court.featureItems ?? []) as Feature[];
 
   return (
     <Link
@@ -54,7 +28,7 @@ export function CourtCard({ court }: CourtCardProps) {
     >
       <div className="relative h-52 overflow-hidden">
         <Image
-          src={court.images?.[0]?.url ?? sportImage[court.sportType]}
+          src={court.images?.[0]?.url ?? placeholderImage}
           alt={court.name}
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
@@ -62,14 +36,6 @@ export function CourtCard({ court }: CourtCardProps) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
         <div className="absolute left-4 top-4 flex items-center gap-2">
-          <span
-            className={cn(
-              'rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white',
-              sportAccent[court.sportType],
-            )}
-          >
-            {sportTypeLabels[court.sportType]}
-          </span>
           <CourtTypeBadge courtType={court.courtType} />
         </div>
         {inactive && (
@@ -100,7 +66,7 @@ export function CourtCard({ court }: CourtCardProps) {
           </p>
         )}
         {court.description?.trim() && (
-          <span className="mb-3 inline-block text-xs font-semibold text-[#944a00]">Xem thêm</span>
+          <span className="mb-3 inline-block text-xs font-semibold text-[#944a00]">Xem them</span>
         )}
         <FacilityFeatureTags features={displayFeatures} maxVisible={3} className="mb-4" />
 

@@ -1,25 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { FacilityFeature, CourtType, SportType, CourtStatus } from '@court-booking/shared';
-import { FACILITY_FEATURE_LABELS } from '@/lib/court-features';
+import { CourtStatus, CourtType } from '@court-booking/shared';
 import { Button } from '@/components/ui/button';
-import { useCreateCourt, useUpdateCourt } from '@/hooks/useAdminCourts';
+import { useCreateCourt, useSyncCourtFeatures, useUpdateCourt } from '@/hooks/useAdminCourts';
+import { useFeatures } from '@/hooks/useFeatures';
+import { useSportTypes } from '@/hooks/useSportTypes';
 import type { Court } from '@/types';
 
 const courtSchema = z.object({
-  name: z.string().min(2, 'Tên sân tối thiểu 2 ký tự'),
-  sportType: z.nativeEnum(SportType),
+  name: z.string().min(2, 'Ten san toi thieu 2 ky tu'),
+  sportTypeId: z.string().uuid('Sport type is required'),
   courtType: z.nativeEnum(CourtType),
-  address: z.string().min(5, 'Địa chỉ tối thiểu 5 ký tự'),
-  pricePerHour: z.number().positive('Giá phải lớn hơn 0'),
+  address: z.string().min(5, 'Dia chi toi thieu 5 ky tu'),
+  pricePerHour: z.number().positive('Gia phai lon hon 0'),
   description: z.string().max(5000).optional(),
-  features: z.array(z.nativeEnum(FacilityFeature)).optional().default([]),
+  featureIds: z.array(z.string().uuid()).optional().default([]),
   status: z.nativeEnum(CourtStatus).optional(),
 });
 
@@ -32,19 +33,18 @@ interface CourtFormDialogProps {
   mode: 'create' | 'edit';
 }
 
-const sportTypeOptions = [
-  { value: SportType.BADMINTON, label: 'Cầu lông' },
-  { value: SportType.TENNIS, label: 'Tennis' },
-  { value: SportType.FOOTBALL, label: 'Bóng đá' },
-  { value: SportType.BASKETBALL, label: 'Bóng rổ' },
-  { value: SportType.VOLLEYBALL, label: 'Bóng chuyền' },
-];
-
 export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDialogProps) {
   const { mutate: createCourt, isPending: isCreating } = useCreateCourt();
   const { mutate: updateCourt, isPending: isUpdating } = useUpdateCourt();
+  const { mutateAsync: syncCourtFeatures } = useSyncCourtFeatures();
+  const { data: sportTypes = [] } = useSportTypes();
+  const { data: features = [] } = useFeatures();
+
   const isPending = isCreating || isUpdating;
   const [preview, setPreview] = useState(false);
+
+  const defaultSportTypeId = useMemo(() => sportTypes[0]?.id ?? '', [sportTypes]);
+
   const {
     register,
     handleSubmit,
@@ -56,64 +56,82 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
     resolver: zodResolver(courtSchema),
     defaultValues: {
       name: '',
-      sportType: SportType.BADMINTON,
+      sportTypeId: '',
       courtType: CourtType.OUTDOOR,
       address: '',
       pricePerHour: 0,
       description: '',
-      features: [],
+      featureIds: [],
       status: CourtStatus.ACTIVE,
     },
   });
 
-  const features = watch('features') ?? [];
+  const featureIds = watch('featureIds') ?? [];
   const description = watch('description') ?? '';
 
   useEffect(() => {
     if (!open) return;
+
     if (court && mode === 'edit') {
       reset({
         name: court.name,
-        sportType: court.sportType,
+        sportTypeId: court.sportTypeId,
         courtType: court.courtType,
         address: court.address,
-        pricePerHour: court.pricePerHour,
+        pricePerHour: Number(court.pricePerHour),
         description: court.description ?? '',
-        features: court.features ?? [],
+        featureIds: (court.featureItems ?? []).map((item) => item.id),
         status: court.status,
       });
-    } else {
-      reset({
-        name: '',
-        sportType: SportType.BADMINTON,
-        courtType: CourtType.OUTDOOR,
-        address: '',
-        pricePerHour: 0,
-        description: '',
-        features: [],
-        status: CourtStatus.ACTIVE,
-      });
+      return;
     }
-  }, [open, court, mode, reset]);
 
-  const toggleFeature = (feature: FacilityFeature) => {
-    const next = features.includes(feature)
-      ? features.filter((f) => f !== feature)
-      : [...features, feature];
-    setValue('features', next);
+    reset({
+      name: '',
+      sportTypeId: defaultSportTypeId,
+      courtType: CourtType.OUTDOOR,
+      address: '',
+      pricePerHour: 0,
+      description: '',
+      featureIds: [],
+      status: CourtStatus.ACTIVE,
+    });
+  }, [open, court, mode, reset, defaultSportTypeId]);
+
+  const toggleFeature = (featureId: string) => {
+    const next = featureIds.includes(featureId)
+      ? featureIds.filter((id) => id !== featureId)
+      : [...featureIds, featureId];
+    setValue('featureIds', next);
   };
 
   const onSubmit = (data: CourtFormData) => {
+    const { featureIds: nextFeatureIds, ...courtPayload } = data;
+
     if (mode === 'create') {
-      createCourt(data, { onSuccess: () => onOpenChange(false) });
+      createCourt(courtPayload, {
+        onSuccess: async (createdCourt) => {
+          await syncCourtFeatures({ courtId: createdCourt.id, featureIds: nextFeatureIds });
+          onOpenChange(false);
+        },
+      });
       return;
     }
-    if (court) {
-      updateCourt({ id: court.id, dto: data }, { onSuccess: () => onOpenChange(false) });
-    }
+
+    if (!court) return;
+    updateCourt(
+      { id: court.id, dto: courtPayload },
+      {
+        onSuccess: async () => {
+          await syncCourtFeatures({ courtId: court.id, featureIds: nextFeatureIds });
+          onOpenChange(false);
+        },
+      },
+    );
   };
 
   if (!open) return null;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
@@ -123,7 +141,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
       <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-xl font-semibold">
-            {mode === 'create' ? 'Tạo sân mới' : 'Chỉnh sửa sân'}
+            {mode === 'create' ? 'Tao san moi' : 'Chinh sua san'}
           </h2>
           <button
             onClick={() => onOpenChange(false)}
@@ -133,85 +151,92 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
             <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <input
             {...register('name')}
-            placeholder="Tên sân"
+            placeholder="Ten san"
             className="w-full rounded-md border px-3 py-2"
           />
           {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
+
           <div className="grid grid-cols-2 gap-3">
-            <select {...register('sportType')} className="rounded-md border px-3 py-2">
-              {sportTypeOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
+            <select {...register('sportTypeId')} className="rounded-md border px-3 py-2">
+              {sportTypes.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.name}
                 </option>
               ))}
             </select>
             <select {...register('courtType')} className="rounded-md border px-3 py-2">
-              <option value={CourtType.INDOOR}>Trong nhà</option>
-              <option value={CourtType.OUTDOOR}>Ngoài trời</option>
+              <option value={CourtType.INDOOR}>Trong nha</option>
+              <option value={CourtType.OUTDOOR}>Ngoai troi</option>
             </select>
           </div>
+
           <input
             {...register('address')}
-            placeholder="Địa chỉ"
+            placeholder="Dia chi"
             className="w-full rounded-md border px-3 py-2"
           />
           <input
             type="number"
             {...register('pricePerHour', { valueAsNumber: true })}
-            placeholder="Giá/giờ"
+            placeholder="Gia/gio"
             className="w-full rounded-md border px-3 py-2"
           />
+
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium">Mô tả sân</span>
+              <span className="text-sm font-medium">Mo ta san</span>
               <button
                 type="button"
                 className="text-sm text-[#944a00]"
                 onClick={() => setPreview((v) => !v)}
               >
-                {preview ? 'Nhập' : 'Xem trước'}
+                {preview ? 'Nhap' : 'Xem truoc'}
               </button>
             </div>
             {!preview ? (
               <textarea
                 {...register('description')}
                 rows={5}
-                placeholder="Nhập mô tả sân (hỗ trợ Markdown)..."
+                placeholder="Nhap mo ta san (ho tro Markdown)..."
                 className="w-full rounded-md border px-3 py-2"
               />
             ) : (
               <div className="prose min-h-[120px] rounded-md border p-3">
-                <ReactMarkdown>{description || '_Chưa có nội dung_'}</ReactMarkdown>
+                <ReactMarkdown>{description || '_Chua co noi dung_'}</ReactMarkdown>
               </div>
             )}
             <p className="mt-1 text-xs text-slate-500">{description.length}/5000</p>
           </div>
+
           <div>
-            <p className="mb-2 text-sm font-medium">Tiện ích sân</p>
+            <p className="mb-2 text-sm font-medium">Tien ich san</p>
             <div className="grid grid-cols-2 gap-2">
-              {Object.values(FacilityFeature).map((feature) => (
-                <label key={feature} className="flex items-center gap-2 text-sm">
+              {features.map((feature) => (
+                <label key={feature.id} className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    checked={features.includes(feature)}
-                    onChange={() => toggleFeature(feature)}
+                    checked={featureIds.includes(feature.id)}
+                    onChange={() => toggleFeature(feature.id)}
                   />
                   <span>
-                    {FACILITY_FEATURE_LABELS[feature].icon} {FACILITY_FEATURE_LABELS[feature].label}
+                    {feature.icon ?? 'SPORT'} {feature.name}
                   </span>
                 </label>
               ))}
             </div>
           </div>
+
           {mode === 'edit' && (
             <select {...register('status')} className="w-full rounded-md border px-3 py-2">
-              <option value={CourtStatus.ACTIVE}>Hoạt động</option>
-              <option value={CourtStatus.INACTIVE}>Tạm ngưng</option>
+              <option value={CourtStatus.ACTIVE}>Hoat dong</option>
+              <option value={CourtStatus.INACTIVE}>Tam ngung</option>
             </select>
           )}
+
           <div className="flex gap-3 pt-2">
             <Button
               type="button"
@@ -220,10 +245,10 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
               disabled={isPending}
               className="flex-1"
             >
-              Hủy
+              Huy
             </Button>
             <Button type="submit" disabled={isPending} className="flex-1">
-              {isPending ? 'Đang xử lý...' : mode === 'create' ? 'Tạo sân' : 'Cập nhật'}
+              {isPending ? 'Dang xu ly...' : mode === 'create' ? 'Tao san' : 'Cap nhat'}
             </Button>
           </div>
         </form>

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useCourt } from './useCourt';
 import { api } from '@/lib/api';
 import type { Court } from '@/types';
-import { SportType, CourtStatus, CourtType } from '@/types';
+import { CourtStatus, CourtType } from '@/types';
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -40,12 +40,12 @@ describe('useCourt', () => {
     const mockCourt: Court = {
       id: '1',
       name: 'Court 1',
-      sportType: SportType.BADMINTON,
+      sportTypeId: 'sport-type-1',
       courtType: CourtType.INDOOR,
       address: '123 Main St',
       district: 'District 1',
       description: null,
-      features: [],
+      featureItems: [],
       images: [],
       pricePerHour: 100000,
       status: CourtStatus.ACTIVE,

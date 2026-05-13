@@ -5,31 +5,28 @@ import { Navbar } from '@/components/shared/Navbar';
 import { SiteFooter } from '@/components/shared/SiteFooter';
 import { Button } from '@/components/ui/button';
 import { CourtStatus } from '@court-booking/shared';
-import { SportType, type Court, type PaginatedResult } from '@/types';
+import { type Court, type PaginatedResult } from '@/types';
 
 type CourtsApiResponse = {
   success: boolean;
   data: PaginatedResult<Court>;
 };
 
-const sportTagByType: Record<SportType, string> = {
-  [SportType.BADMINTON]: 'High Tempo',
-  [SportType.TENNIS]: 'Pro Standard',
-  [SportType.FOOTBALL]: 'Stadium Class',
-  [SportType.BASKETBALL]: 'Elite Performance',
-  [SportType.VOLLEYBALL]: 'Tournament Ready',
+type SportTypeItem = {
+  id: string;
+  name: string;
 };
 
-const sportImageByType: Record<SportType, string> = {
-  [SportType.TENNIS]:
+const sportImageByName: Record<string, string> = {
+  tennis:
     'https://lh3.googleusercontent.com/aida-public/AB6AXuD-qmqGzKTb_fQ97SOjBL8Oxqt3waSI2Mn6C8JOlYoDBy-koBdKOQ-ghYFErIxUJURWyWxbJaZe1X81uxZHw99xJblal_JavfzwtGBWd6eOW3A_s3CdBMz-B5e2nd93RFFMoEnfUF2syDDTaDiXO4KfRsvg7BBjogi1YkZIaRMVsJUWIDRpUaTo75Ipzq6Y-F3XsOGPW4gmwNUVQY2XypA4LRc0enaRMZqo5SMEZF50jkLqUpBA640-nskj4P_zWMFXuyF7dA4nFg',
-  [SportType.BADMINTON]:
+  badminton:
     'https://lh3.googleusercontent.com/aida-public/AB6AXuB0cEbdg1BQGGHPg_G_8H3XHu8ZKf6TLVOCv6T45AprIOKTw3QVUtvIbMSuM9VB3ifPZxyIS-NuRPw4d_d8Rs7XbbZf05MC1GqgW8a5NMvGNQm6qMjEYtkFDcWUjKZp6PAfcIFfLZ6RdGJ7aSW1DhL-mVFNZeTrtinifPDw1Rg4w4XpgfwKEduhI7KgertOD_XggSUmwWysBtUeWcInZ45-j2YcUDpMl3HuHg2Nj4CmfnVNQv24gZeybyY4ZXvT43H40FOaWg4UZg',
-  [SportType.BASKETBALL]:
+  basketball:
     'https://lh3.googleusercontent.com/aida-public/AB6AXuDbQe9JDs9gGcigP92Uh2_RrumHv95bdlTnEGY17MbTczs4i1gWf8PPVcgwyxF7MDsd7LGI3gGxPbvsD9G9I90KtfPMIS3BUng9jgQN_KPIJT9xdoCxs1Ltq6808YuvB5insquUyDkMCt3-i5xYg9RoCv8dogpKbWGci-nnoabhGkw5fgMX_khHccGmszpINxO2JZhLwIlZGJNjabwRO_xpcQ7gUMY1Sjo62KWSDzyeTfPxX58K_wSeBizCv8FvjFwwIZXWTFE5DA',
-  [SportType.FOOTBALL]:
+  football:
     'https://images.unsplash.com/photo-1556056504-5c7696c4c28d?auto=format&fit=crop&w=1400&q=80',
-  [SportType.VOLLEYBALL]:
+  volleyball:
     'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&w=1400&q=80',
 };
 
@@ -47,8 +44,22 @@ async function getFeaturedCourts() {
   }
 }
 
+async function getSportTypes() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) return [] as SportTypeItem[];
+  try {
+    const res = await fetch(`${apiUrl}/api/v1/sport-types`, { cache: 'no-store' });
+    if (!res.ok) return [] as SportTypeItem[];
+    const json = (await res.json()) as { success: boolean; data: SportTypeItem[] };
+    return json?.data ?? [];
+  } catch {
+    return [] as SportTypeItem[];
+  }
+}
+
 export default async function HomePage() {
-  const courts = await getFeaturedCourts();
+  const [courts, sportTypes] = await Promise.all([getFeaturedCourts(), getSportTypes()]);
+  const sportTypeMap = new Map(sportTypes.map((item) => [item.id, item]));
   return (
     <div className="min-h-screen bg-[#f8f9ff] text-[#0b1c30]">
       <Navbar />
@@ -137,17 +148,27 @@ export default async function HomePage() {
                   key={court.id}
                   className="group relative aspect-[4/5] overflow-hidden rounded-xl"
                 >
-                  <Image
-                    src={sportImageByType[court.sportType]}
-                    alt={court.name}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover transition duration-500 group-hover:scale-110"
-                  />
+                  {(() => {
+                    const sport = sportTypeMap.get(court.sportTypeId);
+                    const sportName = sport?.name?.toLowerCase() ?? '';
+                    const imageSrc = sportName ? sportImageByName[sportName] : undefined;
+                    return (
+                      <Image
+                        src={
+                          imageSrc ??
+                          'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?auto=format&fit=crop&w=1400&q=80'
+                        }
+                        alt={court.name}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        className="object-cover transition duration-500 group-hover:scale-110"
+                      />
+                    );
+                  })()}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
                   <div className="absolute bottom-0 p-6">
                     <span className="rounded bg-[#fd933d] px-2 py-1 text-[10px] font-bold uppercase text-[#301400]">
-                      {sportTagByType[court.sportType]}
+                      {sportTypeMap.get(court.sportTypeId)?.name ?? 'Featured'}
                     </span>
                     <h3 className="mt-3 text-2xl font-bold text-white">{court.name}</h3>
                     <p className="mt-2 line-clamp-2 text-sm text-slate-300">{court.address}</p>

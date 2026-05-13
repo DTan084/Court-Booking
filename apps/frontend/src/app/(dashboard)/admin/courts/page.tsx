@@ -9,6 +9,7 @@ import { CourtFormDialog } from '@/components/admin/CourtFormDialog';
 import { DeleteCourtDialog } from '@/components/admin/DeleteCourtDialog';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
 import { AdminShell } from '@/components/admin/AdminShell';
+import { useSportTypes } from '@/hooks/useSportTypes';
 import type { Court } from '@/types';
 
 export default function AdminCourtsPage() {
@@ -20,6 +21,7 @@ export default function AdminCourtsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   const { data, isLoading } = useCourts({ page: 1, limit: 50 });
+  const { data: sportTypes = [] } = useSportTypes();
   const courts = useMemo(() => data?.data ?? [], [data]);
 
   const filteredCourts = useMemo(() => {
@@ -30,13 +32,12 @@ export default function AdminCourtsPage() {
         court.name.toLowerCase().includes(keyword) ||
         court.address.toLowerCase().includes(keyword) ||
         (court.district ?? '').toLowerCase().includes(keyword);
-      const matchesSport = sportFilter === 'ALL' || String(court.sportType) === sportFilter;
+      const matchesSport = sportFilter === 'ALL' || court.sportTypeId === sportFilter;
       const matchesStatus = statusFilter === 'ALL' || String(court.status) === statusFilter;
       return matchesKeyword && matchesSport && matchesStatus;
     });
   }, [courts, search, sportFilter, statusFilter]);
 
-  const sportOptions = Array.from(new Set(courts.map((court) => String(court.sportType))));
   const statusOptions = Array.from(new Set(courts.map((court) => String(court.status))));
 
   return (
@@ -58,9 +59,9 @@ export default function AdminCourtsPage() {
           className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
         >
           <option value="ALL">All sports</option>
-          {sportOptions.map((sport) => (
-            <option key={sport} value={sport}>
-              {sport}
+          {sportTypes.map((sport) => (
+            <option key={sport.id} value={sport.id}>
+              {sport.name}
             </option>
           ))}
         </select>

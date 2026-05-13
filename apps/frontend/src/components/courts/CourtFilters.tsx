@@ -4,8 +4,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useFeatures } from '@/hooks/useFeatures';
-import type { SportType, CourtType } from '@/types';
-import { SportType as SportTypeEnum, CourtType as CourtTypeEnum } from '@court-booking/shared';
+import { useSportTypes } from '@/hooks/useSportTypes';
+import type { CourtType } from '@/types';
+import { CourtType as CourtTypeEnum } from '@court-booking/shared';
 
 export type CourtsSort = 'popular' | 'price_asc' | 'price_desc' | 'name_asc';
 
@@ -14,7 +15,7 @@ interface CourtFiltersProps {
   onFilterChange: (filters: {
     name?: string;
     districts: string[];
-    sportTypes: SportType[];
+    sportTypeIds: string[];
     courtType?: CourtType;
     featureIds: string[];
     maxPrice: number;
@@ -23,14 +24,6 @@ interface CourtFiltersProps {
   }) => void;
   children?: ReactNode;
 }
-
-const sportTypeOptions: { value: SportType; label: string }[] = [
-  { value: SportTypeEnum.BADMINTON, label: 'Badminton' },
-  { value: SportTypeEnum.TENNIS, label: 'Tennis' },
-  { value: SportTypeEnum.FOOTBALL, label: 'Football' },
-  { value: SportTypeEnum.BASKETBALL, label: 'Basketball' },
-  { value: SportTypeEnum.VOLLEYBALL, label: 'Volleyball' },
-];
 
 const courtTypeOptions: Array<{ value?: CourtType; label: string }> = [
   { label: 'Tất cả' },
@@ -45,7 +38,7 @@ export function CourtFilters({
 }: CourtFiltersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [districts, setDistricts] = useState<string[]>([]);
-  const [sportTypes, setSportTypes] = useState<SportType[]>([]);
+  const [sportTypeIds, setSportTypeIds] = useState<string[]>([]);
   const [courtType, setCourtType] = useState<CourtType | undefined>(undefined);
   const [featureIds, setFeatureIds] = useState<string[]>([]);
   const [maxPrice, setMaxPrice] = useState(1000000);
@@ -55,13 +48,14 @@ export function CourtFilters({
   const [sportOpen, setSportOpen] = useState(false);
   const [featureOpen, setFeatureOpen] = useState(false);
   const { data: features = [] } = useFeatures();
+  const { data: sportTypes = [] } = useSportTypes();
 
   useEffect(() => {
     const timer = setTimeout(() => {
       onFilterChange({
         name: searchTerm || undefined,
         districts,
-        sportTypes,
+        sportTypeIds,
         courtType,
         featureIds,
         maxPrice,
@@ -73,7 +67,7 @@ export function CourtFilters({
   }, [
     searchTerm,
     districts,
-    sportTypes,
+    sportTypeIds,
     courtType,
     featureIds,
     maxPrice,
@@ -82,8 +76,8 @@ export function CourtFilters({
     onFilterChange,
   ]);
 
-  const toggleSportType = (value: SportType) =>
-    setSportTypes((prev) =>
+  const toggleSportType = (value: string) =>
+    setSportTypeIds((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value],
     );
   const toggleDistrict = (value: string) =>
@@ -98,7 +92,7 @@ export function CourtFilters({
   const clearAll = () => {
     setSearchTerm('');
     setDistricts([]);
-    setSportTypes([]);
+    setSportTypeIds([]);
     setCourtType(undefined);
     setFeatureIds([]);
     setMaxPrice(1000000);
@@ -179,18 +173,15 @@ export function CourtFilters({
             </button>
             {sportOpen && (
               <div className="space-y-2">
-                {sportTypeOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex items-center gap-2 text-sm text-slate-700"
-                  >
+                {sportTypes.map((option) => (
+                  <label key={option.id} className="flex items-center gap-2 text-sm text-slate-700">
                     <input
                       type="checkbox"
-                      checked={sportTypes.includes(option.value)}
-                      onChange={() => toggleSportType(option.value)}
+                      checked={sportTypeIds.includes(option.id)}
+                      onChange={() => toggleSportType(option.id)}
                       className="rounded border-slate-300 text-[#944a00] focus:ring-[#944a00]"
                     />
-                    {option.label}
+                    {option.name}
                   </label>
                 ))}
               </div>
