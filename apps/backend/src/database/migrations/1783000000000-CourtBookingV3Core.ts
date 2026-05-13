@@ -33,9 +33,25 @@ export class CourtBookingV3Core1783000000000 implements MigrationInterface {
       `ALTER TABLE "courts" ADD COLUMN IF NOT EXISTS "is_featured" boolean NOT NULL DEFAULT false`,
     );
     await queryRunner.query(`ALTER TABLE "courts" ADD COLUMN IF NOT EXISTS "max_players" integer`);
+    await queryRunner.query(`ALTER TABLE "courts" ADD COLUMN IF NOT EXISTS "sport_type_id" uuid`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "idx_courts_sport_type_id" ON "courts" ("sport_type_id")`,
+    );
     await queryRunner.query(
       `CREATE INDEX IF NOT EXISTS "idx_courts_is_featured" ON "courts" ("is_featured")`,
     );
+    await queryRunner.query(`
+      UPDATE "courts"
+      SET "sport_type_id" = st.id
+      FROM "sport_types" st
+      WHERE (
+        (courts.sport_type = 'FOOTBALL' AND st.name = 'BÃ³ng Ä‘Ã¡')
+        OR (courts.sport_type = 'BADMINTON' AND st.name = 'Cáº§u lÃ´ng')
+        OR (courts.sport_type = 'TENNIS' AND st.name = 'Tennis')
+        OR (courts.sport_type = 'BASKETBALL' AND st.name = 'BÃ³ng rá»•')
+        OR (courts.sport_type = 'VOLLEYBALL' AND st.name = 'BÃ³ng chuyá»n')
+      )
+    `);
 
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "features" (
@@ -47,6 +63,17 @@ export class CourtBookingV3Core1783000000000 implements MigrationInterface {
         CONSTRAINT "PK_features" PRIMARY KEY ("id"),
         CONSTRAINT "UQ_features_name" UNIQUE ("name")
       )
+    `);
+    await queryRunner.query(`
+      INSERT INTO "features" ("name","icon","category")
+      VALUES
+        ('MÃ¡i che','ðŸ ','CÆ¡ sá»Ÿ váº­t cháº¥t'),
+        ('ÄÃ¨n ban Ä‘Ãªm','ðŸ’¡','CÆ¡ sá»Ÿ váº­t cháº¥t'),
+        ('Wifi','ðŸ“¶','Dá»‹ch vá»¥'),
+        ('BÃ£i Ä‘á»— xe','ðŸ…¿ï¸','CÆ¡ sá»Ÿ váº­t cháº¥t'),
+        ('PhÃ²ng thay Ä‘á»“','ðŸšª','CÆ¡ sá»Ÿ váº­t cháº¥t'),
+        ('Camera an ninh','ðŸ“·','An toÃ n')
+      ON CONFLICT ("name") DO NOTHING
     `);
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "court_features" (
@@ -166,6 +193,8 @@ export class CourtBookingV3Core1783000000000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS "court_features"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "features"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_courts_is_featured"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "idx_courts_sport_type_id"`);
+    await queryRunner.query(`ALTER TABLE "courts" DROP COLUMN IF EXISTS "sport_type_id"`);
     await queryRunner.query(`ALTER TABLE "courts" DROP COLUMN IF EXISTS "max_players"`);
     await queryRunner.query(`ALTER TABLE "courts" DROP COLUMN IF EXISTS "is_featured"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "sport_types"`);

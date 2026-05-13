@@ -101,6 +101,12 @@ export class CourtsController {
     type: String,
     description: 'ILIKE search in address',
   })
+  @ApiQuery({
+    name: 'featureIds',
+    required: false,
+    type: String,
+    description: 'Comma separated feature UUIDs; AND logic',
+  })
   @ApiResponse({ status: 200, description: 'Paginated list of courts', type: CourtsListResponse })
   @UsePipes(new ZodValidationPipe(getCourtsSchema))
   async findAll(@Query() query: GetCourtsDto) {

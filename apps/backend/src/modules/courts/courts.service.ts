@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, DataSource } from 'typeorm';
+import { Repository, IsNull, DataSource, In } from 'typeorm';
 import Redis from 'ioredis';
 import { CourtEntity } from '../../database/entities/court.entity';
 import { CourtImageEntity } from '../../database/entities/court-image.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
+import { CourtFeatureEntity } from '../../database/entities/court-feature.entity';
+import { FeatureEntity } from '../../database/entities/feature.entity';
 import { CreateCourtDto } from './dto/create-court.dto';
 import { GetCourtsDto } from './dto/get-courts.dto';
 import { UpdateCourtDto } from './dto/update-court.dto';
@@ -28,6 +30,10 @@ export class CourtsService {
     private readonly timeSlotRepository: Repository<CourtTimeSlotEntity>,
     @InjectRepository(CourtImageEntity)
     private readonly courtImageRepository: Repository<CourtImageEntity>,
+    @InjectRepository(CourtFeatureEntity)
+    private readonly courtFeatureRepository: Repository<CourtFeatureEntity>,
+    @InjectRepository(FeatureEntity)
+    private readonly featureRepository: Repository<FeatureEntity>,
     private readonly dataSource: DataSource,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
@@ -68,8 +74,18 @@ export class CourtsService {
   }
 
   async findAll(query: GetCourtsDto) {
-    const { page, limit, name, sportType, courtType, features, address, district, location } =
-      query;
+    const {
+      page,
+      limit,
+      name,
+      sportType,
+      courtType,
+      features,
+      address,
+      district,
+      location,
+      featureIds,
+    } = query;
 
     // Generate cache key based on query params
     const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
@@ -114,11 +130,48 @@ export class CourtsService {
     if (features?.length) {
       qb.andWhere('court.features @> :features', { features });
     }
+    if (featureIds?.length) {
+      qb.andWhere(
+        `court.id IN (
+          SELECT cf.court_id
+          FROM court_features cf
+          WHERE cf.feature_id IN (:...featureIds)
+          GROUP BY cf.court_id
+          HAVING COUNT(DISTINCT cf.feature_id) = :featureCount
+        )`,
+        { featureIds, featureCount: featureIds.length },
+      );
+    }
 
     const [data, total] = await qb.getManyAndCount();
+    const courtIds = data.map((court) => court.id);
+    const featureByCourt = new Map<string, FeatureEntity[]>();
+    if (courtIds.length > 0) {
+      const links = await this.courtFeatureRepository
+        .createQueryBuilder('cf')
+        .where('cf.court_id IN (:...courtIds)', { courtIds })
+        .getMany();
+      const featureIdsInUse = [...new Set(links.map((item) => item.featureId))];
+      const featureList =
+        featureIdsInUse.length > 0
+          ? await this.featureRepository.findBy({ id: In(featureIdsInUse) })
+          : [];
+      const featureMap = new Map(featureList.map((item) => [item.id, item]));
+      for (const link of links) {
+        const feature = featureMap.get(link.featureId);
+        if (!feature) continue;
+        if (!featureByCourt.has(link.courtId)) {
+          featureByCourt.set(link.courtId, []);
+        }
+        featureByCourt.get(link.courtId)!.push(feature);
+      }
+    }
 
     const result = {
-      data,
+      data: data.map((court) => ({
+        ...court,
+        features: featureByCourt.get(court.id) ?? [],
+      })),
       meta: {
         total,
         page,

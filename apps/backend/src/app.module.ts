@@ -21,8 +21,13 @@ import { BookingEntity } from './database/entities/booking.entity';
 import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
 import { NotificationEntity } from './database/entities/notification.entity';
 import { CourtImageEntity } from './database/entities/court-image.entity';
+import { SportTypeEntity } from './database/entities/sport-type.entity';
+import { FeatureEntity } from './database/entities/feature.entity';
+import { CourtFeatureEntity } from './database/entities/court-feature.entity';
 import { RedisModule } from './common/redis/redis.module';
 import { winstonConfig } from './config/winston.config';
+import { SportTypesModule } from './modules/sport-types/sport-types.module';
+import { FeaturesModule } from './modules/features/features.module';
 
 @Module({
   imports: [
@@ -50,6 +55,9 @@ import { winstonConfig } from './config/winston.config';
           RefreshTokenEntity,
           NotificationEntity,
           CourtImageEntity,
+          SportTypeEntity,
+          FeatureEntity,
+          CourtFeatureEntity,
         ],
         synchronize: configService.get<boolean>('database.synchronize', false),
         logging: configService.get<boolean>('database.logging', false),
@@ -69,6 +77,8 @@ import { winstonConfig } from './config/winston.config';
     HealthModule,
     UsersModule,
     NotificationsModule,
+    SportTypesModule,
+    FeaturesModule,
   ],
   controllers: [AppController],
   providers: [],

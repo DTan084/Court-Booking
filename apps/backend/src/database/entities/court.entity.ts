@@ -31,6 +31,10 @@ export class CourtEntity {
   @Column({ type: 'enum', enum: SportType })
   sportType: SportType;
 
+  @Index('idx_courts_sport_type_id')
+  @Column({ type: 'uuid', name: 'sport_type_id', nullable: true })
+  sportTypeId: string | null;
+
   @Column({ type: 'text' })
   address: string;
 

@@ -6,6 +6,8 @@ import { CourtsService } from './courts.service';
 import { CourtEntity } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { CourtImageEntity } from '../../database/entities/court-image.entity';
+import { CourtFeatureEntity } from '../../database/entities/court-feature.entity';
+import { FeatureEntity } from '../../database/entities/feature.entity';
 import { SportType, CourtType } from '@court-booking/shared';
 
 describe('CourtsService', () => {
@@ -70,6 +72,19 @@ describe('CourtsService', () => {
       transaction: jest.fn(),
     };
 
+    const mockCourtFeatureRepo = {
+      findBy: jest.fn().mockResolvedValue([]),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      }),
+    };
+
+    const mockFeatureRepo = {
+      findBy: jest.fn().mockResolvedValue([]),
+      createQueryBuilder: jest.fn(),
+    };
+
     const mockRedis = {
       get: jest.fn().mockResolvedValue(null),
       setex: jest.fn().mockResolvedValue('OK'),
@@ -91,6 +106,14 @@ describe('CourtsService', () => {
         {
           provide: getRepositoryToken(CourtImageEntity),
           useValue: mockCourtImageRepo,
+        },
+        {
+          provide: getRepositoryToken(CourtFeatureEntity),
+          useValue: mockCourtFeatureRepo,
+        },
+        {
+          provide: getRepositoryToken(FeatureEntity),
+          useValue: mockFeatureRepo,
         },
         {
           provide: DataSource,

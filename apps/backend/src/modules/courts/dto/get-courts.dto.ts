@@ -18,6 +18,7 @@ export const getCourtsSchema = z.object({
   address: z.string().optional(),
   district: z.preprocess(toArray, z.array(z.string()).optional()), // REQ-21.2: exact match filter
   location: z.string().optional(), // REQ-21.2: ILIKE search in address
+  featureIds: z.preprocess(toArray, z.array(z.string().uuid()).optional()),
 });
 
 export type GetCourtsDto = z.infer<typeof getCourtsSchema>;
