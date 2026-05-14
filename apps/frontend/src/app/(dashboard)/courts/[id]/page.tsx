@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPin,
+  Users,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
@@ -20,9 +21,9 @@ import { Button } from '@/components/ui/button';
 import { CourtGallery } from '@/components/courts/CourtGallery';
 import { CourtTypeBadge } from '@/components/courts/CourtTypeBadge';
 import { FacilityFeatureTags } from '@/components/courts/FacilityFeatureTags';
-import { buildLocalISO, cn, formatCurrency, formatDate, isSlotBooked } from '@/lib/utils';
-import { CourtStatus } from '@/types';
-import type { BookedRange, CourtTimeSlot, Feature } from '@/types';
+import { buildLocalISO, cn, formatCurrency, formatDate } from '@/lib/utils';
+import { BookingStatus, CourtStatus } from '@/types';
+import type { CourtTimeSlot, Feature } from '@/types';
 
 function getDaySlots(timeSlots: CourtTimeSlot[], selectedDate: Date) {
   const dayOfWeek = selectedDate.getDay();
@@ -44,6 +45,26 @@ function computeTotalPrice(slots: CourtTimeSlot[]) {
   return slots.reduce((sum, slot) => sum + Number(slot.price), 0);
 }
 
+function getSlotBookingState(
+  slot: CourtTimeSlot,
+  selectedDate: Date,
+  bookings: Array<{ startTime: string; endTime: string; status: BookingStatus }> | undefined,
+): 'available' | 'pending' | 'confirmed' {
+  if (!bookings || bookings.length === 0) return 'available';
+  const slotStart = buildLocalISO(selectedDate, slot.startHour);
+  const slotEnd = buildLocalISO(selectedDate, slot.endHour === 24 ? 0 : slot.endHour);
+
+  for (const booking of bookings) {
+    const overlap =
+      new Date(booking.startTime) < new Date(slotEnd) &&
+      new Date(booking.endTime) > new Date(slotStart);
+    if (!overlap) continue;
+    if (booking.status === BookingStatus.CONFIRMED) return 'confirmed';
+    if (booking.status === BookingStatus.PENDING_PAYMENT) return 'pending';
+  }
+  return 'available';
+}
+
 export default function CourtDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -57,18 +78,6 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
   const { data: court, isLoading: courtLoading, error: courtError } = useCourt(params.id);
   const { data: timeSlots, isLoading: slotsLoading } = useTimeSlots(params.id);
   const { data: bookings } = useSchedule(params.id, formatDate(selectedDate));
-
-  const bookedRanges = useMemo<BookedRange[]>(() => {
-    if (!bookings) return [];
-    return bookings.map((booking) => {
-      const start = new Date(booking.startTime);
-      const end = new Date(booking.endTime);
-      return {
-        startHour: start.getHours(),
-        endHour: end.getHours() || 24,
-      };
-    });
-  }, [bookings]);
 
   if (courtError) {
     toast.error('Court not found');
@@ -177,29 +186,42 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="mx-auto w-full max-w-[1440px] px-4 py-8 md:px-8 md:py-10">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-7 lg:grid-cols-12">
         <section className="space-y-6 lg:col-span-8">
-          <CourtGallery images={court.images ?? []} courtName={court.name} />
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+            <CourtGallery images={court.images ?? []} courtName={court.name} />
+          </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5">
               <div>
-                <h1 className="text-4xl font-extrabold tracking-tight text-[#0b1c30]">
-                  {court.name}
-                </h1>
-                <div className="mt-2 flex items-center gap-2">
+                <h1 className="text-4xl font-black tracking-tight text-[#0b1c30]">{court.name}</h1>
+                <div className="mt-3 flex items-center gap-2">
                   <CourtTypeBadge courtType={court.courtType} />
+                  {court.isFeatured && (
+                    <span className="rounded-full bg-[#fd933d] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[#301400]">
+                      Featured
+                    </span>
+                  )}
                 </div>
-                <p className="mt-2 flex items-center gap-2 text-slate-600">
+                <p className="mt-3 flex items-center gap-2 text-slate-600">
                   <MapPin className="h-4 w-4" />
                   {court.address}
                 </p>
+                {court.maxPlayers ? (
+                  <p className="mt-2 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700">
+                    <Users className="h-4 w-4 text-slate-500" />
+                    Max players: <span className="font-semibold">{court.maxPlayers}</span>
+                  </p>
+                ) : null}
               </div>
               <div className="text-right">
                 <p className="text-4xl font-black text-[#944a00]">
                   {formatCurrency(court.pricePerHour)}
                 </p>
-                <p className="text-sm text-slate-500">per hour</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  per hour
+                </p>
               </div>
             </div>
 
@@ -213,11 +235,13 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
               </div>
             )}
 
-            <h2 className="mb-4 text-xl font-bold text-[#0b1c30]">Facility Features</h2>
-            <FacilityFeatureTags features={displayFeatures} />
+            <div className="rounded-xl border border-slate-100 bg-[#f8f9ff] p-4">
+              <h2 className="mb-3 text-lg font-bold text-[#0b1c30]">Facility Features</h2>
+              <FacilityFeatureTags features={displayFeatures} />
+            </div>
 
             <div className="mt-6 border-t border-slate-100 pt-5">
-              <h2 className="mb-3 text-xl font-bold text-[#0b1c30]">About This Court</h2>
+              <h2 className="mb-3 text-lg font-bold text-[#0b1c30]">About This Court</h2>
               {court.description?.trim() ? (
                 <div className="prose prose-slate max-w-none text-slate-600">
                   <ReactMarkdown>{court.description}</ReactMarkdown>
@@ -232,7 +256,9 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
         <aside className="lg:col-span-4">
           <div className="sticky top-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-2xl font-bold text-[#0b1c30]">Availability Schedule</h3>
+              <h3 className="text-2xl font-bold tracking-tight text-[#0b1c30]">
+                Availability Schedule
+              </h3>
               <button
                 type="button"
                 onClick={openDatePicker}
@@ -282,7 +308,8 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
                 </div>
               )}
               {daySlots.map((slot) => {
-                const booked = isSlotBooked(slot.startHour, slot.endHour, bookedRanges);
+                const bookingState = getSlotBookingState(slot, selectedDate, bookings);
+                const booked = bookingState !== 'available';
                 const isPast = isToday && slot.startHour <= currentHour;
                 const isSelected = selectedSlots.some(
                   (s) => s.startHour === slot.startHour && s.endHour === slot.endHour,
@@ -300,8 +327,9 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
                       disabled && 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400',
                       !disabled &&
                         !isSelected &&
-                        'border-slate-300 bg-white hover:border-[#fd933d] hover:bg-orange-50',
-                      isSelected && 'border-2 border-[#fd933d] bg-orange-50 text-[#944a00]',
+                        'border-slate-300 bg-white hover:border-[#fd933d] hover:bg-orange-50 hover:shadow-sm',
+                      isSelected &&
+                        'border-2 border-[#fd933d] bg-orange-50 text-[#944a00] shadow-[0_0_0_2px_rgba(253,147,61,0.2)]',
                     )}
                   >
                     <p className="text-sm font-semibold">
@@ -309,8 +337,17 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
                       {String(slot.endHour).padStart(2, '0')}:00
                     </p>
                     <p className="mt-1 text-xs">
-                      {booked ? 'Booked' : isPast ? 'Past' : formatCurrency(slot.price)}
+                      {bookingState === 'confirmed'
+                        ? 'Booked'
+                        : bookingState === 'pending'
+                          ? 'Held (pending payment)'
+                          : isPast
+                            ? 'Past'
+                            : formatCurrency(slot.price)}
                     </p>
+                    {bookingState === 'pending' && (
+                      <p className="mt-1 text-[10px] font-semibold text-amber-700">May open soon</p>
+                    )}
                   </button>
                 );
               })}

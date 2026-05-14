@@ -124,6 +124,14 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
               <Clock className="h-4 w-4 text-slate-400" />
               {startTimeStr} - {endTimeStr}
             </div>
+            {booking.court.maxPlayers ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 text-[10px] font-bold text-slate-500">
+                  #
+                </span>
+                {booking.court.maxPlayers} players
+              </div>
+            ) : null}
           </div>
 
           {booking.status === BookingStatus.CONFIRMED && canCancel && (

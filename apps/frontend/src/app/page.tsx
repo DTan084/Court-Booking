@@ -60,6 +60,9 @@ async function getSportTypes() {
 export default async function HomePage() {
   const [courts, sportTypes] = await Promise.all([getFeaturedCourts(), getSportTypes()]);
   const sportTypeMap = new Map(sportTypes.map((item) => [item.id, item]));
+  const featuredCourts = courts.filter((court) => court.isFeatured);
+  const nonFeaturedCourts = courts.filter((court) => !court.isFeatured);
+  const priorityCourts = [...featuredCourts, ...nonFeaturedCourts].slice(0, 3);
   return (
     <div className="min-h-screen bg-[#f8f9ff] text-[#0b1c30]">
       <Navbar />
@@ -137,42 +140,59 @@ export default async function HomePage() {
               View All Facilities <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          {courts.length === 0 ? (
+          {priorityCourts.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-600">
               Chưa có dữ liệu sân để hiển thị.
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-3">
-              {courts.map((court) => (
+              {priorityCourts.map((court) => (
                 <article
                   key={court.id}
                   className="group relative aspect-[4/5] overflow-hidden rounded-xl"
                 >
-                  {(() => {
-                    const sport = sportTypeMap.get(court.sportTypeId);
-                    const sportName = sport?.name?.toLowerCase() ?? '';
-                    const imageSrc = sportName ? sportImageByName[sportName] : undefined;
-                    return (
-                      <Image
-                        src={
-                          imageSrc ??
-                          'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?auto=format&fit=crop&w=1400&q=80'
-                        }
-                        alt={court.name}
-                        fill
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                        className="object-cover transition duration-500 group-hover:scale-110"
-                      />
-                    );
-                  })()}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-                  <div className="absolute bottom-0 p-6">
-                    <span className="rounded bg-[#fd933d] px-2 py-1 text-[10px] font-bold uppercase text-[#301400]">
-                      {sportTypeMap.get(court.sportTypeId)?.name ?? 'Featured'}
-                    </span>
-                    <h3 className="mt-3 text-2xl font-bold text-white">{court.name}</h3>
-                    <p className="mt-2 line-clamp-2 text-sm text-slate-300">{court.address}</p>
-                  </div>
+                  <Link
+                    href={`/courts/${court.id}`}
+                    aria-label={`Xem chi tiết sân ${court.name}`}
+                    className="block h-full w-full"
+                  >
+                    {(() => {
+                      const dbImageSrc = court.images?.[0]?.url;
+                      const sport = sportTypeMap.get(court.sportTypeId);
+                      const sportName = sport?.name?.toLowerCase() ?? '';
+                      const sportFallback = sportName ? sportImageByName[sportName] : undefined;
+                      return (
+                        <Image
+                          src={
+                            dbImageSrc ??
+                            sportFallback ??
+                            'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?auto=format&fit=crop&w=1400&q=80'
+                          }
+                          alt={court.name}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                          className="object-cover transition duration-500 group-hover:scale-110"
+                        />
+                      );
+                    })()}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                    <div className="absolute bottom-0 p-6">
+                      <div className="flex items-center gap-2">
+                        {court.isFeatured && (
+                          <span className="rounded bg-[#fd933d] px-2 py-1 text-[10px] font-bold uppercase text-[#301400]">
+                            Featured
+                          </span>
+                        )}
+                        <span className="rounded bg-[#fd933d] px-2 py-1 text-[10px] font-bold uppercase text-[#301400]">
+                          {sportTypeMap.get(court.sportTypeId)?.name ?? 'Court'}
+                        </span>
+                      </div>
+                      <h3 className="mt-3 text-2xl font-bold text-white">{court.name}</h3>
+                      <p className="mt-2 line-clamp-2 text-sm text-slate-300">
+                        {court.description?.trim() || court.address}
+                      </p>
+                    </div>
+                  </Link>
                 </article>
               ))}
             </div>

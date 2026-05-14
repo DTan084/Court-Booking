@@ -19,9 +19,10 @@ export default function CourtsPage() {
   const [sportTypeIds, setSportTypeIds] = useState<string[]>([]);
   const [courtType, setCourtType] = useState<CourtType | undefined>(undefined);
   const [featureIds, setFeatureIds] = useState<string[]>([]);
+  const [minPrice, setMinPrice] = useState(50000);
   const [maxPrice, setMaxPrice] = useState(1000000);
-  const [minPlayers, setMinPlayers] = useState<number | undefined>(undefined);
-  const [maxPlayers, setMaxPlayers] = useState<number | undefined>(undefined);
+  const [minPlayers, setMinPlayers] = useState(1);
+  const [maxPlayers, setMaxPlayers] = useState(20);
   const [availableToday, setAvailableToday] = useState(false);
   const [sortBy, setSortBy] = useState<CourtsSort>('popular');
 
@@ -34,9 +35,10 @@ export default function CourtsPage() {
       sportTypeId: sportTypeIds.length > 0 ? sportTypeIds : undefined,
       courtType,
       featureIds: featureIds.length > 0 ? featureIds : undefined,
+      minPrice: minPrice > 50000 ? minPrice : undefined,
       maxPrice: maxPrice < 1000000 ? maxPrice : undefined,
-      minPlayers,
-      maxPlayers,
+      minPlayers: minPlayers > 1 ? minPlayers : undefined,
+      maxPlayers: maxPlayers < 20 ? maxPlayers : undefined,
       availableToday: availableToday || undefined,
     }),
     [
@@ -46,6 +48,7 @@ export default function CourtsPage() {
       sportTypeIds,
       courtType,
       featureIds,
+      minPrice,
       maxPrice,
       minPlayers,
       maxPlayers,
@@ -75,9 +78,10 @@ export default function CourtsPage() {
       sportTypeIds: string[];
       courtType?: CourtType;
       featureIds: string[];
+      minPrice: number;
       maxPrice: number;
-      minPlayers?: number;
-      maxPlayers?: number;
+      minPlayers: number;
+      maxPlayers: number;
       availableToday: boolean;
       sortBy: CourtsSort;
     }) => {
@@ -86,6 +90,7 @@ export default function CourtsPage() {
       setSportTypeIds(filters.sportTypeIds);
       setCourtType(filters.courtType);
       setFeatureIds(filters.featureIds);
+      setMinPrice(filters.minPrice);
       setMaxPrice(filters.maxPrice);
       setMinPlayers(filters.minPlayers);
       setMaxPlayers(filters.maxPlayers);
@@ -103,9 +108,10 @@ export default function CourtsPage() {
       sportTypeIds.length > 0 ||
       !!courtType ||
       featureIds.length > 0 ||
+      minPrice > 50000 ||
       maxPrice < 1000000 ||
-      minPlayers !== undefined ||
-      maxPlayers !== undefined ||
+      minPlayers > 1 ||
+      maxPlayers < 20 ||
       availableToday ||
       sortBy !== 'popular',
     [
@@ -114,6 +120,7 @@ export default function CourtsPage() {
       sportTypeIds,
       courtType,
       featureIds,
+      minPrice,
       maxPrice,
       minPlayers,
       maxPlayers,

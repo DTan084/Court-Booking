@@ -26,6 +26,8 @@ export function CourtGallery({ images, courtName }: CourtGalleryProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const active = galleryImages[activeIndex] ?? galleryImages[0];
+  const imageCount = galleryImages.length;
+  const extraCount = Math.max(0, imageCount - 3);
 
   const goPrev = useCallback(() => {
     setActiveIndex((idx) => (idx - 1 + galleryImages.length) % Math.max(galleryImages.length, 1));
@@ -46,51 +48,91 @@ export function CourtGallery({ images, courtName }: CourtGalleryProps) {
 
   return (
     <>
-      <div className="grid h-[440px] grid-cols-1 gap-2 overflow-hidden rounded-2xl md:grid-cols-3">
-        <button type="button" className="relative md:col-span-2" onClick={() => setOpen(true)}>
+      {imageCount === 1 && (
+        <button
+          type="button"
+          className="relative block h-[420px] w-full overflow-hidden rounded-2xl"
+          onClick={() => setOpen(true)}
+        >
           <Image
-            src={galleryImages[0]?.url}
-            alt={galleryImages[0]?.altText ?? courtName}
+            src={galleryImages[0].url}
+            alt={galleryImages[0].altText ?? courtName}
             fill
-            sizes="(max-width: 768px) 100vw, 66vw"
-            className="object-cover"
+            sizes="100vw"
+            className="object-cover transition duration-500 hover:scale-[1.02]"
           />
         </button>
-        <div className="hidden grid-rows-2 gap-2 md:grid">
-          {[galleryImages[1], galleryImages[2]].map((img, idx) => (
+      )}
+
+      {imageCount === 2 && (
+        <div className="grid h-[420px] grid-cols-1 gap-2 overflow-hidden rounded-2xl md:grid-cols-2">
+          {galleryImages.slice(0, 2).map((img, idx) => (
             <button
-              key={img?.id ?? `empty-${idx}`}
+              key={img.id}
               type="button"
-              className="overflow-hidden"
+              className="relative overflow-hidden"
               onClick={() => {
-                if (!img) return;
-                setActiveIndex(idx + 1);
+                setActiveIndex(idx);
                 setOpen(true);
               }}
             >
-              {img ? (
-                <Image
-                  src={img.url}
-                  alt={img.altText ?? courtName}
-                  width={480}
-                  height={280}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full w-full bg-slate-100" />
-              )}
+              <Image
+                src={img.url}
+                alt={img.altText ?? courtName}
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="object-cover transition duration-500 hover:scale-[1.03]"
+              />
             </button>
           ))}
         </div>
-      </div>
-      {galleryImages.length > 3 && (
-        <button
-          type="button"
-          className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
-          onClick={() => setOpen(true)}
-        >
-          Xem tat ca {galleryImages.length} anh
-        </button>
+      )}
+
+      {imageCount >= 3 && (
+        <div className="grid h-[440px] grid-cols-1 gap-2 overflow-hidden rounded-2xl md:grid-cols-3">
+          <button
+            type="button"
+            className="relative md:col-span-2"
+            onClick={() => {
+              setActiveIndex(0);
+              setOpen(true);
+            }}
+          >
+            <Image
+              src={galleryImages[0].url}
+              alt={galleryImages[0].altText ?? courtName}
+              fill
+              sizes="(max-width: 768px) 100vw, 66vw"
+              className="object-cover transition duration-500 hover:scale-[1.02]"
+            />
+          </button>
+          <div className="hidden grid-rows-2 gap-2 md:grid">
+            {[galleryImages[1], galleryImages[2]].map((img, idx) => (
+              <button
+                key={img.id}
+                type="button"
+                className="relative overflow-hidden"
+                onClick={() => {
+                  setActiveIndex(idx + 1);
+                  setOpen(true);
+                }}
+              >
+                <Image
+                  src={img.url}
+                  alt={img.altText ?? courtName}
+                  fill
+                  sizes="33vw"
+                  className="object-cover transition duration-500 hover:scale-[1.03]"
+                />
+                {idx === 1 && extraCount > 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-white">
+                    <span className="text-lg font-bold">+{extraCount}</span>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-5xl">
