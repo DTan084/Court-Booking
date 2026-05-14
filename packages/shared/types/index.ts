@@ -174,6 +174,11 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface UserSettings {
+  timezone: string;
+  locale: string;
+}
+
 // ── API Response Types ─────────────────────────
 
 export interface PaginatedResult<T> {
