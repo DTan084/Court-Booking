@@ -18,6 +18,7 @@ export const getCourtsSchema = z.object({
   district: z.preprocess(toArray, z.array(z.string()).optional()), // REQ-21.2: exact match filter
   location: z.string().optional(), // REQ-21.2: ILIKE search in address
   featureIds: z.preprocess(toArray, z.array(z.string().uuid()).optional()),
+  minPrice: z.coerce.number().min(0).optional(),
   maxPrice: z.coerce.number().min(0).optional(),
   minPlayers: z.coerce.number().int().min(1).optional(),
   maxPlayers: z.coerce.number().int().min(1).optional(),

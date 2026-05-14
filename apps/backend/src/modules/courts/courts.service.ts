@@ -99,6 +99,7 @@ export class CourtsService {
       district,
       location,
       featureIds,
+      minPrice,
       maxPrice,
       minPlayers,
       maxPlayers,
@@ -156,6 +157,9 @@ export class CourtsService {
         )`,
         { featureIds, featureCount: featureIds.length },
       );
+    }
+    if (minPrice !== undefined) {
+      qb.andWhere('court.pricePerHour >= :minPrice', { minPrice });
     }
     if (maxPrice !== undefined) {
       qb.andWhere('court.pricePerHour <= :maxPrice', { maxPrice });

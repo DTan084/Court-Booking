@@ -107,6 +107,7 @@ export class CourtsController {
     type: String,
     description: 'Comma separated feature UUIDs; AND logic',
   })
+  @ApiQuery({ name: 'minPrice', required: false, type: Number })
   @ApiQuery({ name: 'maxPrice', required: false, type: Number })
   @ApiQuery({ name: 'minPlayers', required: false, type: Number })
   @ApiQuery({ name: 'maxPlayers', required: false, type: Number })
