@@ -16,6 +16,12 @@ export interface GetBookingsParams {
   [key: string]: unknown; // Add index signature
 }
 
+export interface MyBookingStats {
+  totalBookings: number;
+  upcomingBookings: number;
+  totalSpend: number;
+}
+
 export interface CreateBookingDto {
   courtId: string;
   startTime: string; // ISO 8601
@@ -72,6 +78,17 @@ export function useMyBookings(params: GetBookingsParams) {
     },
     staleTime: 1 * 60 * 1000, // 1 minute
     placeholderData: keepPreviousData, // Keep previous data while fetching new page
+  });
+}
+
+export function useMyBookingStats() {
+  return useQuery<MyBookingStats>({
+    queryKey: ['bookings', 'me', 'stats'],
+    queryFn: async () => {
+      const response = await api.get('/bookings/me/stats');
+      return response.data?.data ?? response.data;
+    },
+    staleTime: 60 * 1000,
   });
 }
 

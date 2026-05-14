@@ -410,6 +410,37 @@ export class BookingsService {
     };
   }
 
+  async getMyBookingStats(userId: string) {
+    const now = new Date();
+    const validStatuses = [BookingStatus.CONFIRMED, BookingStatus.COMPLETED];
+
+    const totalBookings = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .where('booking.userId = :userId', { userId })
+      .andWhere('booking.status IN (:...validStatuses)', { validStatuses })
+      .getCount();
+
+    const upcomingBookings = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .where('booking.userId = :userId', { userId })
+      .andWhere('booking.startTime > :now', { now })
+      .andWhere('booking.status IN (:...validStatuses)', { validStatuses })
+      .getCount();
+
+    const totalSpendRaw = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .select('COALESCE(SUM(booking.totalPrice), 0)', 'totalSpend')
+      .where('booking.userId = :userId', { userId })
+      .andWhere('booking.status IN (:...validStatuses)', { validStatuses })
+      .getRawOne<{ totalSpend: string }>();
+
+    return {
+      totalBookings,
+      upcomingBookings,
+      totalSpend: Number(totalSpendRaw?.totalSpend || 0),
+    };
+  }
+
   async findOne(
     id: string,
     userId: string,

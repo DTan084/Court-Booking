@@ -118,6 +118,15 @@ export class BookingsController {
     return this.bookingsService.findMyBookings(user.id, query);
   }
 
+  @Get('me/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user booking stats' })
+  @ApiResponse({ status: 200, description: 'Booking stats retrieved successfully' })
+  async getMyBookingStats(@CurrentUser() user: UserEntity) {
+    return this.bookingsService.getMyBookingStats(user.id);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
