@@ -53,6 +53,7 @@ export interface User {
   email: string;
   phone: string | null;
   avatarUrl: string | null;
+  dob: string | null;
   role: Role;
   createdAt: string;
   updatedAt: string;

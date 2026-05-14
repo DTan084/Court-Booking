@@ -35,6 +35,9 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 500, name: 'avatar_url', nullable: true })
   avatarUrl: string | null;
 
+  @Column({ type: 'date', nullable: true })
+  dob: string | null;
+
   @OneToMany(() => BookingEntity, (booking) => booking.user)
   bookings: BookingEntity[];
 
