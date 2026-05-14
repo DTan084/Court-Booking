@@ -5,15 +5,22 @@ import { Button } from '@/components/ui/button';
 import { CancelDialog } from './CancelDialog';
 import { formatCurrency, cn } from '@/lib/utils';
 import { canCancelBooking } from '@/lib/booking-utils';
-import { CreditCard, MapPin, Calendar, Clock } from 'lucide-react';
+import {
+  CreditCard,
+  MapPin,
+  Calendar,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { BookingStatus } from '@/types';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { formatCountdown } from '@/lib/booking-utils';
+import { CancelledBy } from '@court-booking/shared';
 import type { Booking, Court, BookingStatus as BookingStatusType } from '@/types';
-
-// ==================== TYPES ====================
 
 export type BookingWithCourt = Booking & { court: Court };
 
@@ -21,8 +28,6 @@ interface BookingRowProps {
   booking: BookingWithCourt;
   isHighlighted?: boolean;
 }
-
-// ==================== STATUS CONFIG ====================
 
 const statusConfig: Record<
   BookingStatusType,
@@ -55,8 +60,6 @@ const statusConfig: Record<
   },
 };
 
-// ==================== COMPONENT ====================
-
 export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const router = useRouter();
@@ -64,8 +67,9 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
   const startTime = new Date(booking.startTime);
   const endTime = new Date(booking.endTime);
   const statusInfo = statusConfig[booking.status];
+  const courtName = booking.court?.name ?? 'Unknown court';
+  const courtAddress = booking.court?.address ?? 'Unknown address';
 
-  // Format date and time
   const dateStr = startTime.toLocaleDateString('vi-VN', {
     day: '2-digit',
     month: '2-digit',
@@ -80,10 +84,49 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
     minute: '2-digit',
   });
 
-  // Check if booking can be cancelled (REQ-19)
-  const canCancel = booking.status === BookingStatus.CONFIRMED && canCancelBooking(booking);
-
+  const canCancel =
+    booking.status === BookingStatus.PENDING_PAYMENT ||
+    (booking.status === BookingStatus.CONFIRMED && canCancelBooking(booking));
   const canPay = booking.status === BookingStatus.PENDING_PAYMENT;
+  const isUpcoming = endTime >= new Date();
+  const canAddToCalendar = booking.status === BookingStatus.CONFIRMED && isUpcoming;
+  const canBookAgain =
+    booking.status === BookingStatus.COMPLETED ||
+    booking.status === BookingStatus.CANCELLED ||
+    booking.status === BookingStatus.EXPIRED;
+
+  const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+    `Court Booking - ${courtName}`,
+  )}&dates=${format(startTime, "yyyyMMdd'T'HHmmss")}/${format(
+    endTime,
+    "yyyyMMdd'T'HHmmss",
+  )}&details=${encodeURIComponent(`Booking at ${courtName}`)}&location=${encodeURIComponent(
+    courtAddress,
+  )}`;
+
+  const isCancelledPaid = booking.status === BookingStatus.CANCELLED && !!booking.paidAt;
+  const refundPending =
+    booking.status === BookingStatus.CANCELLED && isCancelledPaid && !booking.refundedAt;
+  const refundProcessed = booking.status === BookingStatus.CANCELLED && !!booking.refundedAt;
+  const cancellationReason =
+    booking.cancellationNote || booking.cancelledReason || 'No reason provided';
+  const isSystemCancelled =
+    booking.status === BookingStatus.CANCELLED &&
+    (booking.cancelledBy === CancelledBy.SYSTEM ||
+      /system|auto[-\s]?cancel|policy|maintenance|emergency/i.test(
+        `${booking.cancelledReason ?? ''} ${booking.cancellationNote ?? ''}`,
+      ));
+  const cancellationContext =
+    booking.status === BookingStatus.CANCELLED
+      ? isSystemCancelled
+        ? 'Cancelled by system'
+        : booking.cancelledBy === CancelledBy.ADMIN
+          ? 'Cancelled by admin'
+          : 'Cancelled by you'
+      : booking.status === BookingStatus.EXPIRED
+        ? 'Payment expired'
+        : null;
+  const statusLabel = isSystemCancelled ? 'System Cancelled' : statusInfo.label;
 
   return (
     <>
@@ -92,7 +135,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
         className={cn(
           'group relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6 overflow-hidden rounded-xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:border-orange-500',
           isHighlighted && 'ring-2 ring-orange-500 shadow-lg scale-[1.01] animate-pulse-subtle',
-          booking.status === BookingStatus.CANCELLED && 'opacity-75',
+          booking.status === BookingStatus.CANCELLED && 'border-slate-300 bg-slate-50/50',
           booking.status === BookingStatus.EXPIRED && 'opacity-60 grayscale',
         )}
       >
@@ -100,21 +143,36 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
 
         <div className="flex-grow">
           <div className="mb-2 flex items-center gap-3">
-            <h3 className="text-xl font-bold text-slate-900">{booking.court.name}</h3>
+            <h3 className="text-xl font-bold text-slate-900">{courtName}</h3>
             <span
               className={cn(
                 'rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest',
                 statusInfo.colorClass,
+                booking.status === BookingStatus.CANCELLED &&
+                  'border-slate-300 bg-white text-slate-600',
+                isSystemCancelled && 'border-red-100 bg-red-50 text-red-600',
               )}
             >
-              {statusInfo.label}
+              {statusLabel}
             </span>
+            {refundPending && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                <Clock3 className="h-3 w-3" />
+                Refund Pending
+              </span>
+            )}
+            {refundProcessed && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-green-700">
+                <CheckCircle2 className="h-3 w-3" />
+                Refund Processed
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-6 text-sm text-slate-500">
             <div className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-slate-400" />
-              {booking.court.address}
+              {courtAddress}
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-slate-400" />
@@ -124,7 +182,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
               <Clock className="h-4 w-4 text-slate-400" />
               {startTimeStr} - {endTimeStr}
             </div>
-            {booking.court.maxPlayers ? (
+            {booking.court?.maxPlayers ? (
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 text-[10px] font-bold text-slate-500">
                   #
@@ -136,9 +194,9 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
 
           {booking.status === BookingStatus.CONFIRMED && canCancel && (
             <p className="mt-3 text-xs font-medium text-green-600">
-              Có thể hủy trước{' '}
+              Co the huy truoc{' '}
               {booking.latestCancellableTime
-                ? format(new Date(booking.latestCancellableTime), "HH:mm 'ngày' dd/MM", {
+                ? format(new Date(booking.latestCancellableTime), "HH:mm 'ngay' dd/MM", {
                     locale: vi,
                   })
                 : '--'}
@@ -146,8 +204,22 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
           )}
           {booking.status === BookingStatus.CONFIRMED && !canCancel && (
             <p className="mt-3 text-xs italic text-slate-400">
-              Đã quá thời hạn hủy (24h sau đặt & 12h trước chơi)
+              Da qua thoi han huy (24h sau dat & 12h truoc choi)
             </p>
+          )}
+          {cancellationContext && (
+            <div
+              className={cn(
+                'mt-3 inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs',
+                isSystemCancelled
+                  ? 'border-red-100 bg-red-50 text-red-700'
+                  : 'border-slate-200 bg-white text-slate-600',
+              )}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span className="font-semibold">{cancellationContext}:</span>
+              <span className="italic">{cancellationReason}</span>
+            </div>
           )}
         </div>
 
@@ -164,7 +236,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
                   Pay Now
                 </Button>
                 <p className="text-[10px] font-bold uppercase tracking-tight text-orange-600">
-                  Hết hạn sau {formatCountdown(booking.paymentDeadline ?? '')}
+                  Het han sau {formatCountdown(booking.paymentDeadline ?? '')}
                 </p>
               </div>
             )}
@@ -175,13 +247,45 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
                 onClick={() => setIsCancelDialogOpen(true)}
                 className="rounded-lg border border-red-200 px-5 py-2.5 font-semibold text-red-600 transition-all hover:bg-red-50"
               >
-                Hủy đặt
+                Huy dat
               </Button>
             )}
 
             {!canPay && !canCancel && (
+              <>
+                {canAddToCalendar && (
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(calendarUrl, '_blank', 'noopener,noreferrer')}
+                    className="rounded-lg border border-orange-200 px-5 py-2.5 font-semibold text-orange-700 transition-all hover:bg-orange-50"
+                  >
+                    Add to Calendar
+                  </Button>
+                )}
+                {canBookAgain && (
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/courts/${booking.courtId}`)}
+                    className="rounded-lg border border-slate-200 px-5 py-2.5 font-semibold text-slate-700 transition-all hover:bg-slate-50"
+                  >
+                    Book Again
+                  </Button>
+                )}
+                {!canAddToCalendar && !canBookAgain && (
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/bookings?highlight=${booking.id}`)}
+                    className="rounded-lg border border-slate-200 px-5 py-2.5 font-semibold text-slate-600 transition-all hover:bg-slate-50"
+                  >
+                    Details
+                  </Button>
+                )}
+              </>
+            )}
+            {(canPay || canCancel || canAddToCalendar || canBookAgain) && (
               <Button
                 variant="outline"
+                onClick={() => router.push(`/bookings?highlight=${booking.id}`)}
                 className="rounded-lg border border-slate-200 px-5 py-2.5 font-semibold text-slate-600 transition-all hover:bg-slate-50"
               >
                 Details
@@ -191,7 +295,6 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
         </div>
       </div>
 
-      {/* Cancel Dialog */}
       <CancelDialog
         open={isCancelDialogOpen}
         onOpenChange={setIsCancelDialogOpen}

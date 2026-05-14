@@ -6,52 +6,47 @@ import { cn } from '@/lib/utils';
 import { BookingStatus } from '@/types';
 import type { BookingStatus as BookingStatusType } from '@/types';
 
-// ==================== TYPES ====================
-
 interface BookingFiltersProps {
   onFilterChange: (filters: {
+    tab: FilterTab;
     status?: BookingStatusType;
+    statusGroup?: 'failed';
     fromDate?: string;
     toDate?: string;
   }) => void;
 }
 
-type FilterTab = 'all' | 'pending' | 'confirmed' | 'cancelled' | 'expired' | 'completed';
-
-// ==================== COMPONENT ====================
+export type FilterTab = 'all' | 'pending' | 'cancelled' | 'completed';
 
 export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
+  const toStartOfDayIso = (date: string) => new Date(`${date}T00:00:00.000Z`).toISOString();
+  const toEndOfDayIso = (date: string) => new Date(`${date}T23:59:59.999Z`).toISOString();
 
-  // Update filters when tab or dates change
   useEffect(() => {
     const filters: {
+      tab: FilterTab;
       status?: BookingStatusType;
+      statusGroup?: 'failed';
       fromDate?: string;
       toDate?: string;
-    } = {};
+    } = { tab: activeTab };
 
-    // Map tab to status
     if (activeTab === 'pending') {
       filters.status = BookingStatus.PENDING_PAYMENT;
-    } else if (activeTab === 'confirmed') {
-      filters.status = BookingStatus.CONFIRMED;
     } else if (activeTab === 'cancelled') {
-      filters.status = BookingStatus.CANCELLED;
-    } else if (activeTab === 'expired') {
-      filters.status = BookingStatus.EXPIRED;
+      filters.statusGroup = 'failed';
     } else if (activeTab === 'completed') {
       filters.status = BookingStatus.COMPLETED;
     }
 
-    // Add date filters if provided
     if (fromDate) {
-      filters.fromDate = fromDate;
+      filters.fromDate = toStartOfDayIso(fromDate);
     }
     if (toDate) {
-      filters.toDate = toDate;
+      filters.toDate = toEndOfDayIso(toDate);
     }
 
     onFilterChange(filters);
@@ -63,7 +58,6 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
 
   return (
     <>
-      {/* Status Tabs */}
       <div className="flex overflow-x-auto border-b border-slate-100 px-4 no-scrollbar">
         <button
           onClick={() => handleTabClick('all')}
@@ -74,7 +68,7 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
               : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Tất cả (All)
+          Active
         </button>
         <button
           onClick={() => handleTabClick('pending')}
@@ -85,18 +79,7 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
               : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Chờ thanh toán (Pending)
-        </button>
-        <button
-          onClick={() => handleTabClick('confirmed')}
-          className={cn(
-            'whitespace-nowrap px-6 py-4 text-[14px] font-semibold tracking-wide transition-colors',
-            activeTab === 'confirmed'
-              ? 'border-b-2 border-orange-500 text-slate-900'
-              : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
-          )}
-        >
-          Đã xác nhận (Confirmed)
+          Pending Payment
         </button>
         <button
           onClick={() => handleTabClick('completed')}
@@ -107,7 +90,7 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
               : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Hoàn thành (Completed)
+          Completed
         </button>
         <button
           onClick={() => handleTabClick('cancelled')}
@@ -118,22 +101,10 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
               : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
           )}
         >
-          Đã hủy (Cancelled)
-        </button>
-        <button
-          onClick={() => handleTabClick('expired')}
-          className={cn(
-            'whitespace-nowrap px-6 py-4 text-[14px] font-semibold tracking-wide transition-colors',
-            activeTab === 'expired'
-              ? 'border-b-2 border-orange-500 text-slate-900'
-              : 'border-b-2 border-transparent text-slate-400 hover:text-slate-900',
-          )}
-        >
-          Hết hạn (Expired)
+          Cancelled
         </button>
       </div>
 
-      {/* Date Range Picker */}
       <div className="flex flex-wrap items-center gap-4 bg-slate-50/50 p-4">
         <div className="flex max-w-sm flex-grow items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
           <Calendar className="h-4 w-4 text-slate-400" />
@@ -146,7 +117,7 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
             className="w-full border-none p-0 text-sm focus:ring-0"
-            title="Từ ngày"
+            title="Tu ngay"
           />
           <span className="text-slate-300">|</span>
           <input
@@ -155,7 +126,7 @@ export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
             className="w-full border-none p-0 text-sm focus:ring-0"
-            title="Đến ngày"
+            title="Den ngay"
           />
         </div>
       </div>
