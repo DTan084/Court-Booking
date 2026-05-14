@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useSportTypes } from '@/hooks/useSportTypes';
+import { resolveFeatureIcon } from '@/lib/feature-icons';
 import type { CourtType } from '@/types';
 import { CourtType as CourtTypeEnum } from '@court-booking/shared';
 
@@ -19,7 +20,9 @@ interface CourtFiltersProps {
     courtType?: CourtType;
     featureIds: string[];
     maxPrice: number;
-    availableOnly: boolean;
+    minPlayers?: number;
+    maxPlayers?: number;
+    availableToday: boolean;
     sortBy: CourtsSort;
   }) => void;
   children?: ReactNode;
@@ -42,7 +45,9 @@ export function CourtFilters({
   const [courtType, setCourtType] = useState<CourtType | undefined>(undefined);
   const [featureIds, setFeatureIds] = useState<string[]>([]);
   const [maxPrice, setMaxPrice] = useState(1000000);
-  const [availableOnly, setAvailableOnly] = useState(false);
+  const [minPlayers, setMinPlayers] = useState<number | undefined>(undefined);
+  const [maxPlayers, setMaxPlayers] = useState<number | undefined>(undefined);
+  const [availableToday, setAvailableToday] = useState(false);
   const [sortBy, setSortBy] = useState<CourtsSort>('popular');
   const [districtOpen, setDistrictOpen] = useState(false);
   const [sportOpen, setSportOpen] = useState(false);
@@ -59,7 +64,9 @@ export function CourtFilters({
         courtType,
         featureIds,
         maxPrice,
-        availableOnly,
+        minPlayers,
+        maxPlayers,
+        availableToday,
         sortBy,
       });
     }, 250);
@@ -71,7 +78,9 @@ export function CourtFilters({
     courtType,
     featureIds,
     maxPrice,
-    availableOnly,
+    minPlayers,
+    maxPlayers,
+    availableToday,
     sortBy,
     onFilterChange,
   ]);
@@ -96,7 +105,9 @@ export function CourtFilters({
     setCourtType(undefined);
     setFeatureIds([]);
     setMaxPrice(1000000);
-    setAvailableOnly(false);
+    setMinPlayers(undefined);
+    setMaxPlayers(undefined);
+    setAvailableToday(false);
     setSortBy('popular');
   };
 
@@ -188,23 +199,6 @@ export function CourtFilters({
             )}
           </div>
           <div className="mb-6 border-t border-slate-100 pt-5">
-            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
-              Court Type
-            </h4>
-            <div className="flex flex-wrap gap-2">
-              {courtTypeOptions.map((type) => (
-                <button
-                  key={type.label}
-                  type="button"
-                  onClick={() => setCourtType(type.value)}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${courtType === type.value ? 'border-[#944a00] bg-orange-50 text-[#944a00]' : 'border-slate-300 text-slate-600'}`}
-                >
-                  {type.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mb-6 border-t border-slate-100 pt-5">
             <button
               type="button"
               onClick={() => setFeatureOpen((v) => !v)}
@@ -226,13 +220,34 @@ export function CourtFilters({
                       onChange={() => toggleFeature(feature.id)}
                       className="rounded border-slate-300 text-[#944a00] focus:ring-[#944a00]"
                     />
-                    <span>
-                      {feature.icon ?? '🏟️'} {feature.name}
+                    <span className="inline-flex items-center gap-1.5">
+                      {(() => {
+                        const Icon = resolveFeatureIcon({ icon: feature.icon, name: feature.name });
+                        return Icon ? <Icon className="h-3.5 w-3.5 text-slate-500" /> : null;
+                      })()}
+                      {feature.name}
                     </span>
                   </label>
                 ))}
               </div>
             )}
+          </div>
+          <div className="mb-6 border-t border-slate-100 pt-5">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Court Type
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {courtTypeOptions.map((type) => (
+                <button
+                  key={type.label}
+                  type="button"
+                  onClick={() => setCourtType(type.value)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${courtType === type.value ? 'border-[#944a00] bg-orange-50 text-[#944a00]' : 'border-slate-300 text-slate-600'}`}
+                >
+                  {type.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="mb-6 border-t border-slate-100 pt-5">
             <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -252,15 +267,42 @@ export function CourtFilters({
               <span>{maxPrice.toLocaleString('vi-VN')}</span>
             </div>
           </div>
+          <div className="mb-6 border-t border-slate-100 pt-5">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Players Capacity
+            </h4>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="number"
+                min={1}
+                placeholder="Min"
+                value={minPlayers ?? ''}
+                onChange={(e) =>
+                  setMinPlayers(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
+                }
+                className="h-10 rounded-lg border-slate-300 bg-[#f8f9ff]"
+              />
+              <Input
+                type="number"
+                min={1}
+                placeholder="Max"
+                value={maxPlayers ?? ''}
+                onChange={(e) =>
+                  setMaxPlayers(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
+                }
+                className="h-10 rounded-lg border-slate-300 bg-[#f8f9ff]"
+              />
+            </div>
+          </div>
           <div className="border-t border-slate-100 pt-5">
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
-                checked={availableOnly}
-                onChange={(e) => setAvailableOnly(e.target.checked)}
+                checked={availableToday}
+                onChange={(e) => setAvailableToday(e.target.checked)}
                 className="rounded border-slate-300 text-[#944a00] focus:ring-[#944a00]"
               />
-              Available only
+              Available today
             </label>
           </div>
         </aside>

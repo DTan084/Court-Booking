@@ -20,6 +20,9 @@ export default function CourtsPage() {
   const [courtType, setCourtType] = useState<CourtType | undefined>(undefined);
   const [featureIds, setFeatureIds] = useState<string[]>([]);
   const [maxPrice, setMaxPrice] = useState(1000000);
+  const [minPlayers, setMinPlayers] = useState<number | undefined>(undefined);
+  const [maxPlayers, setMaxPlayers] = useState<number | undefined>(undefined);
+  const [availableToday, setAvailableToday] = useState(false);
   const [sortBy, setSortBy] = useState<CourtsSort>('popular');
 
   const queryParams = useMemo(
@@ -31,8 +34,23 @@ export default function CourtsPage() {
       sportTypeId: sportTypeIds.length > 0 ? sportTypeIds : undefined,
       courtType,
       featureIds: featureIds.length > 0 ? featureIds : undefined,
+      maxPrice: maxPrice < 1000000 ? maxPrice : undefined,
+      minPlayers,
+      maxPlayers,
+      availableToday: availableToday || undefined,
     }),
-    [page, name, districts, sportTypeIds, courtType, featureIds],
+    [
+      page,
+      name,
+      districts,
+      sportTypeIds,
+      courtType,
+      featureIds,
+      maxPrice,
+      minPlayers,
+      maxPlayers,
+      availableToday,
+    ],
   );
 
   const { data, isLoading, error } = useCourts(queryParams);
@@ -40,7 +58,7 @@ export default function CourtsPage() {
 
   const filteredData = useMemo(() => {
     if (!data) return data;
-    const list = [...data.data].filter((court) => Number(court.pricePerHour) <= maxPrice);
+    const list = [...data.data];
     list.sort((a, b) => {
       if (sortBy === 'price_asc') return Number(a.pricePerHour) - Number(b.pricePerHour);
       if (sortBy === 'price_desc') return Number(b.pricePerHour) - Number(a.pricePerHour);
@@ -48,7 +66,7 @@ export default function CourtsPage() {
       return 0;
     });
     return { ...data, data: list };
-  }, [data, maxPrice, sortBy]);
+  }, [data, sortBy]);
 
   const handleFilterChange = useCallback(
     (filters: {
@@ -58,7 +76,9 @@ export default function CourtsPage() {
       courtType?: CourtType;
       featureIds: string[];
       maxPrice: number;
-      availableOnly: boolean;
+      minPlayers?: number;
+      maxPlayers?: number;
+      availableToday: boolean;
       sortBy: CourtsSort;
     }) => {
       setName(filters.name);
@@ -67,6 +87,9 @@ export default function CourtsPage() {
       setCourtType(filters.courtType);
       setFeatureIds(filters.featureIds);
       setMaxPrice(filters.maxPrice);
+      setMinPlayers(filters.minPlayers);
+      setMaxPlayers(filters.maxPlayers);
+      setAvailableToday(filters.availableToday);
       setSortBy(filters.sortBy);
       setPage(1);
     },
@@ -81,8 +104,22 @@ export default function CourtsPage() {
       !!courtType ||
       featureIds.length > 0 ||
       maxPrice < 1000000 ||
+      minPlayers !== undefined ||
+      maxPlayers !== undefined ||
+      availableToday ||
       sortBy !== 'popular',
-    [name, districts, sportTypeIds, courtType, featureIds, maxPrice, sortBy],
+    [
+      name,
+      districts,
+      sportTypeIds,
+      courtType,
+      featureIds,
+      maxPrice,
+      minPlayers,
+      maxPlayers,
+      availableToday,
+      sortBy,
+    ],
   );
 
   return (
