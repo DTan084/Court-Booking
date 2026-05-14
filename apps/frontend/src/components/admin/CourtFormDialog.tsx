@@ -9,8 +9,10 @@ import ReactMarkdown from 'react-markdown';
 import { CourtStatus, CourtType } from '@court-booking/shared';
 import { Button } from '@/components/ui/button';
 import { useCreateCourt, useSyncCourtFeatures, useUpdateCourt } from '@/hooks/useAdminCourts';
+import { useCourt } from '@/hooks/useCourt';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useSportTypes } from '@/hooks/useSportTypes';
+import { resolveFeatureIcon } from '@/lib/feature-icons';
 import type { Court } from '@/types';
 
 const courtSchema = z.object({
@@ -39,6 +41,10 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
   const { mutateAsync: syncCourtFeatures } = useSyncCourtFeatures();
   const { data: sportTypes = [] } = useSportTypes();
   const { data: features = [] } = useFeatures();
+  const { data: courtDetail } = useCourt(
+    court?.id ?? '',
+    open && mode === 'edit' && Boolean(court?.id),
+  );
 
   const isPending = isCreating || isUpdating;
   const [preview, setPreview] = useState(false);
@@ -68,20 +74,21 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
 
   const featureIds = watch('featureIds') ?? [];
   const description = watch('description') ?? '';
+  const editingCourt = mode === 'edit' ? (courtDetail ?? court) : undefined;
 
   useEffect(() => {
     if (!open) return;
 
-    if (court && mode === 'edit') {
+    if (editingCourt && mode === 'edit') {
       reset({
-        name: court.name,
-        sportTypeId: court.sportTypeId,
-        courtType: court.courtType,
-        address: court.address,
-        pricePerHour: Number(court.pricePerHour),
-        description: court.description ?? '',
-        featureIds: (court.featureItems ?? []).map((item) => item.id),
-        status: court.status,
+        name: editingCourt.name,
+        sportTypeId: editingCourt.sportTypeId,
+        courtType: editingCourt.courtType,
+        address: editingCourt.address,
+        pricePerHour: Number(editingCourt.pricePerHour),
+        description: editingCourt.description ?? '',
+        featureIds: (editingCourt.featureItems ?? []).map((item) => item.id),
+        status: editingCourt.status,
       });
       return;
     }
@@ -96,7 +103,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
       featureIds: [],
       status: CourtStatus.ACTIVE,
     });
-  }, [open, court, mode, reset, defaultSportTypeId]);
+  }, [open, editingCourt, mode, reset, defaultSportTypeId]);
 
   const toggleFeature = (featureId: string) => {
     const next = featureIds.includes(featureId)
@@ -217,14 +224,16 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
             <div className="grid grid-cols-2 gap-2">
               {features.map((feature) => (
                 <label key={feature.id} className="flex items-center gap-2 text-sm">
+                  {(() => {
+                    const Icon = resolveFeatureIcon({ icon: feature.icon, name: feature.name });
+                    return Icon ? <Icon className="h-3.5 w-3.5 text-slate-500" /> : null;
+                  })()}
                   <input
                     type="checkbox"
                     checked={featureIds.includes(feature.id)}
                     onChange={() => toggleFeature(feature.id)}
                   />
-                  <span>
-                    {feature.icon ?? 'SPORT'} {feature.name}
-                  </span>
+                  <span>{feature.name}</span>
                 </label>
               ))}
             </div>
