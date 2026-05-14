@@ -1,4 +1,4 @@
-import { DataSource, DataSourceOptions } from 'typeorm';
+﻿import { DataSource, DataSourceOptions } from 'typeorm';
 import { UserEntity } from './entities/user.entity';
 import { CourtEntity } from './entities/court.entity';
 import { CourtTimeSlotEntity } from './entities/court-time-slot.entity';
@@ -10,6 +10,7 @@ import { FeatureEntity } from './entities/feature.entity';
 import { CourtFeatureEntity } from './entities/court-feature.entity';
 import { SlotTemplateEntity } from './entities/slot-template.entity';
 import { SlotTemplateItemEntity } from './entities/slot-template-item.entity';
+import { SystemSettingEntity } from './entities/system-setting.entity';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -36,6 +37,7 @@ export const dataSourceOptions: DataSourceOptions = {
     CourtFeatureEntity,
     SlotTemplateEntity,
     SlotTemplateItemEntity,
+    SystemSettingEntity,
     path.join(__dirname, 'entities/notification.entity{.ts,.js}'),
   ],
   // Use .js in production (compiled), .ts in development

@@ -1,4 +1,4 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -68,7 +68,7 @@ export class CourtEntity {
   @Column({ type: 'integer', name: 'max_players', nullable: true })
   maxPlayers: number | null;
 
-  @DeleteDateColumn({ name: 'deleted_at' })
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt: Date | null;
 
   @OneToMany(() => BookingEntity, (booking) => booking.court)
@@ -77,9 +77,9 @@ export class CourtEntity {
   @OneToMany(() => CourtTimeSlotEntity, (slot) => slot.court, { cascade: true })
   timeSlots: CourtTimeSlotEntity[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

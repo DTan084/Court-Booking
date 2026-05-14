@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+﻿import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('court_features')
 @Index(['courtId', 'featureId'], { unique: true })
@@ -12,6 +12,6 @@ export class CourtFeatureEntity {
   @Column({ type: 'uuid', name: 'feature_id' })
   featureId: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

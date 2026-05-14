@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+﻿import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('sport_types')
 export class SportTypeEntity {
@@ -20,6 +20,6 @@ export class SportTypeEntity {
   @Column({ type: 'integer', name: 'display_order', default: 0 })
   displayOrder: number;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

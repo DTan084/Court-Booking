@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
@@ -26,6 +26,7 @@ import { FeatureEntity } from './database/entities/feature.entity';
 import { CourtFeatureEntity } from './database/entities/court-feature.entity';
 import { SlotTemplateEntity } from './database/entities/slot-template.entity';
 import { SlotTemplateItemEntity } from './database/entities/slot-template-item.entity';
+import { SystemSettingEntity } from './database/entities/system-setting.entity';
 import { RedisModule } from './common/redis/redis.module';
 import { winstonConfig } from './config/winston.config';
 import { SportTypesModule } from './modules/sport-types/sport-types.module';
@@ -63,6 +64,7 @@ import { SlotTemplatesModule } from './modules/slot-templates/slot-templates.mod
           CourtFeatureEntity,
           SlotTemplateEntity,
           SlotTemplateItemEntity,
+          SystemSettingEntity,
         ],
         synchronize: configService.get<boolean>('database.synchronize', false),
         logging: configService.get<boolean>('database.logging', false),
