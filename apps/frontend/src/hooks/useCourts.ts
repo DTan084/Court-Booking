@@ -11,6 +11,11 @@ export interface GetCourtsParams {
   featureIds?: string[];
   district?: string[];
   location?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minPlayers?: number;
+  maxPlayers?: number;
+  availableToday?: boolean;
   [key: string]: unknown;
 }
 
