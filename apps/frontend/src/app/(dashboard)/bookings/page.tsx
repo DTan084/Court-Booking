@@ -34,7 +34,21 @@ type VenueStat = {
 
 function BookingsPageContent() {
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
-  const [showAllPastBookings, setShowAllPastBookings] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<{
+    live: boolean;
+    past: boolean;
+    pending: boolean;
+    completed: boolean;
+    cancelled: boolean;
+    venues: boolean;
+  }>({
+    live: false,
+    past: false,
+    pending: false,
+    completed: false,
+    cancelled: false,
+    venues: false,
+  });
   const [status, setStatus] = useState<BookingStatus | undefined>(undefined);
   const [statusGroup, setStatusGroup] = useState<'failed' | undefined>(undefined);
   const [fromDate, setFromDate] = useState<string | undefined>(undefined);
@@ -107,10 +121,13 @@ function BookingsPageContent() {
       booking.status === BookingStatus.EXPIRED;
     return isTerminal || new Date(booking.endTime) < now;
   });
-  const PAST_BOOKINGS_PREVIEW_COUNT = 5;
-  const pastBookingsToShow = showAllPastBookings
+  const PREVIEW_COUNT = 5;
+  const pastBookingsToShow = expandedSections.past
     ? pastBookings
-    : pastBookings.slice(0, PAST_BOOKINGS_PREVIEW_COUNT);
+    : pastBookings.slice(0, PREVIEW_COUNT);
+  const liveAndUpcomingToShow = expandedSections.live
+    ? liveAndUpcoming
+    : liveAndUpcoming.slice(0, PREVIEW_COUNT);
 
   const allBookings = (allBookingsData?.data ?? []) as BookingWithCourt[];
   const paidPastBookings = allBookings.filter((booking) => {
@@ -152,6 +169,10 @@ function BookingsPageContent() {
   const pastVenues = Object.values(pastVenueStats).sort(
     (a, b) => new Date(b.lastPlayedAt).getTime() - new Date(a.lastPlayedAt).getTime(),
   );
+  const VENUES_PREVIEW_COUNT = 3;
+  const pastVenuesToShow = expandedSections.venues
+    ? pastVenues
+    : pastVenues.slice(0, VENUES_PREVIEW_COUNT);
 
   const renderCompactPastList = (list: BookingWithCourt[]) => (
     <div className="space-y-4">
@@ -285,6 +306,127 @@ function BookingsPageContent() {
     </div>
   );
 
+  const renderBookingRowPreview = (
+    list: BookingWithCourt[],
+    section: 'pending' | 'completed' | 'cancelled',
+    viewAllLabel: string,
+  ) => {
+    const visible = expandedSections[section] ? list : list.slice(0, PREVIEW_COUNT);
+    return (
+      <>
+        <div className="space-y-4">
+          {visible.map((booking) => (
+            <BookingRow
+              key={booking.id}
+              booking={booking}
+              isHighlighted={highlightedId === booking.id}
+            />
+          ))}
+        </div>
+        {!expandedSections[section] && list.length > PREVIEW_COUNT && (
+          <div className="pt-2 text-center">
+            <button
+              onClick={() => setExpandedSections((prev) => ({ ...prev, [section]: true }))}
+              className="text-xs font-semibold text-slate-500 transition-colors hover:text-orange-600"
+            >
+              View All {list.length} {viewAllLabel}
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderPastVenuesSection = ({
+    title = 'Past Venues',
+    titleClassName = 'text-lg font-bold text-slate-900',
+    showCount = false,
+  }: {
+    title?: string;
+    titleClassName?: string;
+    showCount?: boolean;
+  } = {}) => (
+    <section className="space-y-4 pt-6">
+      <div className="flex items-center justify-between">
+        <h3 className={titleClassName}>{title}</h3>
+        {showCount && (
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            {pastVenues.length} venues
+          </span>
+        )}
+      </div>
+      {pastVenues.length > 0 ? (
+        <>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {pastVenuesToShow.map((venue) => (
+              <article
+                key={venue.courtId}
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
+              >
+                <div className="relative h-40">
+                  {venue.imageUrl ? (
+                    <Image
+                      src={venue.imageUrl}
+                      alt={venue.courtName}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-slate-200" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute bottom-4 left-4 text-white">
+                    <h4 className="font-bold">{venue.courtName}</h4>
+                    <p className="text-xs opacity-85">
+                      Last played: {new Date(venue.lastPlayedAt).toLocaleDateString('vi-VN')}
+                    </p>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <p className="mb-3 flex items-start gap-2 text-sm text-slate-500">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{venue.address}</span>
+                  </p>
+                  <div className="mb-4 flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      {venue.totalBookings} bookings
+                    </p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {formatCurrency(venue.totalSpent)}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => window.location.assign(`/courts/${venue.courtId}`)}
+                    className="w-full bg-slate-50 text-slate-700 hover:bg-orange-600 hover:text-white"
+                    variant="outline"
+                  >
+                    Book Again
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+          {!expandedSections.venues && pastVenues.length > VENUES_PREVIEW_COUNT && (
+            <div className="pt-2 text-center">
+              <button
+                onClick={() => setExpandedSections((prev) => ({ ...prev, venues: true }))}
+                className="text-xs font-semibold text-slate-500 transition-colors hover:text-orange-600"
+              >
+                View All {pastVenues.length} Past Entries
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <EmptyState
+          title="Chưa có sân đã chơi"
+          description="Venue đã chơi sẽ xuất hiện sau khi có booking quá khứ."
+        />
+      )}
+    </section>
+  );
+
   return (
     <UserAccountShell
       title="My Bookings"
@@ -318,15 +460,27 @@ function BookingsPageContent() {
                     </span>
                   </div>
                   {liveAndUpcoming.length > 0 ? (
-                    <div className="space-y-4">
-                      {liveAndUpcoming.map((booking) => (
-                        <BookingRow
-                          key={booking.id}
-                          booking={booking}
-                          isHighlighted={highlightedId === booking.id}
-                        />
-                      ))}
-                    </div>
+                    <>
+                      <div className="space-y-4">
+                        {liveAndUpcomingToShow.map((booking) => (
+                          <BookingRow
+                            key={booking.id}
+                            booking={booking}
+                            isHighlighted={highlightedId === booking.id}
+                          />
+                        ))}
+                      </div>
+                      {!expandedSections.live && liveAndUpcoming.length > PREVIEW_COUNT && (
+                        <div className="pt-2 text-center">
+                          <button
+                            onClick={() => setExpandedSections((prev) => ({ ...prev, live: true }))}
+                            className="text-xs font-semibold text-slate-500 transition-colors hover:text-orange-600"
+                          >
+                            View All {liveAndUpcoming.length} Live & Upcoming Entries
+                          </button>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <EmptyState
                       title="Không có lịch sắp tới"
@@ -345,90 +499,21 @@ function BookingsPageContent() {
                   {pastBookings.length > 0 ? (
                     <>
                       {renderCompactPastList(pastBookingsToShow)}
-                      {!showAllPastBookings &&
-                        pastBookings.length > PAST_BOOKINGS_PREVIEW_COUNT && (
-                          <div className="pt-2 text-center">
-                            <button
-                              onClick={() => setShowAllPastBookings(true)}
-                              className="text-xs font-semibold text-slate-500 transition-colors hover:text-orange-600"
-                            >
-                              View All {pastBookings.length - PAST_BOOKINGS_PREVIEW_COUNT} More Past
-                              Entries
-                            </button>
-                          </div>
-                        )}
+                      {!expandedSections.past && pastBookings.length > PREVIEW_COUNT && (
+                        <div className="pt-2 text-center">
+                          <button
+                            onClick={() => setExpandedSections((prev) => ({ ...prev, past: true }))}
+                            className="text-xs font-semibold text-slate-500 transition-colors hover:text-orange-600"
+                          >
+                            View All {pastBookings.length} Past Entries
+                          </button>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <EmptyState
                       title="Chưa có lịch sử"
                       description="Các booking đã kết thúc/hủy/hết hạn sẽ hiển thị ở đây."
-                    />
-                  )}
-                </section>
-
-                <section className="space-y-4 pt-6">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-bold text-slate-900">Past Venues</h2>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      {pastVenues.length} venues
-                    </span>
-                  </div>
-                  {pastVenues.length > 0 ? (
-                    <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                      {pastVenues.map((venue) => (
-                        <article
-                          key={venue.courtId}
-                          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
-                        >
-                          <div className="relative h-40">
-                            {venue.imageUrl ? (
-                              <Image
-                                src={venue.imageUrl}
-                                alt={venue.courtName}
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                              />
-                            ) : (
-                              <div className="h-full w-full bg-slate-200" />
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                            <div className="absolute bottom-4 left-4 text-white">
-                              <h4 className="font-bold">{venue.courtName}</h4>
-                              <p className="text-xs opacity-85">
-                                Last played:{' '}
-                                {new Date(venue.lastPlayedAt).toLocaleDateString('vi-VN')}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="p-5">
-                            <p className="mb-3 flex items-start gap-2 text-sm text-slate-500">
-                              <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                              <span>{venue.address}</span>
-                            </p>
-                            <div className="mb-4 flex items-center justify-between">
-                              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                {venue.totalBookings} bookings
-                              </p>
-                              <p className="text-sm font-semibold text-slate-900">
-                                {formatCurrency(venue.totalSpent)}
-                              </p>
-                            </div>
-                            <Button
-                              onClick={() => window.location.assign(`/courts/${venue.courtId}`)}
-                              className="w-full bg-slate-50 text-slate-700 hover:bg-orange-600 hover:text-white"
-                              variant="outline"
-                            >
-                              Book Again
-                            </Button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      title="Chưa có sân đã chơi"
-                      description="Venue đã chơi sẽ xuất hiện sau khi có booking quá khứ."
                     />
                   )}
                 </section>
@@ -449,15 +534,7 @@ function BookingsPageContent() {
                 </div>
                 {activeTab === 'pending' ? (
                   bookings.length > 0 ? (
-                    <div className="space-y-4">
-                      {bookings.map((booking) => (
-                        <BookingRow
-                          key={booking.id}
-                          booking={booking}
-                          isHighlighted={highlightedId === booking.id}
-                        />
-                      ))}
-                    </div>
+                    renderBookingRowPreview(bookings, 'pending', 'Pending Entries')
                   ) : (
                     <EmptyState
                       title="Không có booking chờ thanh toán"
@@ -471,15 +548,13 @@ function BookingsPageContent() {
                 ) : (
                   <>
                     {bookings.length > 0 ? (
-                      <div className="space-y-4">
-                        {bookings.map((booking) => (
-                          <BookingRow
-                            key={booking.id}
-                            booking={booking}
-                            isHighlighted={highlightedId === booking.id}
-                          />
-                        ))}
-                      </div>
+                      renderBookingRowPreview(
+                        bookings,
+                        activeTab === 'completed' ? 'completed' : 'cancelled',
+                        activeTab === 'completed'
+                          ? 'Completed Entries'
+                          : 'Cancelled / Expired Entries',
+                      )
                     ) : (
                       <EmptyState
                         title={
@@ -494,134 +569,17 @@ function BookingsPageContent() {
                         }}
                       />
                     )}
-                    <section className="space-y-4 pt-6">
-                      <h3 className="text-lg font-bold text-slate-900">Past Venues</h3>
-                      {pastVenues.length > 0 ? (
-                        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                          {pastVenues.map((venue) => (
-                            <article
-                              key={venue.courtId}
-                              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
-                            >
-                              <div className="relative h-40">
-                                {venue.imageUrl ? (
-                                  <Image
-                                    src={venue.imageUrl}
-                                    alt={venue.courtName}
-                                    fill
-                                    className="object-cover"
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                                  />
-                                ) : (
-                                  <div className="h-full w-full bg-slate-200" />
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                <div className="absolute bottom-4 left-4 text-white">
-                                  <h4 className="font-bold">{venue.courtName}</h4>
-                                  <p className="text-xs opacity-85">
-                                    Last played:{' '}
-                                    {new Date(venue.lastPlayedAt).toLocaleDateString('vi-VN')}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="p-5">
-                                <p className="mb-3 flex items-start gap-2 text-sm text-slate-500">
-                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                                  <span>{venue.address}</span>
-                                </p>
-                                <div className="mb-4 flex items-center justify-between">
-                                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                    {venue.totalBookings} bookings
-                                  </p>
-                                  <p className="text-sm font-semibold text-slate-900">
-                                    {formatCurrency(venue.totalSpent)}
-                                  </p>
-                                </div>
-                                <Button
-                                  onClick={() => window.location.assign(`/courts/${venue.courtId}`)}
-                                  className="w-full bg-slate-50 text-slate-700 hover:bg-orange-600 hover:text-white"
-                                  variant="outline"
-                                >
-                                  Book Again
-                                </Button>
-                              </div>
-                            </article>
-                          ))}
-                        </div>
-                      ) : (
-                        <EmptyState
-                          title="Chưa có sân đã chơi"
-                          description="Venue đã chơi sẽ xuất hiện sau khi có booking quá khứ."
-                        />
-                      )}
-                    </section>
                   </>
-                )}
-                {activeTab === 'pending' && (
-                  <section className="space-y-4 pt-6">
-                    <h3 className="text-lg font-bold text-slate-900">Past Venues</h3>
-                    {pastVenues.length > 0 ? (
-                      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                        {pastVenues.map((venue) => (
-                          <article
-                            key={venue.courtId}
-                            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
-                          >
-                            <div className="relative h-40">
-                              {venue.imageUrl ? (
-                                <Image
-                                  src={venue.imageUrl}
-                                  alt={venue.courtName}
-                                  fill
-                                  className="object-cover"
-                                  sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                                />
-                              ) : (
-                                <div className="h-full w-full bg-slate-200" />
-                              )}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                              <div className="absolute bottom-4 left-4 text-white">
-                                <h4 className="font-bold">{venue.courtName}</h4>
-                                <p className="text-xs opacity-85">
-                                  Last played:{' '}
-                                  {new Date(venue.lastPlayedAt).toLocaleDateString('vi-VN')}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="p-5">
-                              <p className="mb-3 flex items-start gap-2 text-sm text-slate-500">
-                                <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-                                <span>{venue.address}</span>
-                              </p>
-                              <div className="mb-4 flex items-center justify-between">
-                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                  {venue.totalBookings} bookings
-                                </p>
-                                <p className="text-sm font-semibold text-slate-900">
-                                  {formatCurrency(venue.totalSpent)}
-                                </p>
-                              </div>
-                              <Button
-                                onClick={() => window.location.assign(`/courts/${venue.courtId}`)}
-                                className="w-full bg-slate-50 text-slate-700 hover:bg-orange-600 hover:text-white"
-                                variant="outline"
-                              >
-                                Book Again
-                              </Button>
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    ) : (
-                      <EmptyState
-                        title="ChÆ°a cÃ³ sÃ¢n Ä‘Ã£ chÆ¡i"
-                        description="Venue Ä‘Ã£ chÆ¡i sáº½ xuáº¥t hiá»‡n sau khi cÃ³ booking quÃ¡ khá»©."
-                      />
-                    )}
-                  </section>
                 )}
               </section>
             )}
+            {renderPastVenuesSection({
+              titleClassName:
+                activeTab === 'all'
+                  ? 'text-xl font-bold text-slate-900'
+                  : 'text-lg font-bold text-slate-900',
+              showCount: activeTab === 'all',
+            })}
           </>
         )}
       </div>
