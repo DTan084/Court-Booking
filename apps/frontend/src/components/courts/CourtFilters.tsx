@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -19,9 +19,10 @@ interface CourtFiltersProps {
     sportTypeIds: string[];
     courtType?: CourtType;
     featureIds: string[];
+    minPrice: number;
     maxPrice: number;
-    minPlayers?: number;
-    maxPlayers?: number;
+    minPlayers: number;
+    maxPlayers: number;
     availableToday: boolean;
     sortBy: CourtsSort;
   }) => void;
@@ -29,24 +30,96 @@ interface CourtFiltersProps {
 }
 
 const courtTypeOptions: Array<{ value?: CourtType; label: string }> = [
-  { label: 'Tất cả' },
-  { value: CourtTypeEnum.INDOOR, label: 'Trong nhà' },
-  { value: CourtTypeEnum.OUTDOOR, label: 'Ngoài trời' },
+  { label: 'All' },
+  { value: CourtTypeEnum.INDOOR, label: 'Indoor' },
+  { value: CourtTypeEnum.OUTDOOR, label: 'Outdoor' },
 ];
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(value, max));
+}
+
+function parseDraftNumber(value: string): number | null {
+  if (value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function RangeSlider({
+  min,
+  max,
+  step,
+  lowerValue,
+  upperValue,
+  onLowerChange,
+  onUpperChange,
+}: {
+  min: number;
+  max: number;
+  step: number;
+  lowerValue: number;
+  upperValue: number;
+  onLowerChange: (value: number) => void;
+  onUpperChange: (value: number) => void;
+}) {
+  const minPercent = ((lowerValue - min) / (max - min)) * 100;
+  const maxPercent = ((upperValue - min) / (max - min)) * 100;
+
+  return (
+    <div className="relative mt-3 h-7">
+      <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-slate-200" />
+      <div
+        className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full bg-[#944a00]"
+        style={{
+          left: `${minPercent}%`,
+          right: `${100 - maxPercent}%`,
+        }}
+      />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={lowerValue}
+        onChange={(e) => onLowerChange(Number(e.target.value))}
+        className="pointer-events-none absolute inset-0 z-10 h-7 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[#944a00] [&::-webkit-slider-thumb]:bg-[#944a00] [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-[#944a00] [&::-moz-range-thumb]:bg-[#944a00] [&::-moz-range-thumb]:shadow-sm"
+      />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={upperValue}
+        onChange={(e) => onUpperChange(Number(e.target.value))}
+        className="pointer-events-none absolute inset-0 z-20 h-7 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[#944a00] [&::-webkit-slider-thumb]:bg-[#944a00] [&::-webkit-slider-thumb]:shadow-sm [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-[#944a00] [&::-moz-range-thumb]:bg-[#944a00] [&::-moz-range-thumb]:shadow-sm"
+      />
+    </div>
+  );
+}
 
 export function CourtFilters({
   districtOptions = [],
   onFilterChange,
   children,
 }: CourtFiltersProps) {
+  const PRICE_MIN = 50000;
+  const PRICE_MAX = 1000000;
+  const PLAYERS_MIN = 1;
+  const PLAYERS_MAX = 20;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [districts, setDistricts] = useState<string[]>([]);
   const [sportTypeIds, setSportTypeIds] = useState<string[]>([]);
   const [courtType, setCourtType] = useState<CourtType | undefined>(undefined);
   const [featureIds, setFeatureIds] = useState<string[]>([]);
-  const [maxPrice, setMaxPrice] = useState(1000000);
-  const [minPlayers, setMinPlayers] = useState<number | undefined>(undefined);
-  const [maxPlayers, setMaxPlayers] = useState<number | undefined>(undefined);
+  const [minPrice, setMinPrice] = useState(PRICE_MIN);
+  const [maxPrice, setMaxPrice] = useState(PRICE_MAX);
+  const [minPlayers, setMinPlayers] = useState(PLAYERS_MIN);
+  const [maxPlayers, setMaxPlayers] = useState(PLAYERS_MAX);
+  const [minPriceInput, setMinPriceInput] = useState(String(PRICE_MIN));
+  const [maxPriceInput, setMaxPriceInput] = useState(String(PRICE_MAX));
+  const [minPlayersInput, setMinPlayersInput] = useState(String(PLAYERS_MIN));
+  const [maxPlayersInput, setMaxPlayersInput] = useState(String(PLAYERS_MAX));
   const [availableToday, setAvailableToday] = useState(false);
   const [sortBy, setSortBy] = useState<CourtsSort>('popular');
   const [districtOpen, setDistrictOpen] = useState(false);
@@ -63,6 +136,7 @@ export function CourtFilters({
         sportTypeIds,
         courtType,
         featureIds,
+        minPrice,
         maxPrice,
         minPlayers,
         maxPlayers,
@@ -77,6 +151,7 @@ export function CourtFilters({
     sportTypeIds,
     courtType,
     featureIds,
+    minPrice,
     maxPrice,
     minPlayers,
     maxPlayers,
@@ -104,9 +179,14 @@ export function CourtFilters({
     setSportTypeIds([]);
     setCourtType(undefined);
     setFeatureIds([]);
-    setMaxPrice(1000000);
-    setMinPlayers(undefined);
-    setMaxPlayers(undefined);
+    setMinPrice(PRICE_MIN);
+    setMaxPrice(PRICE_MAX);
+    setMinPlayers(PLAYERS_MIN);
+    setMaxPlayers(PLAYERS_MAX);
+    setMinPriceInput(String(PRICE_MIN));
+    setMaxPriceInput(String(PRICE_MAX));
+    setMinPlayersInput(String(PLAYERS_MIN));
+    setMaxPlayersInput(String(PLAYERS_MAX));
     setAvailableToday(false);
     setSortBy('popular');
   };
@@ -204,7 +284,7 @@ export function CourtFilters({
               onClick={() => setFeatureOpen((v) => !v)}
               className="mb-3 flex w-full items-center justify-between text-left text-xs font-bold uppercase tracking-wider text-slate-500"
             >
-              Tiện ích{' '}
+              Amenities{' '}
               <ChevronDown className={`h-4 w-4 transition ${featureOpen ? 'rotate-180' : ''}`} />
             </button>
             {featureOpen && (
@@ -253,45 +333,134 @@ export function CourtFilters({
             <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
               Price Per Hour
             </h4>
-            <input
-              type="range"
-              min={50000}
-              max={1000000}
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+              <input
+                type="text"
+                min={PRICE_MIN}
+                max={PRICE_MAX}
+                step={10000}
+                inputMode="numeric"
+                value={minPriceInput}
+                onChange={(e) => {
+                  setMinPriceInput(e.target.value.replace(/[^\d]/g, ''));
+                }}
+                onBlur={() => {
+                  const parsed = parseDraftNumber(minPriceInput);
+                  const next = clamp(parsed ?? PRICE_MIN, PRICE_MIN, PRICE_MAX);
+                  const applied = Math.min(next, maxPrice);
+                  setMinPrice(applied);
+                  setMinPriceInput(String(applied));
+                }}
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-right text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <span className="text-sm text-slate-400">-</span>
+              <input
+                type="text"
+                min={PRICE_MIN}
+                max={PRICE_MAX}
+                step={10000}
+                inputMode="numeric"
+                value={maxPriceInput}
+                onChange={(e) => {
+                  setMaxPriceInput(e.target.value.replace(/[^\d]/g, ''));
+                }}
+                onBlur={() => {
+                  const parsed = parseDraftNumber(maxPriceInput);
+                  const next = clamp(parsed ?? PRICE_MAX, PRICE_MIN, PRICE_MAX);
+                  const applied = Math.max(next, minPrice);
+                  setMaxPrice(applied);
+                  setMaxPriceInput(String(applied));
+                }}
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-right text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+            </div>
+            <RangeSlider
+              min={PRICE_MIN}
+              max={PRICE_MAX}
               step={10000}
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
-              className="w-full accent-[#944a00]"
+              lowerValue={minPrice}
+              upperValue={maxPrice}
+              onLowerChange={(next) => {
+                const applied = Math.min(next, maxPrice);
+                setMinPrice(applied);
+                setMinPriceInput(String(applied));
+              }}
+              onUpperChange={(next) => {
+                const applied = Math.max(next, minPrice);
+                setMaxPrice(applied);
+                setMaxPriceInput(String(applied));
+              }}
             />
-            <div className="mt-2 flex justify-between text-xs text-slate-500">
-              <span>50,000</span>
-              <span>{maxPrice.toLocaleString('vi-VN')}</span>
+            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+              <span>{minPrice.toLocaleString('vi-VN')} VND</span>
+              <span>{maxPrice.toLocaleString('vi-VN')} VND</span>
             </div>
           </div>
           <div className="mb-6 border-t border-slate-100 pt-5">
             <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
               Players Capacity
             </h4>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="number"
-                min={1}
-                placeholder="Min"
-                value={minPlayers ?? ''}
-                onChange={(e) =>
-                  setMinPlayers(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
-                }
-                className="h-10 rounded-lg border-slate-300 bg-[#f8f9ff]"
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+              <input
+                type="text"
+                min={PLAYERS_MIN}
+                max={PLAYERS_MAX}
+                step={1}
+                inputMode="numeric"
+                value={minPlayersInput}
+                onChange={(e) => {
+                  setMinPlayersInput(e.target.value.replace(/[^\d]/g, ''));
+                }}
+                onBlur={() => {
+                  const parsed = parseDraftNumber(minPlayersInput);
+                  const next = clamp(parsed ?? PLAYERS_MIN, PLAYERS_MIN, PLAYERS_MAX);
+                  const applied = Math.min(next, maxPlayers);
+                  setMinPlayers(applied);
+                  setMinPlayersInput(String(applied));
+                }}
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-right text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
-              <Input
-                type="number"
-                min={1}
-                placeholder="Max"
-                value={maxPlayers ?? ''}
-                onChange={(e) =>
-                  setMaxPlayers(e.target.value ? Number.parseInt(e.target.value, 10) : undefined)
-                }
-                className="h-10 rounded-lg border-slate-300 bg-[#f8f9ff]"
+              <span className="text-sm text-slate-400">-</span>
+              <input
+                type="text"
+                min={PLAYERS_MIN}
+                max={PLAYERS_MAX}
+                step={1}
+                inputMode="numeric"
+                value={maxPlayersInput}
+                onChange={(e) => {
+                  setMaxPlayersInput(e.target.value.replace(/[^\d]/g, ''));
+                }}
+                onBlur={() => {
+                  const parsed = parseDraftNumber(maxPlayersInput);
+                  const next = clamp(parsed ?? PLAYERS_MAX, PLAYERS_MIN, PLAYERS_MAX);
+                  const applied = Math.max(next, minPlayers);
+                  setMaxPlayers(applied);
+                  setMaxPlayersInput(String(applied));
+                }}
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-300 px-3 text-right text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
+            </div>
+            <RangeSlider
+              min={PLAYERS_MIN}
+              max={PLAYERS_MAX}
+              step={1}
+              lowerValue={minPlayers}
+              upperValue={maxPlayers}
+              onLowerChange={(next) => {
+                const applied = Math.min(next, maxPlayers);
+                setMinPlayers(applied);
+                setMinPlayersInput(String(applied));
+              }}
+              onUpperChange={(next) => {
+                const applied = Math.max(next, minPlayers);
+                setMaxPlayers(applied);
+                setMaxPlayersInput(String(applied));
+              }}
+            />
+            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+              <span>{minPlayers}</span>
+              <span>{maxPlayers}</span>
             </div>
           </div>
           <div className="border-t border-slate-100 pt-5">
