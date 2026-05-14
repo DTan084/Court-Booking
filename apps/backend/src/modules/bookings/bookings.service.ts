@@ -300,11 +300,20 @@ export class BookingsService {
         throw new ConflictException('Booking is already cancelled');
       }
 
-      if (booking.status !== BookingStatus.CONFIRMED) {
-        throw new BadRequestException('Only confirmed bookings can be cancelled');
+      const now = new Date();
+
+      if (booking.status === BookingStatus.PENDING_PAYMENT) {
+        booking.status = BookingStatus.CANCELLED;
+        booking.cancelledAt = now;
+        booking.cancelledBy = CancelledBy.USER;
+        return manager.save(booking);
       }
 
-      const now = new Date();
+      if (booking.status !== BookingStatus.CONFIRMED) {
+        throw new BadRequestException(
+          'Only pending payment or confirmed bookings can be cancelled',
+        );
+      }
 
       // REQ-19.3: Rule A — must cancel within 24h of creation
       const hoursSinceCreated = differenceInHours(now, booking.createdAt);
@@ -345,12 +354,13 @@ export class BookingsService {
   }
 
   async findMyBookings(userId: string, query: GetMyBookingsDto) {
-    const { page, limit, status, fromDate, toDate } = query;
+    const { page, limit, status, statusGroup, fromDate, toDate } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.court', 'court')
+      .leftJoinAndSelect('court.images', 'courtImages')
       .where('booking.userId = :userId', { userId })
       .orderBy('booking.startTime', 'DESC')
       .skip(skip)
@@ -358,6 +368,10 @@ export class BookingsService {
 
     if (status) {
       queryBuilder.andWhere('booking.status = :status', { status });
+    } else if (statusGroup === 'failed') {
+      queryBuilder.andWhere('booking.status IN (:...failedStatuses)', {
+        failedStatuses: [BookingStatus.CANCELLED, BookingStatus.EXPIRED],
+      });
     }
 
     if (fromDate) {
@@ -402,7 +416,7 @@ export class BookingsService {
   ): Promise<BookingEntity & { cancellationDeadline: string; latestCancellableTime: string }> {
     const booking = await this.bookingRepository.findOne({
       where: { id, userId },
-      relations: ['court'],
+      relations: ['court', 'court.images'],
     });
 
     if (!booking) throw new NotFoundException('Booking not found');

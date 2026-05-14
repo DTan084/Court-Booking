@@ -190,6 +190,29 @@ describe('BookingsService', () => {
       );
     });
 
+    it('should cancel pending payment booking immediately', async () => {
+      const booking = {
+        id: mockBookingId,
+        userId: mockUserId,
+        status: BookingStatus.PENDING_PAYMENT,
+        startTime: new Date(),
+        createdAt: new Date(),
+      };
+
+      dataSource.transaction.mockImplementation(async (cb) => {
+        const mockManager = {
+          findOne: jest.fn().mockResolvedValue(booking),
+          save: jest.fn().mockResolvedValue({ ...booking, status: BookingStatus.CANCELLED }),
+        };
+        return cb(mockManager);
+      });
+
+      const result = await service.cancelBooking(mockBookingId, mockUserId);
+
+      expect(result.status).toBe(BookingStatus.CANCELLED);
+      expect(dataSource.transaction).toHaveBeenCalled();
+    });
+
     it('should cancel the booking if all conditions are met', async () => {
       const startTime = new Date();
       startTime.setHours(startTime.getHours() + 15); // 15 hours away (valid, > 12h)

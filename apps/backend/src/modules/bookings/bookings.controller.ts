@@ -102,6 +102,12 @@ export class BookingsController {
     required: false,
     enum: ['PENDING_PAYMENT', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'EXPIRED'],
   })
+  @ApiQuery({
+    name: 'statusGroup',
+    required: false,
+    enum: ['failed'],
+    description: 'failed = CANCELLED + EXPIRED',
+  })
   @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'ISO 8601 date' })
   @ApiQuery({ name: 'toDate', required: false, type: String, description: 'ISO 8601 date' })
   @ApiResponse({ status: 200, description: 'Paginated booking history', type: MyBookingsResponse })
