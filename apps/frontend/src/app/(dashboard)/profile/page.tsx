@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import { ProfileClient } from './profile-client';
+import { UserAccountShell } from '@/components/account/UserAccountShell';
 
 export const metadata: Metadata = {
   title: 'Hồ sơ cá nhân | Court Booking',
@@ -8,8 +9,8 @@ export const metadata: Metadata = {
 
 export default function ProfilePage() {
   return (
-    <div className="container py-10">
+    <UserAccountShell title="Personal" subtitle="Manage your personal information and account.">
       <ProfileClient />
-    </div>
+    </UserAccountShell>
   );
 }

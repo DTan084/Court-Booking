@@ -17,6 +17,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const hasFetched = useRef(false);
   const isCheckoutRoute = pathname.startsWith('/checkout/');
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
+  const isAccountRoute = pathname === '/profile' || pathname.startsWith('/bookings');
 
   useEffect(() => {
     // Skip if already have user or already attempted
@@ -40,7 +41,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className={isCheckoutRoute || isAdminRoute ? 'w-full' : 'container py-6'}>
+      <main
+        className={isCheckoutRoute || isAdminRoute || isAccountRoute ? 'w-full' : 'container py-6'}
+      >
         {children}
       </main>
       <SiteFooter />
