@@ -216,7 +216,7 @@ export function ProfileClient() {
                 {isProfileLocked && nextProfileUpdateAt ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                     Ban da cap nhat gan day. Co the cap nhat lai sau:{' '}
-                    {nextProfileUpdateAt.toLocaleString()}
+                    {nextProfileUpdateAt.toLocaleString('vi-VN')}
                   </div>
                 ) : null}
                 <fieldset

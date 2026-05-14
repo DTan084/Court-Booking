@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import { Bell, Loader2 } from 'lucide-react';
@@ -18,6 +18,7 @@ import {
   useMarkAllNotificationsAsRead,
 } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
+import { formatDateTimeByTimezone } from '@/lib/datetime';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
@@ -32,10 +33,9 @@ export function NotificationBell() {
 
   const [prevUnreadCount, setPrevUnreadCount] = React.useState(0);
 
-  // REQ-24.8: Show toast when new notification arrives
   React.useEffect(() => {
     if (unreadCount > prevUnreadCount) {
-      toast('Bạn có thông báo mới', {
+      toast('Ban co thong bao moi', {
         icon: <Bell className="h-4 w-4 text-primary" />,
       });
     }
@@ -76,7 +76,7 @@ export function NotificationBell() {
       >
         <DropdownMenuLabel className="p-4 bg-muted/30 backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-bold">Thông báo</span>
+            <span className="text-sm font-bold">Thong bao</span>
             {unreadCount > 0 && (
               <Button
                 variant="ghost"
@@ -84,7 +84,7 @@ export function NotificationBell() {
                 className="h-auto p-0 text-xs text-primary hover:bg-transparent font-semibold"
                 onClick={() => markAllAsRead()}
               >
-                Đánh dấu tất cả đã đọc
+                Danh dau tat ca da doc
               </Button>
             )}
           </div>
@@ -124,6 +124,8 @@ export function NotificationBell() {
                     addSuffix: true,
                     locale: vi,
                   })}
+                  {' · '}
+                  {formatDateTimeByTimezone(notification.createdAt, 'Asia/Ho_Chi_Minh', 'vi-VN')}
                 </span>
               </DropdownMenuItem>
             ))
@@ -133,7 +135,7 @@ export function NotificationBell() {
                 <Bell size={24} />
               </div>
               <p className="text-sm font-medium text-muted-foreground">
-                Bạn không có thông báo nào
+                Ban khong co thong bao nao
               </p>
             </div>
           )}

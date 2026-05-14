@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { vi } from 'date-fns/locale';
 import Image from 'next/image';
 import {
   AlertTriangle,
@@ -22,6 +21,7 @@ import { CountdownTimer } from '@/components/bookings/countdown-timer';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/auth';
 import { calculateBookingPrice, formatCurrency } from '@/lib/utils';
+import { formatDateByTimezone, formatTimeByTimezone } from '@/lib/datetime';
 
 interface CheckoutClientProps {
   bookingId: string;
@@ -103,6 +103,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const [cardNumber, setCardNumber] = React.useState('');
   const [expiry, setExpiry] = React.useState('');
   const [cvv, setCvv] = React.useState('');
+  const timezone = 'Asia/Ho_Chi_Minh';
+  const locale = 'vi-VN';
 
   const {
     data: booking,
@@ -134,6 +136,15 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
 
     return daySlots.filter((slot) => slot.startHour >= startHour && slot.endHour <= endHour);
   }, [booking, timeSlots]);
+
+  const selectedSlotStartHour =
+    bookingDaySlots.length > 0 ? Math.min(...bookingDaySlots.map((slot) => slot.startHour)) : null;
+  const selectedSlotEndHour =
+    bookingDaySlots.length > 0 ? Math.max(...bookingDaySlots.map((slot) => slot.endHour)) : null;
+  const slotTimeRangeLabel =
+    selectedSlotStartHour !== null && selectedSlotEndHour !== null
+      ? `${String(selectedSlotStartHour).padStart(2, '0')}:00 - ${String(selectedSlotEndHour).padStart(2, '0')}:00`
+      : null;
 
   if (isLoading) {
     return (
@@ -219,14 +230,16 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                       <div>
                         <p className="text-xs uppercase text-slate-500 mb-1">Date</p>
                         <p className="text-lg font-semibold">
-                          {format(new Date(booking.startTime), 'EEEE, dd/MM/yyyy', { locale: vi })}
+                          {formatDateByTimezone(new Date(booking.startTime), timezone, locale, {
+                            weekday: 'long',
+                          })}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs uppercase text-slate-500 mb-1">Time</p>
                         <p className="text-lg font-semibold">
-                          {format(new Date(booking.startTime), 'HH:mm')} -{' '}
-                          {format(new Date(booking.endTime), 'HH:mm')}
+                          {slotTimeRangeLabel ||
+                            `${formatTimeByTimezone(new Date(booking.startTime), timezone, locale)} - ${formatTimeByTimezone(new Date(booking.endTime), timezone, locale)}`}
                         </p>
                       </div>
                     </div>
@@ -410,14 +423,14 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                       <div className="flex flex-col">
                         <span className="text-xs text-slate-500 mb-2">DATE</span>
                         <span className="text-lg text-slate-900 font-bold">
-                          {format(new Date(booking.startTime), 'dd/MM/yyyy')}
+                          {formatDateByTimezone(new Date(booking.startTime), timezone, locale)}
                         </span>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-xs text-slate-500 mb-2">TIME</span>
                         <span className="text-lg text-slate-900 font-bold">
-                          {format(new Date(booking.startTime), 'HH:mm')} -{' '}
-                          {format(new Date(booking.endTime), 'HH:mm')}
+                          {slotTimeRangeLabel ||
+                            `${formatTimeByTimezone(new Date(booking.startTime), timezone, locale)} - ${formatTimeByTimezone(new Date(booking.endTime), timezone, locale)}`}
                         </span>
                       </div>
                     </div>
@@ -599,9 +612,9 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     <div className="mb-5 rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm">
                       <p className="font-semibold text-slate-900">{booking.court?.name}</p>
                       <p className="mt-1 text-slate-600">
-                        {format(new Date(booking.startTime), 'dd/MM/yyyy')} •{' '}
-                        {format(new Date(booking.startTime), 'HH:mm')} -{' '}
-                        {format(new Date(booking.endTime), 'HH:mm')}
+                        {formatDateByTimezone(new Date(booking.startTime), timezone, locale)} •{' '}
+                        {slotTimeRangeLabel ||
+                          `${formatTimeByTimezone(new Date(booking.startTime), timezone, locale)} - ${formatTimeByTimezone(new Date(booking.endTime), timezone, locale)}`}
                       </p>
                     </div>
                     <div className="space-y-4 mb-8 text-sm">

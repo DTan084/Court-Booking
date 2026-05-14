@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
@@ -8,8 +8,11 @@ import { AdminShell } from '@/components/admin/AdminShell';
 import { MetricCard } from '@/components/admin/MetricCard';
 import { Button } from '@/components/ui/button';
 import { useAdminBookings } from '@/hooks/useBookings';
+import { formatDateByTimezone, formatTimeByTimezone } from '@/lib/datetime';
 
 export default function AdminBookingsPage() {
+  const timezone = 'Asia/Ho_Chi_Minh';
+  const locale = 'vi-VN';
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState('ALL');
   const [source, setSource] = useState<'ALL' | BookingSource>('ALL');
@@ -138,10 +141,10 @@ export default function AdminBookingsPage() {
                 <tr key={row.id} className="border-t border-slate-100">
                   <td className="px-6 py-4 font-semibold">{row.id.slice(0, 8)}</td>
                   <td className="px-6 py-4">{row.court?.name ?? '-'}</td>
-                  <td className="px-6 py-4">{start.toLocaleDateString('vi-VN')}</td>
+                  <td className="px-6 py-4">{formatDateByTimezone(start, timezone, locale)}</td>
                   <td className="px-6 py-4">
-                    {start.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} -{' '}
-                    {end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                    {formatTimeByTimezone(start, timezone, locale)} -{' '}
+                    {formatTimeByTimezone(end, timezone, locale)}
                   </td>
                   <td className="px-6 py-4">{row.guestName ?? row.userId ?? '-'}</td>
                   <td className="px-6 py-4">

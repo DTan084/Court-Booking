@@ -289,9 +289,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <div className="text-sm font-semibold text-slate-700">
-                {selectedDate.toLocaleDateString()}
-              </div>
+              <div className="text-sm font-semibold text-slate-700">{formatDate(selectedDate)}</div>
               <button
                 onClick={handleNextDate}
                 className="rounded-md p-2 text-slate-600 transition hover:bg-slate-200"
@@ -361,9 +359,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
               <div className="space-y-2 text-sm text-slate-600">
                 <div className="flex items-center justify-between">
                   <span>Date</span>
-                  <span className="font-medium text-slate-800">
-                    {selectedDate.toLocaleDateString()}
-                  </span>
+                  <span className="font-medium text-slate-800">{formatDate(selectedDate)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Selected slots</span>

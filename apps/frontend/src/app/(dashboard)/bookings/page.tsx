@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Suspense, useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { CancelledBy } from '@court-booking/shared';
 import Image from 'next/image';
+import { formatDateByTimezone } from '@/lib/datetime';
 
 type BookingWithCourt = Booking & { court: Court };
 
@@ -33,6 +34,8 @@ type VenueStat = {
 // ==================== COMPONENT ====================
 
 function BookingsPageContent() {
+  const timezone = 'Asia/Ho_Chi_Minh';
+  const locale = 'vi-VN';
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [expandedSections, setExpandedSections] = useState<{
     live: boolean;
@@ -263,7 +266,7 @@ function BookingsPageContent() {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-4 text-[12px] text-slate-400">
-                  <span>{new Date(booking.startTime).toLocaleDateString('vi-VN')}</span>
+                  <span>{formatDateByTimezone(booking.startTime, timezone, locale)}</span>
                   {booking.status === BookingStatus.CANCELLED ? (
                     <>
                       <span>{formatCurrency(booking.totalPrice)}</span>
@@ -379,7 +382,7 @@ function BookingsPageContent() {
                   <div className="absolute bottom-4 left-4 text-white">
                     <h4 className="font-bold">{venue.courtName}</h4>
                     <p className="text-xs opacity-85">
-                      Last played: {new Date(venue.lastPlayedAt).toLocaleDateString('vi-VN')}
+                      Last played: {formatDateByTimezone(venue.lastPlayedAt, timezone, locale)}
                     </p>
                   </div>
                 </div>
@@ -420,8 +423,8 @@ function BookingsPageContent() {
         </>
       ) : (
         <EmptyState
-          title="Chưa có sân đã chơi"
-          description="Venue đã chơi sẽ xuất hiện sau khi có booking quá khứ."
+          title="ChÆ°a cÃ³ sÃ¢n Ä‘Ã£ chÆ¡i"
+          description="Venue Ä‘Ã£ chÆ¡i sáº½ xuáº¥t hiá»‡n sau khi cÃ³ booking quÃ¡ khá»©."
         />
       )}
     </section>
@@ -483,8 +486,8 @@ function BookingsPageContent() {
                     </>
                   ) : (
                     <EmptyState
-                      title="Không có lịch sắp tới"
-                      description="Bạn chưa có booking pending/confirmed trong thời gian tới."
+                      title="KhÃ´ng cÃ³ lá»‹ch sáº¯p tá»›i"
+                      description="Báº¡n chÆ°a cÃ³ booking pending/confirmed trong thá»i gian tá»›i."
                     />
                   )}
                 </section>
@@ -512,8 +515,8 @@ function BookingsPageContent() {
                     </>
                   ) : (
                     <EmptyState
-                      title="Chưa có lịch sử"
-                      description="Các booking đã kết thúc/hủy/hết hạn sẽ hiển thị ở đây."
+                      title="ChÆ°a cÃ³ lá»‹ch sá»­"
+                      description="CÃ¡c booking Ä‘Ã£ káº¿t thÃºc/há»§y/háº¿t háº¡n sáº½ hiá»ƒn thá»‹ á»Ÿ Ä‘Ã¢y."
                     />
                   )}
                 </section>
@@ -537,10 +540,10 @@ function BookingsPageContent() {
                     renderBookingRowPreview(bookings, 'pending', 'Pending Entries')
                   ) : (
                     <EmptyState
-                      title="Không có booking chờ thanh toán"
-                      description="Bạn chưa có booking nào cần thanh toán. Đặt sân mới để tiếp tục."
+                      title="KhÃ´ng cÃ³ booking chá» thanh toÃ¡n"
+                      description="Báº¡n chÆ°a cÃ³ booking nÃ o cáº§n thanh toÃ¡n. Äáº·t sÃ¢n má»›i Ä‘á»ƒ tiáº¿p tá»¥c."
                       action={{
-                        label: 'Đặt sân ngay',
+                        label: 'Äáº·t sÃ¢n ngay',
                         href: '/courts',
                       }}
                     />
@@ -559,12 +562,12 @@ function BookingsPageContent() {
                       <EmptyState
                         title={
                           activeTab === 'completed'
-                            ? 'Không có booking đã hoàn tất'
-                            : 'Không có booking huỷ/hết hạn'
+                            ? 'KhÃ´ng cÃ³ booking Ä‘Ã£ hoÃ n táº¥t'
+                            : 'KhÃ´ng cÃ³ booking huá»·/háº¿t háº¡n'
                         }
-                        description="Chưa có dữ liệu phù hợp với bộ lọc hiện tại. Bạn có thể đặt sân mới."
+                        description="ChÆ°a cÃ³ dá»¯ liá»‡u phÃ¹ há»£p vá»›i bá»™ lá»c hiá»‡n táº¡i. Báº¡n cÃ³ thá»ƒ Ä‘áº·t sÃ¢n má»›i."
                         action={{
-                          label: 'Đặt sân ngay',
+                          label: 'Äáº·t sÃ¢n ngay',
                           href: '/courts',
                         }}
                       />

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -16,11 +16,15 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { BookingStatus } from '@/types';
-import { format } from 'date-fns';
-import { vi } from 'date-fns/locale';
 import { formatCountdown } from '@/lib/booking-utils';
 import { CancelledBy } from '@court-booking/shared';
 import type { Booking, Court, BookingStatus as BookingStatusType } from '@/types';
+import { format } from 'date-fns';
+import {
+  formatDateByTimezone,
+  formatDateTimeByTimezone,
+  formatTimeByTimezone,
+} from '@/lib/datetime';
 
 export type BookingWithCourt = Booking & { court: Court };
 
@@ -63,6 +67,8 @@ const statusConfig: Record<
 export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const router = useRouter();
+  const timezone = 'Asia/Ho_Chi_Minh';
+  const locale = 'vi-VN';
 
   const startTime = new Date(booking.startTime);
   const endTime = new Date(booking.endTime);
@@ -70,19 +76,9 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
   const courtName = booking.court?.name ?? 'Unknown court';
   const courtAddress = booking.court?.address ?? 'Unknown address';
 
-  const dateStr = startTime.toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-  const startTimeStr = startTime.toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  const endTimeStr = endTime.toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const dateStr = formatDateByTimezone(startTime, timezone, locale);
+  const startTimeStr = formatTimeByTimezone(startTime, timezone, locale);
+  const endTimeStr = formatTimeByTimezone(endTime, timezone, locale);
 
   const canCancel =
     booking.status === BookingStatus.PENDING_PAYMENT ||
@@ -196,8 +192,11 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
             <p className="mt-3 text-xs font-medium text-green-600">
               Co the huy truoc{' '}
               {booking.latestCancellableTime
-                ? format(new Date(booking.latestCancellableTime), "HH:mm 'ngay' dd/MM", {
-                    locale: vi,
+                ? formatDateTimeByTimezone(booking.latestCancellableTime, timezone, locale, {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    day: '2-digit',
+                    month: '2-digit',
                   })
                 : '--'}
             </p>
