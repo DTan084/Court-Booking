@@ -4,12 +4,14 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import Image from 'next/image';
 import {
   AlertTriangle,
   Calendar,
   CheckCircle2,
   ChevronLeft,
   Clock,
+  CreditCard,
   Lock,
   MapPin,
 } from 'lucide-react';
@@ -34,8 +36,14 @@ const checkoutSteps: Array<{ key: Step; label: string }> = [
 ];
 
 function CheckoutSidebar({ step }: { step: Step }) {
+  const stepIcons: Record<Step, React.ReactNode> = {
+    review: <CheckCircle2 className="h-4 w-4" />,
+    payment: <CreditCard className="h-4 w-4" />,
+    confirmation: <Lock className="h-4 w-4" />,
+  };
+
   return (
-    <aside className="hidden rounded-2xl border border-slate-200 bg-slate-50 p-0 text-sm lg:flex lg:h-fit lg:flex-col lg:sticky lg:top-24">
+    <aside className="hidden rounded-2xl border border-slate-200 bg-slate-50 p-0 text-sm lg:sticky lg:top-24 lg:flex lg:h-fit lg:flex-col">
       <div className="px-6 py-4">
         <h2 className="text-lg font-bold text-slate-900">Booking Progress</h2>
         <p className="text-slate-500">
@@ -45,12 +53,32 @@ function CheckoutSidebar({ step }: { step: Step }) {
       <nav className="flex flex-col">
         {checkoutSteps.map((item) => {
           const isActive = item.key === step;
+          const isPassed =
+            (step === 'payment' && item.key === 'review') ||
+            (step === 'confirmation' && (item.key === 'review' || item.key === 'payment'));
 
           return (
             <div
               key={item.key}
-              className={`flex items-center gap-3 border-b border-slate-200 px-4 py-3 ${isActive ? 'border-r-4 border-orange-600 bg-orange-50 text-orange-600' : 'text-slate-500 hover:bg-slate-100'}`}
+              className={`flex items-center gap-3 border-b border-slate-200 px-4 py-3 ${
+                isActive
+                  ? 'border-r-4 border-orange-600 bg-orange-50 text-orange-600'
+                  : isPassed
+                    ? 'text-slate-700'
+                    : 'text-slate-500 hover:bg-slate-100'
+              }`}
             >
+              <span
+                className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${
+                  isActive
+                    ? 'border-orange-200 bg-white text-orange-600'
+                    : isPassed
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                      : 'border-slate-200 bg-white text-slate-400'
+                }`}
+              >
+                {isPassed ? <CheckCircle2 className="h-4 w-4" /> : stepIcons[item.key]}
+              </span>
               {item.label}
             </div>
           );
@@ -69,6 +97,7 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const [localExpired, setLocalExpired] = React.useState(false);
   const [step, setStep] = React.useState<Step>('review');
   const [paymentCompleted, setPaymentCompleted] = React.useState(false);
+  const paymentSectionRef = React.useRef<HTMLElement | null>(null);
 
   const [cardName, setCardName] = React.useState('');
   const [cardNumber, setCardNumber] = React.useState('');
@@ -125,6 +154,9 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   }
 
   const isExpired = booking.status === BookingStatus.EXPIRED || localExpired;
+  const hoursUntilStart = (new Date(booking.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
+  const isWithinNoCancelWindow = hoursUntilStart <= 12;
+  const primaryCourtImage = booking.court?.images?.[0]?.url ?? null;
 
   const handleCompletePayment = async () => {
     try {
@@ -137,6 +169,15 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   };
 
   if (paymentCompleted && step === 'confirmation') {
+    const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+      `Court Booking - ${booking.court?.name ?? 'Court'}`,
+    )}&dates=${format(new Date(booking.startTime), "yyyyMMdd'T'HHmmss")}/${format(
+      new Date(booking.endTime),
+      "yyyyMMdd'T'HHmmss",
+    )}&details=${encodeURIComponent(`Booking at ${booking.court?.name ?? 'Court'}`)}&location=${encodeURIComponent(
+      booking.court?.address ?? '',
+    )}`;
+
     return (
       <div className="mx-auto w-full max-w-7xl px-4 py-8 lg:px-8 lg:py-10">
         <div className="grid gap-8 lg:grid-cols-[16rem_minmax(0,1fr)]">
@@ -157,6 +198,15 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
               <div className="md:col-span-7 space-y-8">
                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                   <div className="h-48 w-full relative">
+                    {primaryCourtImage && (
+                      <Image
+                        src={primaryCourtImage}
+                        alt={booking.court?.name ?? 'Court image'}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 60vw"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                     <div className="absolute inset-0 flex items-end p-6">
                       <span className="text-white text-xl font-semibold">
@@ -241,7 +291,10 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
               </div>
 
               <div className="md:col-span-5 flex flex-col gap-4">
-                <button className="w-full h-12 bg-orange-500 text-white font-semibold flex items-center justify-center gap-2 rounded-lg hover:brightness-95 active:scale-[0.98] transition-all">
+                <button
+                  className="w-full h-12 bg-orange-500 text-white font-semibold flex items-center justify-center gap-2 rounded-lg hover:brightness-95 active:scale-[0.98] transition-all"
+                  onClick={() => window.open(calendarUrl, '_blank', 'noopener,noreferrer')}
+                >
                   Add to Calendar
                 </button>
                 <div className="grid grid-cols-1 gap-3">
@@ -290,6 +343,10 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     ? 'Please verify your booking details before proceeding to payment.'
                     : 'Complete your booking details below.'}
                 </p>
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <Lock className="h-3.5 w-3.5" />
+                  SSL secured checkout
+                </div>
               </div>
               <button
                 className="flex items-center gap-2 text-orange-600 text-sm hover:underline"
@@ -305,7 +362,20 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                   <div className="p-8">
                     <div className="flex items-start justify-between mb-8">
                       <div className="flex gap-6">
-                        <div className="w-24 h-24 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 bg-[linear-gradient(135deg,#dce9ff,#f8f9ff)]" />
+                        {primaryCourtImage && (
+                          <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200">
+                            <Image
+                              src={primaryCourtImage}
+                              alt={booking.court?.name ?? 'Court image'}
+                              fill
+                              className="object-cover"
+                              sizes="96px"
+                            />
+                          </div>
+                        )}
+                        {!primaryCourtImage && (
+                          <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-[linear-gradient(135deg,#dce9ff,#f8f9ff)]" />
+                        )}
                         <div>
                           <h3 className="text-xl font-semibold text-slate-900 mb-1">
                             {booking.court?.name}
@@ -318,6 +388,11 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                             <span className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">
                               Premium Court
                             </span>
+                            {booking.status === BookingStatus.PENDING_PAYMENT && (
+                              <span className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-bold uppercase tracking-wider text-amber-700">
+                                Pending Payment
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -348,6 +423,12 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     </div>
 
                     <div className="mt-8 border-t border-slate-100 pt-8">
+                      {isWithinNoCancelWindow && (
+                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                          Warning: Booking này bắt đầu trong vòng 12 giờ, bạn sẽ không thể hủy theo
+                          chính sách.
+                        </div>
+                      )}
                       <h4 className="text-lg font-semibold text-slate-900 mb-4">Selected Slots</h4>
                       <div className="space-y-3">
                         {bookingDaySlots.length > 0 ? (
@@ -434,59 +515,79 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                 )}
 
                 {step === 'payment' && (
-                  <section className="bg-white border border-slate-200 rounded-2xl p-8">
-                    <h3 className="text-xl font-semibold text-slate-900 mb-6">Card Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="md:col-span-2">
-                        <label className="block text-sm text-slate-700 mb-2">Cardholder Name</label>
-                        <input
-                          className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
-                          value={cardName}
-                          onChange={(e) => setCardName(e.target.value)}
-                          placeholder="JANE DOE"
-                          type="text"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm text-slate-700 mb-2">Card Number</label>
-                        <input
-                          className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
-                          value={cardNumber}
-                          onChange={(e) => setCardNumber(e.target.value)}
-                          placeholder="0000 0000 0000 0000"
-                          type="text"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm text-slate-700 mb-2">Expiry Date</label>
-                        <input
-                          className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
-                          value={expiry}
-                          onChange={(e) => setExpiry(e.target.value)}
-                          placeholder="MM/YY"
-                          type="text"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm text-slate-700 mb-2">CVV</label>
-                        <input
-                          className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
-                          value={cvv}
-                          onChange={(e) => setCvv(e.target.value)}
-                          placeholder="123"
-                          type="text"
-                        />
+                  <section ref={paymentSectionRef} className="space-y-6">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-8">
+                      <h3 className="mb-4 text-xl font-semibold text-slate-900">Payment Method</h3>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <button className="rounded-xl border-2 border-orange-300 bg-orange-50 p-4 text-left">
+                          <p className="text-sm font-semibold text-orange-700">Card</p>
+                          <p className="text-xs text-orange-600">Credit / Debit</p>
+                        </button>
+                        <button className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-500">
+                          Apple Pay
+                        </button>
+                        <button className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-500">
+                          Google Pay
+                        </button>
                       </div>
                     </div>
 
-                    <button
-                      className="w-full mt-8 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-4 rounded-lg transition-colors flex justify-center items-center gap-2"
-                      disabled={isExpired || confirmPayment.isPending}
-                      onClick={handleCompletePayment}
-                    >
-                      <Lock className="h-4 w-4" />
-                      {confirmPayment.isPending ? 'Processing...' : 'Complete Payment'}
-                    </button>
+                    <div className="bg-white border border-slate-200 rounded-2xl p-8">
+                      <h3 className="text-xl font-semibold text-slate-900 mb-6">Card Details</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm text-slate-700 mb-2">
+                            Cardholder Name
+                          </label>
+                          <input
+                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
+                            value={cardName}
+                            onChange={(e) => setCardName(e.target.value)}
+                            placeholder="JANE DOE"
+                            type="text"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm text-slate-700 mb-2">Card Number</label>
+                          <input
+                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
+                            value={cardNumber}
+                            onChange={(e) => setCardNumber(e.target.value)}
+                            placeholder="0000 0000 0000 0000"
+                            type="text"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-slate-700 mb-2">Expiry Date</label>
+                          <input
+                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
+                            value={expiry}
+                            onChange={(e) => setExpiry(e.target.value)}
+                            placeholder="MM/YY"
+                            type="text"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-slate-700 mb-2">CVV</label>
+                          <input
+                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
+                            value={cvv}
+                            onChange={(e) => setCvv(e.target.value)}
+                            placeholder="123"
+                            type="text"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        className="w-full mt-8 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-4 rounded-lg transition-colors flex justify-center items-center gap-2"
+                        disabled={isExpired || confirmPayment.isPending}
+                        onClick={handleCompletePayment}
+                      >
+                        <Lock className="h-4 w-4" />
+                        {confirmPayment.isPending ? 'Processing...' : 'Complete Payment'}
+                      </button>
+                    </div>
                   </section>
                 )}
               </div>
@@ -495,6 +596,14 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                 <div className="sticky top-24 space-y-6">
                   <div className="bg-white rounded-2xl border border-slate-200 p-8">
                     <h3 className="text-xl font-semibold text-slate-900 mb-6">Payment Summary</h3>
+                    <div className="mb-5 rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm">
+                      <p className="font-semibold text-slate-900">{booking.court?.name}</p>
+                      <p className="mt-1 text-slate-600">
+                        {format(new Date(booking.startTime), 'dd/MM/yyyy')} •{' '}
+                        {format(new Date(booking.startTime), 'HH:mm')} -{' '}
+                        {format(new Date(booking.endTime), 'HH:mm')}
+                      </p>
+                    </div>
                     <div className="space-y-4 mb-8 text-sm">
                       <div className="flex justify-between">
                         <span className="text-slate-500">Base Amount</span>
@@ -518,9 +627,28 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                       <button
                         className="w-full bg-orange-600 text-white py-4 px-6 rounded-lg font-semibold flex items-center justify-center gap-3 hover:bg-orange-500 transition-all"
                         disabled={isExpired}
-                        onClick={() => setStep('payment')}
+                        onClick={() => {
+                          setStep('payment');
+                          requestAnimationFrame(() => {
+                            paymentSectionRef.current?.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'start',
+                            });
+                          });
+                        }}
                       >
                         Proceed to Payment
+                      </button>
+                    )}
+
+                    {step === 'payment' && (
+                      <button
+                        className="w-full bg-orange-600 text-white py-4 px-6 rounded-lg font-semibold flex items-center justify-center gap-3 hover:bg-orange-500 transition-all"
+                        disabled={isExpired || confirmPayment.isPending}
+                        onClick={handleCompletePayment}
+                      >
+                        <Lock className="h-4 w-4" />
+                        {confirmPayment.isPending ? 'Processing...' : 'Complete Payment'}
                       </button>
                     )}
 
