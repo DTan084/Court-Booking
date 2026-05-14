@@ -35,14 +35,6 @@ export enum CancelledBy {
   ADMIN = 'ADMIN',
 }
 
-export enum SportType {
-  BADMINTON = 'BADMINTON',
-  TENNIS = 'TENNIS',
-  FOOTBALL = 'FOOTBALL',
-  BASKETBALL = 'BASKETBALL',
-  VOLLEYBALL = 'VOLLEYBALL',
-}
-
 export enum CourtStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
@@ -51,19 +43,6 @@ export enum CourtStatus {
 export enum CourtType {
   INDOOR = 'INDOOR',
   OUTDOOR = 'OUTDOOR',
-}
-
-export enum FacilityFeature {
-  PARKING = 'PARKING',
-  LOCKER_ROOM = 'LOCKER_ROOM',
-  SHOWER = 'SHOWER',
-  LIGHTING = 'LIGHTING',
-  AIR_CONDITIONING = 'AIR_CONDITIONING',
-  WIFI = 'WIFI',
-  CAFETERIA = 'CAFETERIA',
-  EQUIPMENT_RENTAL = 'EQUIPMENT_RENTAL',
-  FIRST_AID = 'FIRST_AID',
-  WHEELCHAIR_ACCESSIBLE = 'WHEELCHAIR_ACCESSIBLE',
 }
 
 // ── Base Types ─────────────────────────────────
@@ -125,14 +104,13 @@ export interface SlotTemplate {
 export interface Court {
   id: string;
   name: string;
-  sportType: SportType;
+  sportTypeId: string;
   courtType: CourtType;
   address: string;
   district: string | null;
   description: string | null;
-  features: FacilityFeature[];
   sportTypeName?: string;
-  sportTypeData?: SportTypeModel;
+  sportTypeRef?: SportTypeModel;
   featureItems?: Feature[];
   isFeatured?: boolean;
   maxPlayers?: number | null;

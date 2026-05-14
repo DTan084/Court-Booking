@@ -89,8 +89,21 @@ export class CourtsService {
   }
 
   async findAll(query: GetCourtsDto) {
-    const { page, limit, name, sportTypeId, courtType, address, district, location, featureIds } =
-      query;
+    const {
+      page,
+      limit,
+      name,
+      sportTypeId,
+      courtType,
+      address,
+      district,
+      location,
+      featureIds,
+      maxPrice,
+      minPlayers,
+      maxPlayers,
+      availableToday,
+    } = query;
 
     // Generate cache key based on query params
     const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
@@ -142,6 +155,51 @@ export class CourtsService {
           HAVING COUNT(DISTINCT cf.feature_id) = :featureCount
         )`,
         { featureIds, featureCount: featureIds.length },
+      );
+    }
+    if (maxPrice !== undefined) {
+      qb.andWhere('court.pricePerHour <= :maxPrice', { maxPrice });
+    }
+    if (minPlayers !== undefined) {
+      qb.andWhere('court.maxPlayers IS NOT NULL AND court.maxPlayers >= :minPlayers', {
+        minPlayers,
+      });
+    }
+    if (maxPlayers !== undefined) {
+      qb.andWhere('court.maxPlayers IS NOT NULL AND court.maxPlayers <= :maxPlayers', {
+        maxPlayers,
+      });
+    }
+    if (availableToday) {
+      const now = new Date();
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1
+          FROM court_time_slots cts
+          WHERE cts.court_id = court.id
+            AND cts.day_of_week = EXTRACT(DOW FROM :now::timestamp)
+            AND cts.end_hour > EXTRACT(HOUR FROM :now::timestamp)
+            AND NOT EXISTS (
+              SELECT 1
+              FROM bookings b
+              WHERE b.court_id = court.id
+                AND b.start_time < (DATE(:now::timestamp) + (cts.end_hour || ' hours')::interval)
+                AND b.end_time > (DATE(:now::timestamp) + (cts.start_hour || ' hours')::interval)
+                AND (
+                  b.status = :confirmedStatus
+                  OR (
+                    b.status = :pendingStatus
+                    AND b.payment_deadline IS NOT NULL
+                    AND b.payment_deadline > :now
+                  )
+                )
+            )
+        )`,
+        {
+          now,
+          confirmedStatus: BookingStatus.CONFIRMED,
+          pendingStatus: BookingStatus.PENDING_PAYMENT,
+        },
       );
     }
 
@@ -206,10 +264,23 @@ export class CourtsService {
       throw new NotFoundException(`Court with ID ${id} not found`);
     }
 
-    // Cache the court
-    await this.safeCacheSet(cacheKey, this.CACHE_TTL, JSON.stringify(court));
+    const links = await this.courtFeatureRepository
+      .createQueryBuilder('cf')
+      .where('cf.court_id = :courtId', { courtId: court.id })
+      .getMany();
+    const featureIds = [...new Set(links.map((item) => item.featureId))];
+    const featureItems =
+      featureIds.length > 0 ? await this.featureRepository.findBy({ id: In(featureIds) }) : [];
 
-    return court;
+    const result = {
+      ...court,
+      featureItems,
+    };
+
+    // Cache the court
+    await this.safeCacheSet(cacheKey, this.CACHE_TTL, JSON.stringify(result));
+
+    return result as CourtEntity;
   }
 
   async update(id: string, updateCourtDto: UpdateCourtDto): Promise<CourtEntity> {

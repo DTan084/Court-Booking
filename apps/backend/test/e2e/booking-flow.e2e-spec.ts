@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { Role, SportType, BookingStatus } from '@court-booking/shared';
+import { Role, BookingStatus } from '@court-booking/shared';
 import { DataSource } from 'typeorm';
 
 describe('Booking Flow (e2e)', () => {
@@ -13,6 +13,7 @@ describe('Booking Flow (e2e)', () => {
   let userId: string;
   let courtId: string;
   let bookingId: string;
+  let sportTypeId: string;
 
   const testEmail = `user_flow_${Date.now()}@example.com`;
   const adminEmail = `admin_flow_${Date.now()}@example.com`;
@@ -43,13 +44,18 @@ describe('Booking Flow (e2e)', () => {
       password,
     });
     adminToken = adminLogin.body.access_token;
+    const [firstSportType] = await dataSource.query(
+      'SELECT id FROM sport_types WHERE is_active = true ORDER BY display_order ASC, created_at ASC LIMIT 1',
+    );
+    sportTypeId = firstSportType?.id;
 
     const courtRes = await request(app.getHttpServer())
       .post('/api/courts')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         name: 'Sân Flow Test',
-        sportType: SportType.BADMINTON,
+        sportTypeId,
+        courtType: 'INDOOR',
         address: 'Flow Address',
         pricePerHour: 100000,
       });

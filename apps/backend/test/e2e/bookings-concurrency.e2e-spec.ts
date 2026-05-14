@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { Role, SportType } from '@court-booking/shared';
+import { Role } from '@court-booking/shared';
 import { DataSource } from 'typeorm';
 
 describe('Bookings Concurrency (e2e)', () => {
@@ -12,6 +12,7 @@ describe('Bookings Concurrency (e2e)', () => {
   let user1Token: string;
   let user2Token: string;
   let courtId: string;
+  let sportTypeId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -39,6 +40,10 @@ describe('Bookings Concurrency (e2e)', () => {
       password: 'Password123!',
     });
     adminToken = adminLogin.body.access_token;
+    const [firstSportType] = await dataSource.query(
+      'SELECT id FROM sport_types WHERE is_active = true ORDER BY display_order ASC, created_at ASC LIMIT 1',
+    );
+    sportTypeId = firstSportType?.id;
 
     // 2. Create User 1
     const user1Email = `user1_conc_${Date.now()}@example.com`;
@@ -72,7 +77,8 @@ describe('Bookings Concurrency (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         name: 'Sân Conc Test',
-        sportType: SportType.TENNIS,
+        sportTypeId,
+        courtType: 'INDOOR',
         address: 'Conc Address',
         pricePerHour: 150000,
       });

@@ -174,7 +174,7 @@ describe('CourtsService', () => {
   describe('findOne', () => {
     it('should return a single court', async () => {
       const result = await service.findOne('court-uuid');
-      expect(result).toEqual(mockCourt);
+      expect(result).toEqual({ ...mockCourt, featureItems: [] });
       expect(repository.findOne).toHaveBeenCalled();
     });
 

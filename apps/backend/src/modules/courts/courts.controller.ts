@@ -107,6 +107,15 @@ export class CourtsController {
     type: String,
     description: 'Comma separated feature UUIDs; AND logic',
   })
+  @ApiQuery({ name: 'maxPrice', required: false, type: Number })
+  @ApiQuery({ name: 'minPlayers', required: false, type: Number })
+  @ApiQuery({ name: 'maxPlayers', required: false, type: Number })
+  @ApiQuery({
+    name: 'availableToday',
+    required: false,
+    type: Boolean,
+    description: 'Only courts with at least one free slot today',
+  })
   @ApiResponse({ status: 200, description: 'Paginated list of courts', type: CourtsListResponse })
   @UsePipes(new ZodValidationPipe(getCourtsSchema))
   async findAll(@Query() query: GetCourtsDto) {
