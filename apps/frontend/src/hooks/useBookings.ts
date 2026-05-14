@@ -10,6 +10,7 @@ export interface GetBookingsParams {
   page: number;
   limit: number;
   status?: BookingStatus;
+  statusGroup?: 'failed';
   fromDate?: string; // YYYY-MM-DD
   toDate?: string; // YYYY-MM-DD
   [key: string]: unknown; // Add index signature
