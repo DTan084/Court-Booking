@@ -5,7 +5,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '@/lib/auth';
-import { useUpdateProfile } from '@/hooks/useUser';
+import { useUpdateProfile, useUploadAvatar } from '@/hooks/useUser';
+import { useMyBookingStats } from '@/hooks/useBookings';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -18,17 +19,18 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { User, Camera, Mail, Phone, ShieldCheck } from 'lucide-react';
+import { User, Camera, Mail, Phone, ShieldCheck, CalendarDays } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const profileSchema = z.object({
-  name: z.string().min(2, 'Tên phải có ít nhất 2 ký tự'),
+  name: z.string().min(2, 'Ten phai co it nhat 2 ky tu'),
   phone: z
     .string()
-    .regex(/^0\d{9}$/, 'Số điện thoại không hợp lệ (phải là 10 chữ số, bắt đầu bằng 0)')
+    .regex(/^0\d{9}$/, 'So dien thoai khong hop le (phai la 10 chu so, bat dau bang 0)')
     .or(z.literal(''))
     .nullable(),
-  avatarUrl: z.string().url('URL ảnh không hợp lệ').or(z.literal('')).nullable(),
+  avatarUrl: z.string().url('URL anh khong hop le').or(z.literal('')).nullable(),
+  dob: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -36,6 +38,18 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 export function ProfileClient() {
   const user = useAuthStore((state) => state.user);
   const { mutate: updateProfile, isPending } = useUpdateProfile();
+  const { mutate: uploadAvatar, isPending: isUploadingAvatar } = useUploadAvatar();
+  const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = React.useState<string>('');
+  const { data: myBookingStats } = useMyBookingStats();
+  const updatedAt = user?.updatedAt ? new Date(user.updatedAt) : null;
+  const nextProfileUpdateAt = updatedAt
+    ? new Date(updatedAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+    : null;
+  const isProfileLocked =
+    !!nextProfileUpdateAt &&
+    Number.isFinite(nextProfileUpdateAt.getTime()) &&
+    Date.now() < nextProfileUpdateAt.getTime();
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -43,176 +57,278 @@ export function ProfileClient() {
       name: user?.name || '',
       phone: user?.phone || '',
       avatarUrl: user?.avatarUrl || '',
+      dob: user?.dob || '',
     },
   });
 
-  const onSubmit = (data: ProfileFormValues) => {
-    updateProfile(data, {
-      onSuccess: () => {
-        toast.success('Cập nhật thông tin thành công');
-      },
-      onError: (error: unknown) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        toast.error((error as any).response?.data?.message || 'Có lỗi xảy ra khi cập nhật hồ sơ');
-      },
+  React.useEffect(() => {
+    if (!user) return;
+    setAvatarPreviewUrl(user.avatarUrl || '');
+    form.reset({
+      name: user.name || '',
+      phone: user.phone || '',
+      avatarUrl: user.avatarUrl || '',
+      dob: user.dob || '',
     });
+  }, [user, form]);
+
+  const onSubmit = (data: ProfileFormValues) => {
+    const normalizedPhone = data.phone && data.phone.trim().length > 0 ? data.phone : null;
+    const normalizedAvatarUrl =
+      data.avatarUrl && data.avatarUrl.trim().length > 0 ? data.avatarUrl : null;
+    const normalizedDob = data.dob && data.dob.trim().length > 0 ? data.dob : null;
+
+    updateProfile(
+      {
+        name: data.name,
+        phone: normalizedPhone,
+        avatarUrl: normalizedAvatarUrl,
+        dob: normalizedDob,
+      },
+      {
+        onSuccess: () => {
+          toast.success('Cap nhat thong tin thanh cong');
+        },
+        onError: (error: unknown) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          toast.error((error as any).response?.data?.message || 'Co loi xay ra khi cap nhat ho so');
+        },
+      },
+    );
   };
 
   if (!user) return null;
 
+  const totalBookings = myBookingStats?.totalBookings ?? 0;
+  const upcomingBookings = myBookingStats?.upcomingBookings ?? 0;
+  const totalSpent = myBookingStats?.totalSpend ?? 0;
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Profile Sidebar */}
-        <div className="w-full md:w-1/3 space-y-6">
-          <div className="relative group flex flex-col items-center p-8 rounded-3xl border bg-card/50 backdrop-blur-xl shadow-2xl overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5 -z-10" />
+    <div className="mx-auto max-w-5xl space-y-8">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <aside className="space-y-6 lg:col-span-4">
+          <div className="rounded-2xl border bg-card p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="relative">
+                <Avatar className="h-20 w-20 border-2 border-orange-500/30">
+                  <AvatarImage src={avatarPreviewUrl || user.avatarUrl || ''} alt={user.name} />
+                  <AvatarFallback className="bg-orange-500/10 text-xl font-bold text-orange-700">
+                    {user.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute -bottom-1 -right-1 rounded-full border bg-background p-1.5 text-muted-foreground">
+                  <button
+                    type="button"
+                    className="inline-flex"
+                    onClick={() => avatarFileInputRef.current?.click()}
+                    disabled={isUploadingAvatar || isProfileLocked}
+                  >
+                    <Camera size={14} />
+                  </button>
+                </div>
+              </div>
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const localPreview = URL.createObjectURL(file);
+                  setAvatarPreviewUrl(localPreview);
+                  uploadAvatar(file, {
+                    onSuccess: (uploadedUrl) => {
+                      setAvatarPreviewUrl(uploadedUrl || localPreview);
+                      form.setValue('avatarUrl', uploadedUrl || '');
+                      toast.success('Upload avatar thanh cong, bam Luu thay doi de cap nhat DB');
+                    },
+                    onError: () => {
+                      setAvatarPreviewUrl(user.avatarUrl || '');
+                      toast.error('Upload avatar that bai');
+                    },
+                  });
+                  e.currentTarget.value = '';
+                }}
+              />
 
-            <div className="relative">
-              <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
-                <AvatarImage src={user.avatarUrl || ''} alt={user.name} />
-                <AvatarFallback className="text-3xl bg-primary text-primary-foreground font-bold">
-                  {user.name.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute bottom-0 right-0 p-2 bg-primary rounded-full border-2 border-background text-primary-foreground shadow-lg cursor-pointer hover:scale-110 transition-transform">
-                <Camera size={18} />
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-semibold text-foreground">{user.name}</h2>
+                <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-orange-700">
+                  <ShieldCheck size={12} />
+                  {user.role}
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 text-center">
-              <h2 className="text-2xl font-bold">{user.name}</h2>
-              <div className="flex items-center justify-center gap-2 mt-1 text-muted-foreground">
-                <ShieldCheck size={16} className="text-primary" />
-                <span className="text-sm font-medium uppercase tracking-wider">{user.role}</span>
+            <div className="mt-5 space-y-3 border-t pt-5">
+              <div className="flex items-center gap-3 text-sm">
+                <Mail size={16} className="text-muted-foreground" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="truncate font-medium text-foreground">{user.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <Phone size={16} className="text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">So dien thoai</p>
+                  <p className="font-medium text-foreground">{user.phone || 'Chua cap nhat'}</p>
+                </div>
               </div>
             </div>
 
-            <div className="w-full mt-8 pt-8 border-t space-y-4">
-              <div className="flex items-center gap-3 text-sm">
-                <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                  <Mail size={16} />
+            <div className="mt-5 rounded-xl border bg-muted/20 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Activity
+              </p>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Total bookings</span>
+                  <span className="font-semibold text-foreground">{totalBookings}</span>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground font-medium">Email</span>
-                  <span className="font-semibold">{user.email}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Upcoming</span>
+                  <span className="font-semibold text-foreground">{upcomingBookings}</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <div className="p-2 rounded-xl bg-primary/10 text-primary">
-                  <Phone size={16} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-muted-foreground font-medium">Số điện thoại</span>
-                  <span className="font-semibold">{user.phone || 'Chưa cập nhật'}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Total spend</span>
+                  <span className="font-semibold text-foreground">
+                    {new Intl.NumberFormat('vi-VN').format(totalSpent)} VND
+                  </span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </aside>
 
-        {/* Profile Form */}
-        <div className="flex-1 space-y-6">
-          <div className="p-8 rounded-3xl border bg-card/30 backdrop-blur-xl shadow-xl">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold tracking-tight">Hồ sơ của tôi</h1>
-              <p className="text-muted-foreground mt-2">
-                Quản lý thông tin cá nhân và cài đặt tài khoản của bạn.
-              </p>
+        <section className="lg:col-span-8">
+          <div className="rounded-2xl border bg-card p-6 shadow-sm md:p-8">
+            <div className="mb-6 flex items-center justify-between gap-4 border-b pb-4">
+              <div>
+                <h3 className="text-xl font-semibold text-foreground">Personal Information</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Cap nhat ho so cua ban</p>
+              </div>
             </div>
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-bold uppercase tracking-wider">
-                        Họ và tên
-                      </FormLabel>
-                      <FormControl>
-                        <div className="relative group">
-                          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                          <Input
-                            placeholder="Nhập họ và tên"
-                            className="pl-10 h-12 rounded-xl border-muted-foreground/20 focus:ring-primary/20 bg-background/50"
-                            {...field}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {isProfileLocked && nextProfileUpdateAt ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Ban da cap nhat gan day. Co the cap nhat lai sau:{' '}
+                    {nextProfileUpdateAt.toLocaleString()}
+                  </div>
+                ) : null}
+                <fieldset
+                  disabled={isProfileLocked || isPending || isUploadingAvatar}
+                  className="space-y-6"
+                >
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">Ho va ten</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                placeholder="Nhap ho va ten"
+                                className="h-11 pl-10"
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">Email</FormLabel>
+                      <FormControl>
+                        <Input value={user.email} disabled className="h-11 bg-muted/30" />
+                      </FormControl>
+                      <FormDescription>Email khong the thay doi.</FormDescription>
+                    </FormItem>
+
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">So dien thoai</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                placeholder="0xxxxxxxxx"
+                                className="h-11 pl-10"
+                                {...field}
+                                value={field.value || ''}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="dob"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium">Ngay sinh (DOB)</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <Input type="date" className="h-11 pl-10" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="phone"
+                    name="avatarUrl"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-bold uppercase tracking-wider">
-                          Số điện thoại
-                        </FormLabel>
+                        <FormLabel className="text-sm font-medium">URL anh dai dien</FormLabel>
                         <FormControl>
-                          <div className="relative group">
-                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                          <div className="relative">
+                            <Camera className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
-                              placeholder="0xxxxxxxxx"
-                              className="pl-10 h-12 rounded-xl border-muted-foreground/20 focus:ring-primary/20 bg-background/50"
+                              placeholder="https://..."
+                              className="h-11 pl-10"
                               {...field}
                               value={field.value || ''}
                             />
                           </div>
                         </FormControl>
-                        <FormDescription>
-                          Dùng để liên hệ khi có thay đổi lịch đặt sân.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
 
-                <FormField
-                  control={form.control}
-                  name="avatarUrl"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-bold uppercase tracking-wider">
-                        URL ảnh đại diện
-                      </FormLabel>
-                      <FormControl>
-                        <div className="relative group">
-                          <Camera className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                          <Input
-                            placeholder="https://..."
-                            className="pl-10 h-12 rounded-xl border-muted-foreground/20 focus:ring-primary/20 bg-background/50"
-                            {...field}
-                            value={field.value || ''}
-                          />
-                        </div>
-                      </FormControl>
-                      <FormDescription>Dán URL hình ảnh của bạn vào đây.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="pt-4">
-                  <Button
-                    type="submit"
-                    className="w-full md:w-auto h-12 px-8 rounded-xl font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    disabled={isPending}
-                  >
-                    {isPending ? 'Đang cập nhật...' : 'Lưu thay đổi'}
-                  </Button>
-                </div>
+                  <div className="pt-2">
+                    <Button
+                      type="submit"
+                      className="h-11 px-6"
+                      disabled={isPending || isProfileLocked}
+                    >
+                      {isPending ? 'Dang cap nhat...' : 'Luu thay doi'}
+                    </Button>
+                  </div>
+                </fieldset>
               </form>
             </Form>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
