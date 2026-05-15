@@ -94,7 +94,6 @@ export default function AdminNewBookingPage() {
             {courts.map((court) => (
               <option key={court.id} value={court.id}>
                 {court.name}
-                {court.sportTypeName ? ` - ${court.sportTypeName}` : ''}
               </option>
             ))}
           </select>
