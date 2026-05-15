@@ -835,4 +835,194 @@ export class BookingsService {
 
     return this.bookingRepository.save(booking);
   }
+
+  async getAdminCourtAnalytics(dateFrom: string, dateTo: string, courtId?: string) {
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from >= to) {
+      throw new BadRequestException('Invalid date range');
+    }
+
+    const statuses = [BookingStatus.CONFIRMED, BookingStatus.COMPLETED];
+    const qb = this.bookingRepository
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.court', 'court')
+      .where('booking.status IN (:...statuses)', { statuses })
+      .andWhere('booking.startTime < :to', { to })
+      .andWhere('booking.endTime > :from', { from });
+    if (courtId) qb.andWhere('booking.courtId = :courtId', { courtId });
+    const rows = await qb.getMany();
+
+    const totalRevenue = rows.reduce((sum, b) => sum + Number(b.totalPrice || 0), 0);
+    const totalBookings = rows.length;
+    const byCourt = new Map<
+      string,
+      {
+        courtName: string;
+        sportTypeId: string | null;
+        bookingCount: number;
+        totalRevenue: number;
+        bookedHours: number;
+      }
+    >();
+    let totalBookedHours = 0;
+    for (const b of rows) {
+      const overlapStart = Math.max(new Date(b.startTime).getTime(), from.getTime());
+      const overlapEnd = Math.min(new Date(b.endTime).getTime(), to.getTime());
+      const overlapHours = overlapEnd > overlapStart ? (overlapEnd - overlapStart) / 3600000 : 0;
+      totalBookedHours += overlapHours;
+
+      const key = b.courtId;
+      const current = byCourt.get(key) ?? {
+        courtName: b.court?.name ?? 'Unknown court',
+        sportTypeId: b.court?.sportTypeId ?? null,
+        bookingCount: 0,
+        totalRevenue: 0,
+        bookedHours: 0,
+      };
+      current.bookingCount += 1;
+      current.totalRevenue += Number(b.totalPrice || 0);
+      current.bookedHours += overlapHours;
+      byCourt.set(key, current);
+    }
+
+    const courts = await this.courtRepository.find({
+      where: courtId ? { id: courtId } : { status: CourtStatus.ACTIVE },
+      select: { id: true, name: true },
+    });
+    const courtIds = courts.map((c) => c.id);
+    const slots =
+      courtIds.length > 0
+        ? await this.timeSlotRepository.find({
+            where: courtIds.map((id) => ({ courtId: id })),
+            select: { courtId: true, dayOfWeek: true, startHour: true, endHour: true },
+          })
+        : [];
+    const courtHoursPerDay = new Map<string, Map<number, number>>();
+    for (const slot of slots) {
+      if (!courtHoursPerDay.has(slot.courtId)) courtHoursPerDay.set(slot.courtId, new Map());
+      const m = courtHoursPerDay.get(slot.courtId)!;
+      m.set(slot.dayOfWeek, (m.get(slot.dayOfWeek) ?? 0) + (slot.endHour - slot.startHour));
+    }
+    let totalAvailableHours = 0;
+    for (let d = new Date(from); d < to; d.setDate(d.getDate() + 1)) {
+      const dow = d.getDay();
+      for (const c of courts) {
+        totalAvailableHours += courtHoursPerDay.get(c.id)?.get(dow) ?? 0;
+      }
+    }
+    const avgUtilization =
+      totalAvailableHours > 0 ? (totalBookedHours / totalAvailableHours) * 100 : 0;
+
+    const heatmap = Array.from({ length: 7 }, (_, day) => ({
+      day,
+      hours: Array.from({ length: 18 }, (_, i) => ({ hour: i + 6, count: 0 })),
+    }));
+    for (const b of rows) {
+      const start = new Date(b.startTime);
+      const end = new Date(b.endTime);
+      const day = start.getDay();
+      const fromHour = Math.max(6, start.getHours());
+      const toHour = Math.min(24, end.getHours() || 24);
+      for (let h = fromHour; h < toHour; h++) {
+        const idx = h - 6;
+        if (idx >= 0 && idx < heatmap[day].hours.length) heatmap[day].hours[idx].count += 1;
+      }
+    }
+
+    const revenueByCourt = Array.from(byCourt.entries())
+      .map(([id, item]) => ({
+        courtId: id,
+        courtName: item.courtName,
+        sportTypeId: item.sportTypeId,
+        bookings: item.bookingCount,
+        hoursBooked: Number(item.bookedHours.toFixed(2)),
+        avgHourlyRate:
+          item.bookedHours > 0 ? Number((item.totalRevenue / item.bookedHours).toFixed(0)) : 0,
+        netRevenue: Number(item.totalRevenue.toFixed(0)),
+      }))
+      .sort((a, b) => b.netRevenue - a.netRevenue);
+
+    const currentPeriodUsersRaw = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .select('DISTINCT booking.userId', 'userId')
+      .where('booking.userId IS NOT NULL')
+      .andWhere('booking.status IN (:...statuses)', { statuses })
+      .andWhere('booking.startTime >= :from', { from })
+      .andWhere('booking.startTime <= :to', { to })
+      .getRawMany<{ userId: string }>();
+    const currentUserIds = currentPeriodUsersRaw.map((r) => r.userId).filter(Boolean);
+    const totalUniqueCustomers = currentUserIds.length;
+
+    let newCustomers = 0;
+    let returningCustomers = 0;
+    if (currentUserIds.length > 0) {
+      newCustomers = await this.userRepository
+        .createQueryBuilder('user')
+        .where('user.id IN (:...userIds)', { userIds: currentUserIds })
+        .andWhere('user.createdAt >= :from', { from })
+        .andWhere('user.createdAt <= :to', { to })
+        .getCount();
+
+      const returningUserRows = await this.bookingRepository
+        .createQueryBuilder('booking')
+        .select('DISTINCT booking.userId', 'userId')
+        .where('booking.userId IN (:...userIds)', { userIds: currentUserIds })
+        .andWhere('booking.status IN (:...statuses)', { statuses })
+        .andWhere('booking.startTime < :from', { from })
+        .getRawMany<{ userId: string }>();
+      returningCustomers = returningUserRows.length;
+    }
+    const otherCustomers = Math.max(0, totalUniqueCustomers - newCustomers - returningCustomers);
+    let age18_24 = 0;
+    let age25_34 = 0;
+    let age35_44 = 0;
+    let age45Plus = 0;
+    if (currentUserIds.length > 0) {
+      const users = await this.userRepository
+        .createQueryBuilder('user')
+        .select(['user.id', 'user.dob'])
+        .where('user.id IN (:...userIds)', { userIds: currentUserIds })
+        .andWhere('user.dob IS NOT NULL')
+        .getMany();
+      const now = new Date();
+      for (const u of users) {
+        if (!u.dob) continue;
+        const dob = new Date(u.dob);
+        if (Number.isNaN(dob.getTime())) continue;
+        let age = now.getFullYear() - dob.getFullYear();
+        const m = now.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age -= 1;
+        if (age >= 18 && age <= 24) age18_24 += 1;
+        else if (age >= 25 && age <= 34) age25_34 += 1;
+        else if (age >= 35 && age <= 44) age35_44 += 1;
+        else if (age >= 45) age45Plus += 1;
+      }
+    }
+
+    return {
+      window: { dateFrom, dateTo, courtId: courtId ?? null },
+      kpis: {
+        totalRevenue: Number(totalRevenue.toFixed(0)),
+        avgUtilization: Number(Math.min(100, avgUtilization).toFixed(1)),
+        totalBookings,
+        bookedHours: Number(totalBookedHours.toFixed(2)),
+        availableHours: Number(totalAvailableHours.toFixed(2)),
+      },
+      heatmap,
+      revenueByCourt,
+      customerDemographics: {
+        totalUniqueCustomers,
+        newCustomers,
+        returningCustomers,
+        otherCustomers,
+        ageDistribution: {
+          age18_24,
+          age25_34,
+          age35_44,
+          age45Plus,
+        },
+      },
+    };
+  }
 }

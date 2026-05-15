@@ -51,6 +51,12 @@ const adminOverviewQuerySchema = z.object({
   dateTo: z.string().datetime({ offset: true }),
 });
 
+const adminAnalyticsQuerySchema = z.object({
+  dateFrom: z.string().datetime({ offset: true }),
+  dateTo: z.string().datetime({ offset: true }),
+  courtId: z.string().uuid().optional(),
+});
+
 @Controller('admin/bookings')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -95,6 +101,14 @@ export class AdminBookingsController {
     query: z.infer<typeof adminOverviewQuerySchema>,
   ) {
     return this.bookingsService.getAdminOverview(query.dateFrom, query.dateTo);
+  }
+
+  @Get('analytics')
+  analytics(
+    @Query(new ZodValidationPipe(adminAnalyticsQuerySchema))
+    query: z.infer<typeof adminAnalyticsQuerySchema>,
+  ) {
+    return this.bookingsService.getAdminCourtAnalytics(query.dateFrom, query.dateTo, query.courtId);
   }
 
   @Patch(':id/check-in')

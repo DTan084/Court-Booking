@@ -1,273 +1,423 @@
 ﻿'use client';
 
-import { useState } from 'react';
-import { BookOpen, ChevronDown, Clock, TrendingUp } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { MetricCard } from '@/components/admin/MetricCard';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
-import { useCourtStats } from '@/hooks/useAdminStats';
 import { useCourts } from '@/hooks/useCourts';
+import { useAdminAnalytics } from '@/hooks/useAdminAnalytics';
+import { formatCurrency } from '@/lib/utils';
 
-function getDefaultDateRange() {
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function getDefaultRange() {
   const to = new Date();
   const from = new Date();
-  from.setDate(from.getDate() - 29);
-  return { fromDate: from.toISOString(), toDate: to.toISOString() };
+  from.setDate(from.getDate() - 6);
+  return {
+    fromDate: from.toISOString(),
+    toDate: to.toISOString(),
+  };
 }
 
-function toLocalDateInput(isoString: string): string {
-  return isoString.split('T')[0];
+function toInputDate(iso: string) {
+  return iso.slice(0, 10);
 }
 
-function toISOFromDateInput(dateStr: string, endOfDay = false): string {
-  const d = new Date(dateStr);
-  if (endOfDay) d.setHours(23, 59, 59, 999);
+function toISO(date: string, end = false) {
+  const d = new Date(date);
+  if (end) d.setHours(23, 59, 59, 999);
   else d.setHours(0, 0, 0, 0);
   return d.toISOString();
 }
 
-const revenueRows = [
-  {
-    court: 'Court A - Center',
-    sport: 'Basketball',
-    rate: '$85',
-    hours: 342,
-    maintenance: '-$1,200',
-    net: '$27,870',
-  },
-  {
-    court: 'Court B - East',
-    sport: 'Volleyball',
-    rate: '$65',
-    hours: 280,
-    maintenance: '-$850',
-    net: '$17,350',
-  },
-  {
-    court: 'Court C - West',
-    sport: 'Tennis',
-    rate: '$110',
-    hours: 195,
-    maintenance: '-$2,100',
-    net: '$19,350',
-  },
-  {
-    court: 'Court D - North',
-    sport: 'Pickleball',
-    rate: '$45',
-    hours: 410,
-    maintenance: '-$400',
-    net: '$18,050',
-  },
-];
-
 export default function AdminStatsPage() {
-  const defaults = getDefaultDateRange();
-  const [fromDateInput, setFromDateInput] = useState(toLocalDateInput(defaults.fromDate));
-  const [toDateInput, setToDateInput] = useState(toLocalDateInput(defaults.toDate));
-  const [selectedCourtId, setSelectedCourtId] = useState('');
-
-  const { data: courtsData, isLoading: courtsLoading } = useCourts({ page: 1, limit: 50 });
+  const defaults = getDefaultRange();
+  const [fromInput, setFromInput] = useState(toInputDate(defaults.fromDate));
+  const [toInput, setToInput] = useState(toInputDate(defaults.toDate));
+  const [courtId, setCourtId] = useState('');
+  const [revenuePage, setRevenuePage] = useState(1);
+  const revenueLimit = 8;
+  const { data: courtsData } = useCourts({ page: 1, limit: 50 });
   const courts = courtsData?.data ?? [];
 
-  const statsParams = {
-    fromDate: toISOFromDateInput(fromDateInput, false),
-    toDate: toISOFromDateInput(toDateInput, true),
-  };
-
-  const {
-    data: stats,
-    isLoading: statsLoading,
-    error: statsError,
-  } = useCourtStats(selectedCourtId, statsParams);
-  const utilizationHighlight = (stats?.utilizationPercentage ?? 0) > 80;
+  const params = useMemo(
+    () => ({
+      dateFrom: toISO(fromInput),
+      dateTo: toISO(toInput, true),
+      courtId: courtId || undefined,
+    }),
+    [fromInput, toInput, courtId],
+  );
+  const { data, isLoading } = useAdminAnalytics(params);
+  const revenueRows = data?.revenueByCourt ?? [];
+  const revenueTotal = revenueRows.length;
+  const revenueTotalPages = Math.max(1, Math.ceil(revenueTotal / revenueLimit));
+  const safeRevenuePage = Math.min(revenuePage, revenueTotalPages);
+  const revenueStart = revenueTotal === 0 ? 0 : (safeRevenuePage - 1) * revenueLimit + 1;
+  const revenueEnd =
+    revenueTotal === 0 ? 0 : Math.min(safeRevenuePage * revenueLimit, revenueTotal);
+  const pagedRevenueRows = revenueRows.slice(
+    (safeRevenuePage - 1) * revenueLimit,
+    safeRevenuePage * revenueLimit,
+  );
 
   return (
-    <AdminShell
-      title="Court Analytics"
-      subtitle="Comprehensive performance metrics across all venues."
-    >
-      <div className="rounded-xl border border-slate-200 bg-white p-4 md:p-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="md:col-span-2">
-            <label
-              htmlFor="stats-court"
-              className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500"
-            >
-              Court
-            </label>
-            <div className="relative">
-              <select
-                id="stats-court"
-                value={selectedCourtId}
-                onChange={(e) => setSelectedCourtId(e.target.value)}
-                disabled={courtsLoading}
-                className="w-full appearance-none rounded-lg border border-slate-300 px-3 py-2.5 pr-8 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400 disabled:opacity-50"
-              >
-                <option value="">-- Select a court --</option>
-                {courts.map((court) => (
-                  <option key={court.id} value={court.id}>
-                    {court.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-slate-400" />
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="stats-from-date"
-              className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500"
-            >
-              From Date
-            </label>
-            <input
-              id="stats-from-date"
-              type="date"
-              value={fromDateInput}
-              max={toDateInput}
-              onChange={(e) => setFromDateInput(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="stats-to-date"
-              className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-500"
-            >
-              To Date
-            </label>
-            <input
-              id="stats-to-date"
-              type="date"
-              value={toDateInput}
-              min={fromDateInput}
-              onChange={(e) => setToDateInput(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
-            />
-          </div>
+    <AdminShell title="Court Analytics" subtitle="Comprehensive performance metrics from database.">
+      <div className="mb-6 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 lg:grid-cols-3">
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">From</label>
+          <input
+            type="date"
+            value={fromInput}
+            onChange={(e) => setFromInput(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+          />
         </div>
-      </div>
-
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {!selectedCourtId || statsLoading ? (
-          <SkeletonCard count={4} />
-        ) : statsError ? (
-          <div className="col-span-full rounded-xl border border-red-200 bg-red-50 p-6 text-red-600">
-            Unable to load analytics data.
-          </div>
-        ) : (
-          <>
-            <MetricCard
-              title="Total Bookings"
-              value={String(stats?.totalBookings ?? 0)}
-              icon={<BookOpen className="h-5 w-5" />}
-            />
-            <MetricCard
-              title="Booked Hours"
-              value={`${stats?.totalHours ?? 0}h`}
-              icon={<Clock className="h-5 w-5" />}
-            />
-            <MetricCard
-              title="Available Hours"
-              value={`${stats?.totalAvailableHours ?? 0}h`}
-              icon={<Clock className="h-5 w-5" />}
-            />
-            <MetricCard
-              title="Utilization"
-              value={`${stats?.utilizationPercentage?.toFixed(1) ?? '0.0'}%`}
-              icon={<TrendingUp className="h-5 w-5" />}
-              highlight={utilizationHighlight}
-            />
-          </>
-        )}
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-12">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 xl:col-span-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-xl font-bold">Utilization Heatmap</h3>
-            <div className="text-xs text-slate-500">Mock chart placeholder</div>
-          </div>
-          <div className="flex h-72 items-center justify-center rounded-lg bg-slate-50 text-sm text-slate-500">
-            Interactive heatmap (Mon-Sun / 06:00-23:00)
-          </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">To</label>
+          <input
+            type="date"
+            value={toInput}
+            onChange={(e) => setToInput(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+          />
         </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-6 xl:col-span-4">
-          <h3 className="mb-4 text-xl font-bold">Customer Demographics</h3>
-          {[
-            ['18-24', '25%'],
-            ['25-34', '45%'],
-            ['35-44', '20%'],
-            ['45+', '10%'],
-          ].map(([label, value]) => (
-            <div key={label} className="mb-3">
-              <div className="mb-1 flex justify-between text-sm">
-                <span>{label}</span>
-                <span>{value}</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-100">
-                <div className="h-2 rounded-full bg-orange-400" style={{ width: value }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 p-5">
-          <h3 className="text-xl font-bold">Revenue by Court</h3>
-          <button className="text-sm font-semibold text-[#944a00]">Export CSV</button>
-        </div>
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
-            <tr>
-              <th className="px-6 py-4">Court Name</th>
-              <th className="px-6 py-4">Primary Sport</th>
-              <th className="px-6 py-4 text-right">Avg. Hourly Rate</th>
-              <th className="px-6 py-4 text-right">Hours Booked</th>
-              <th className="px-6 py-4 text-right">Maintenance</th>
-              <th className="px-6 py-4 text-right">Net Revenue</th>
-            </tr>
-          </thead>
-          <tbody>
-            {revenueRows.map((row) => (
-              <tr key={row.court} className="border-t border-slate-100">
-                <td className="px-6 py-4 font-semibold">{row.court}</td>
-                <td className="px-6 py-4">{row.sport}</td>
-                <td className="px-6 py-4 text-right">{row.rate}</td>
-                <td className="px-6 py-4 text-right">{row.hours}</td>
-                <td className="px-6 py-4 text-right text-rose-600">{row.maintenance}</td>
-                <td className="px-6 py-4 text-right font-bold">{row.net}</td>
-              </tr>
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+            Facility
+          </label>
+          <select
+            value={courtId}
+            onChange={(e) => setCourtId(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+          >
+            <option value="">All courts</option>
+            {courts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
-          </tbody>
-        </table>
+          </select>
+        </div>
       </div>
 
-      {selectedCourtId && stats && (
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-800">Current Selected Court Utilization</span>
-            <span
-              className={utilizationHighlight ? 'font-semibold text-emerald-700' : 'text-slate-500'}
-            >
-              {stats.utilizationPercentage.toFixed(1)}%
-            </span>
+      {isLoading || !data ? (
+        <SkeletonCard count={4} />
+      ) : (
+        <>
+          <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <article className="rounded-lg border border-slate-200 bg-white p-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Total Revenue
+              </p>
+              <p className="mt-2 text-4xl font-black tracking-tight text-slate-900">
+                {formatCurrency(data.kpis.totalRevenue)}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">Revenue in selected range</p>
+            </article>
+            <article className="rounded-lg border border-slate-200 bg-white p-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Occupancy Rate
+              </p>
+              <p className="mt-2 text-4xl font-black tracking-tight text-slate-900">
+                {data.kpis.avgUtilization}%
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                {Number(data.kpis.bookedHours ?? 0)}h / {Number(data.kpis.availableHours ?? 0)}h by
+                court_time_slots
+              </p>
+            </article>
+            <article className="rounded-lg border border-slate-200 bg-white p-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Total Bookings
+              </p>
+              <p className="mt-2 text-4xl font-black tracking-tight text-slate-900">
+                {data.kpis.totalBookings}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">Confirmed + completed in range</p>
+            </article>
+            <article className="rounded-lg border border-slate-200 bg-white p-6">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                Active Courts
+              </p>
+              <p className="mt-2 text-4xl font-black tracking-tight text-slate-900">
+                {data.revenueByCourt.length}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">Courts with bookings in range</p>
+            </article>
           </div>
-          <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
-            <div
-              className={`h-full rounded-full transition-all ${utilizationHighlight ? 'bg-emerald-500' : 'bg-orange-500'}`}
-              style={{ width: `${Math.min(stats.utilizationPercentage, 100)}%` }}
-            />
+
+          <div className="mb-6 grid gap-6 xl:grid-cols-12">
+            <div className="rounded-lg border border-slate-200 bg-white p-6 xl:col-span-8">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-2xl font-bold tracking-tight text-slate-900">
+                  Utilization Heatmap
+                </h3>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <span>Low</span>
+                  <div className="h-2 w-24 rounded-full bg-gradient-to-r from-slate-100 to-orange-400" />
+                  <span>High</span>
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <div className="mb-2 grid grid-cols-[44px_repeat(18,minmax(0,1fr))] gap-1">
+                  <div />
+                  {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => (
+                    <div key={h} className="text-center text-[10px] text-slate-400">
+                      {h <= 12 ? `${h}a` : `${h - 12}p`}
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  {(() => {
+                    const maxCount = Math.max(
+                      1,
+                      ...data.heatmap.flatMap((r) => r.hours.map((h) => Number(h.count) || 0)),
+                    );
+                    return data.heatmap.map((row) => (
+                      <div
+                        key={row.day}
+                        className="grid grid-cols-[44px_repeat(18,minmax(0,1fr))] gap-1"
+                      >
+                        <div className="text-[10px] font-bold uppercase text-slate-500">
+                          {DAY_LABELS[row.day]}
+                        </div>
+                        {row.hours.map((h) => {
+                          const count = Number(h.count) || 0;
+                          if (count === 0) {
+                            return (
+                              <div
+                                key={h.hour}
+                                className="h-5 rounded-sm bg-slate-100"
+                                title={`${h.hour}:00 - 0 bookings`}
+                              />
+                            );
+                          }
+                          const ratio = count / maxCount;
+                          const lightness = 86 - ratio * 34; // more bookings => darker orange
+                          return (
+                            <div
+                              key={h.hour}
+                              className="h-5 rounded-sm"
+                              style={{ backgroundColor: `hsl(29 88% ${lightness}%)` }}
+                              title={`${h.hour}:00 - ${count} bookings`}
+                            />
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-6 xl:col-span-4">
+              <h3 className="mb-4 text-2xl font-bold tracking-tight text-slate-900">
+                Utilization Snapshot
+              </h3>
+              <div className="space-y-4">
+                {(() => {
+                  const topRows = data.revenueByCourt.slice(0, 5);
+                  const max = Math.max(1, ...topRows.map((r) => Number(r.hoursBooked) || 0));
+                  return topRows.map((row) => {
+                    const pct = Math.round((row.hoursBooked / max) * 100);
+                    return (
+                      <div key={row.courtId}>
+                        <div className="mb-1 flex justify-between text-sm">
+                          <span className="font-medium text-slate-700">{row.courtName}</span>
+                          <span className="text-slate-500">{row.hoursBooked}h</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100">
+                          <div
+                            className="h-2 rounded-full bg-orange-400"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+                {data.revenueByCourt.length === 0 && (
+                  <p className="text-sm text-slate-500">No court data in selected range.</p>
+                )}
+              </div>
+            </div>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            {stats.totalHours}h / {stats.totalAvailableHours}h available
-          </p>
-        </div>
+
+          <div className="mb-6 grid gap-6 xl:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-white p-6">
+              <h3 className="mb-4 text-2xl font-bold tracking-tight text-slate-900">
+                Customer Demographics
+              </h3>
+              <div className="space-y-4">
+                {(() => {
+                  const total = Number(data.customerDemographics?.totalUniqueCustomers ?? 0);
+                  const newCount = Number(data.customerDemographics?.newCustomers ?? 0);
+                  const returningCount = Number(data.customerDemographics?.returningCustomers ?? 0);
+                  const otherCount = Number(data.customerDemographics?.otherCustomers ?? 0);
+                  const newPct = total > 0 ? Math.round((newCount / total) * 100) : 0;
+                  const returningPct = total > 0 ? Math.round((returningCount / total) * 100) : 0;
+                  const otherPct = Math.max(0, 100 - newPct - returningPct);
+                  return (
+                    <>
+                      <div>
+                        <div className="mb-1 flex justify-between text-sm">
+                          <span className="font-medium text-slate-700">New Customers</span>
+                          <span className="text-slate-500">
+                            {newCount} ({newPct}%)
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100">
+                          <div
+                            className="h-2 rounded-full bg-orange-400"
+                            style={{ width: `${newPct}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="mb-1 flex justify-between text-sm">
+                          <span className="font-medium text-slate-700">Returning Customers</span>
+                          <span className="text-slate-500">
+                            {returningCount} ({returningPct}%)
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100">
+                          <div
+                            className="h-2 rounded-full bg-emerald-400"
+                            style={{ width: `${returningPct}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="mb-1 flex justify-between text-sm">
+                          <span className="font-medium text-slate-700">Unclassified</span>
+                          <span className="text-slate-500">
+                            {otherCount} ({otherPct}%)
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100">
+                          <div
+                            className="h-2 rounded-full bg-slate-400"
+                            style={{ width: `${otherPct}%` }}
+                          />
+                        </div>
+                      </div>
+                      <p className="pt-2 text-xs text-slate-500">
+                        Based on unique booking customers in selected range
+                      </p>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-6">
+              <h3 className="mb-4 text-2xl font-bold tracking-tight text-slate-900">
+                Customer Demographics (Age Distribution)
+              </h3>
+              {(() => {
+                const age = data.customerDemographics?.ageDistribution;
+                const a18_24 = Number(age?.age18_24 ?? 0);
+                const a25_34 = Number(age?.age25_34 ?? 0);
+                const a35_44 = Number(age?.age35_44 ?? 0);
+                const a45 = Number(age?.age45Plus ?? 0);
+                const classified = a18_24 + a25_34 + a35_44 + a45;
+                const baseTotal = Number(data.customerDemographics?.totalUniqueCustomers ?? 0);
+                const unclassified = Math.max(0, baseTotal - classified);
+                const total = classified + unclassified;
+                const rows = [
+                  { label: '18-24', count: a18_24, color: 'bg-orange-400' },
+                  { label: '25-34', count: a25_34, color: 'bg-emerald-400' },
+                  { label: '35-44', count: a35_44, color: 'bg-blue-400' },
+                  { label: '45+', count: a45, color: 'bg-slate-500' },
+                  { label: 'Unclassified', count: unclassified, color: 'bg-slate-300' },
+                ];
+                return (
+                  <div className="space-y-4">
+                    {rows.map((r) => {
+                      const pct = total > 0 ? Math.round((r.count / total) * 100) : 0;
+                      return (
+                        <div key={r.label}>
+                          <div className="mb-1 flex justify-between text-sm">
+                            <span className="font-medium text-slate-700">{r.label}</span>
+                            <span className="text-slate-500">
+                              {r.count} ({pct}%)
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-100">
+                            <div
+                              className={`h-2 rounded-full ${r.color}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <p className="pt-2 text-xs text-slate-500">
+                      Based on unique booking customers in selected range
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="border-b border-slate-200 p-5">
+              <h3 className="text-xl font-bold tracking-tight text-slate-900">Revenue by Court</h3>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-6 py-4">Court Name</th>
+                  <th className="px-6 py-4 text-right">Avg. Hourly Rate</th>
+                  <th className="px-6 py-4 text-right">Hours Booked</th>
+                  <th className="px-6 py-4 text-right">Bookings</th>
+                  <th className="px-6 py-4 text-right">Net Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedRevenueRows.map((row) => (
+                  <tr key={row.courtId} className="border-t border-slate-100">
+                    <td className="px-6 py-4 font-semibold">{row.courtName}</td>
+                    <td className="px-6 py-4 text-right">{formatCurrency(row.avgHourlyRate)}</td>
+                    <td className="px-6 py-4 text-right">{row.hoursBooked}</td>
+                    <td className="px-6 py-4 text-right">{row.bookings}</td>
+                    <td className="px-6 py-4 text-right font-bold">
+                      {formatCurrency(row.netRevenue)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/30 px-8 py-4">
+              <p className="text-xs font-medium text-slate-500">
+                Showing {revenueStart}-{revenueEnd} of {revenueTotal.toLocaleString('vi-VN')} courts
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRevenuePage((p) => Math.max(1, p - 1))}
+                  disabled={safeRevenuePage <= 1}
+                  className="rounded border border-slate-200 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRevenuePage((p) => Math.min(revenueTotalPages, p + 1))}
+                  disabled={safeRevenuePage >= revenueTotalPages}
+                  className="rounded border border-slate-200 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </AdminShell>
   );
