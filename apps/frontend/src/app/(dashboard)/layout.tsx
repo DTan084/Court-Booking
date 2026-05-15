@@ -46,7 +46,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         {children}
       </main>
-      <SiteFooter />
+      <div className={isAdminRoute || isAccountRoute ? 'lg:pl-64' : ''}>
+        <SiteFooter />
+      </div>
     </div>
   );
 }
