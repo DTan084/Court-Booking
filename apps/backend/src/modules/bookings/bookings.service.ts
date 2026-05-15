@@ -460,9 +460,19 @@ export class BookingsService {
     guestPhone?: string;
     note?: string;
     paymentMethod?: string;
+    bookingSource?: BookingSource;
   }): Promise<BookingEntity> {
-    const { courtId, startTime, endTime, userId, guestName, guestPhone, note, paymentMethod } =
-      payload;
+    const {
+      courtId,
+      startTime,
+      endTime,
+      userId,
+      guestName,
+      guestPhone,
+      note,
+      paymentMethod,
+      bookingSource,
+    } = payload;
     if (!userId && !guestName?.trim()) {
       throw new BadRequestException('Phải cung cấp user_id hoặc guest_name');
     }
@@ -518,7 +528,7 @@ export class BookingsService {
         paidAt: new Date(),
         paymentDeadline: null,
         paymentMethod: paymentMethod ?? null,
-        bookingSource: BookingSource.ADMIN,
+        bookingSource: bookingSource ?? BookingSource.ADMIN,
         guestName: guestName ?? null,
         guestPhone: guestPhone ?? null,
         note: note ?? null,
@@ -549,6 +559,10 @@ export class BookingsService {
     courtId?: string;
     dateFrom?: string;
     dateTo?: string;
+    search?: string;
+    sportTypeId?: string;
+    day?: string;
+    statusView?: 'CANCELLED_GROUP' | 'REFUND_PENDING';
   }) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
@@ -567,12 +581,103 @@ export class BookingsService {
       qb.andWhere('booking.startTime >= :dateFrom', { dateFrom: new Date(query.dateFrom) });
     if (query.dateTo)
       qb.andWhere('booking.startTime <= :dateTo', { dateTo: new Date(query.dateTo) });
+    if (query.search?.trim()) {
+      const s = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        new Brackets((sub) => {
+          sub
+            .where('LOWER(booking.id::text) LIKE :s', { s })
+            .orWhere('LOWER(court.name) LIKE :s', { s })
+            .orWhere('LOWER(user.name) LIKE :s', { s })
+            .orWhere('LOWER(booking.guestName) LIKE :s', { s });
+        }),
+      );
+    }
+    if (query.sportTypeId) {
+      qb.andWhere('court.sportTypeId = :sportTypeId', { sportTypeId: query.sportTypeId });
+    }
+    if (query.day) {
+      const dayStart = new Date(`${query.day}T00:00:00`);
+      const dayEnd = new Date(`${query.day}T23:59:59.999`);
+      qb.andWhere('booking.startTime >= :dayStart', { dayStart }).andWhere(
+        'booking.startTime <= :dayEnd',
+        { dayEnd },
+      );
+    }
+    if (query.statusView === 'CANCELLED_GROUP') {
+      qb.andWhere('booking.status IN (:...cancelledLike)', {
+        cancelledLike: [BookingStatus.CANCELLED, BookingStatus.EXPIRED],
+      });
+    }
+    if (query.statusView === 'REFUND_PENDING') {
+      qb.andWhere('booking.status IN (:...cancelledLike)', {
+        cancelledLike: [BookingStatus.CANCELLED, BookingStatus.EXPIRED],
+      })
+        .andWhere('booking.paidAt IS NOT NULL')
+        .andWhere(
+          '(booking.refundedAt IS NULL AND (booking.refundAmount IS NULL OR booking.refundAmount = 0))',
+        );
+    }
     const [data, total] = await qb.getManyAndCount();
     const enriched = data.map((item: BookingEntity & { user?: { name?: string } }) => ({
       ...item,
       customerName: item.guestName || item.user?.name || 'Member',
     }));
-    return { data: enriched, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    const now = new Date();
+    const liveSessions = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .where('booking.status = :status', { status: BookingStatus.CONFIRMED })
+      .andWhere('booking.startTime <= :now', { now })
+      .andWhere('booking.endTime >= :now', { now })
+      .getCount();
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const dailyRevenueRaw = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .select('COALESCE(SUM(booking.totalPrice), 0)', 'total')
+      .where('booking.status IN (:...statuses)', {
+        statuses: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
+      })
+      .andWhere('booking.startTime >= :todayStart', { todayStart })
+      .andWhere('booking.startTime <= :todayEnd', { todayEnd })
+      .getRawOne<{ total: string }>();
+
+    const [totalAll, confirmedCount, completedCount, adminWalkInCount, cancelledLikeCount] =
+      await Promise.all([
+        this.bookingRepository.count(),
+        this.bookingRepository.count({ where: { status: BookingStatus.CONFIRMED } }),
+        this.bookingRepository.count({ where: { status: BookingStatus.COMPLETED } }),
+        this.bookingRepository
+          .createQueryBuilder('booking')
+          .where('booking.bookingSource IN (:...sources)', {
+            sources: [BookingSource.ADMIN, BookingSource.WALK_IN],
+          })
+          .getCount(),
+        this.bookingRepository
+          .createQueryBuilder('booking')
+          .where('booking.status IN (:...statuses)', {
+            statuses: [BookingStatus.CANCELLED, BookingStatus.EXPIRED],
+          })
+          .getCount(),
+      ]);
+    const confirmedOrCompleted = confirmedCount + completedCount;
+
+    return {
+      data: enriched,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      summary: {
+        total: totalAll,
+        confirmed: confirmedCount,
+        confirmedOrCompleted,
+        adminWalkIn: adminWalkInCount,
+        cancelled: cancelledLikeCount,
+        liveSessions,
+        dailyRevenue: Number(dailyRevenueRaw?.total ?? 0),
+      },
+    };
   }
 
   async getAdminOverview(dateFrom: string, dateTo: string) {
@@ -674,7 +779,7 @@ export class BookingsService {
 
   async adminCancelBooking(
     bookingId: string,
-    payload: { cancelledReason?: string; cancellationNote?: string },
+    payload: { cancelledReason?: string; cancellationNote?: string; cancelledBy?: CancelledBy },
   ) {
     const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
@@ -683,7 +788,7 @@ export class BookingsService {
     }
     booking.status = BookingStatus.CANCELLED;
     booking.cancelledAt = new Date();
-    booking.cancelledBy = CancelledBy.ADMIN;
+    booking.cancelledBy = payload.cancelledBy ?? CancelledBy.ADMIN;
     booking.cancelledReason = payload.cancelledReason ?? null;
     booking.cancellationNote = payload.cancellationNote ?? null;
     return this.bookingRepository.save(booking);
@@ -692,12 +797,45 @@ export class BookingsService {
   async refundBooking(bookingId: string, refundAmount: number): Promise<BookingEntity> {
     const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.refundedAt) throw new ConflictException('Booking này đã được hoàn tiền');
+    if (booking.refundedAt) throw new ConflictException('Booking da duoc hoan tien');
+
+    if (![BookingStatus.CANCELLED, BookingStatus.EXPIRED].includes(booking.status)) {
+      throw new BadRequestException('Chi hoan tien cho booking da huy hoac het han');
+    }
+    if (!booking.paidAt) {
+      throw new BadRequestException('Booking chua thanh toan, khong the hoan tien');
+    }
     if (refundAmount > Number(booking.totalPrice)) {
       throw new BadRequestException('Số tiền hoàn trả không được vượt quá tổng giá trị booking');
     }
     booking.refundedAt = new Date();
     booking.refundAmount = refundAmount;
+    return this.bookingRepository.save(booking);
+  }
+
+  async updateAdminBooking(
+    bookingId: string,
+    payload: {
+      guestName?: string | null;
+      guestPhone?: string | null;
+      note?: string | null;
+      paymentMethod?: string | null;
+      cancelledReason?: string | null;
+      cancellationNote?: string | null;
+      cancelledBy?: CancelledBy | null;
+    },
+  ): Promise<BookingEntity> {
+    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    if (payload.guestName !== undefined) booking.guestName = payload.guestName;
+    if (payload.guestPhone !== undefined) booking.guestPhone = payload.guestPhone;
+    if (payload.note !== undefined) booking.note = payload.note;
+    if (payload.paymentMethod !== undefined) booking.paymentMethod = payload.paymentMethod;
+    if (payload.cancelledReason !== undefined) booking.cancelledReason = payload.cancelledReason;
+    if (payload.cancellationNote !== undefined) booking.cancellationNote = payload.cancellationNote;
+    if (payload.cancelledBy !== undefined) booking.cancelledBy = payload.cancelledBy;
+
     return this.bookingRepository.save(booking);
   }
 }

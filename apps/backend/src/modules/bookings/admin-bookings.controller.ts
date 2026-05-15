@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
-import { Role, BookingStatus, BookingSource } from '@court-booking/shared';
+import { Role, BookingStatus, BookingSource, CancelledBy } from '@court-booking/shared';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -16,6 +16,17 @@ const adminCreateBookingSchema = z.object({
   guestPhone: z.string().max(20).optional(),
   note: z.string().max(500).optional(),
   paymentMethod: z.string().max(50).optional(),
+  bookingSource: z.nativeEnum(BookingSource).optional(),
+});
+
+const adminUpdateBookingSchema = z.object({
+  guestName: z.string().max(100).optional().nullable(),
+  guestPhone: z.string().max(20).optional().nullable(),
+  note: z.string().max(500).optional().nullable(),
+  paymentMethod: z.string().max(50).optional().nullable(),
+  cancelledReason: z.string().max(100).optional().nullable(),
+  cancellationNote: z.string().max(500).optional().nullable(),
+  cancelledBy: z.nativeEnum(CancelledBy).optional().nullable(),
 });
 
 const adminBookingsQuerySchema = z.object({
@@ -26,6 +37,13 @@ const adminBookingsQuerySchema = z.object({
   courtId: z.string().uuid().optional(),
   dateFrom: z.string().datetime({ offset: true }).optional(),
   dateTo: z.string().datetime({ offset: true }).optional(),
+  search: z.string().trim().min(1).optional(),
+  sportTypeId: z.string().uuid().optional(),
+  day: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  statusView: z.enum(['CANCELLED_GROUP', 'REFUND_PENDING']).optional(),
 });
 
 const adminOverviewQuerySchema = z.object({
@@ -63,6 +81,10 @@ export class AdminBookingsController {
         courtId?: string;
         dateFrom?: string;
         dateTo?: string;
+        search?: string;
+        sportTypeId?: string;
+        day?: string;
+        statusView?: 'CANCELLED_GROUP' | 'REFUND_PENDING';
       },
     );
   }
@@ -83,7 +105,8 @@ export class AdminBookingsController {
   @Patch(':id/cancel')
   cancel(
     @Param('id') id: string,
-    @Body() body: { cancelledReason?: string; cancellationNote?: string },
+    @Body()
+    body: { cancelledReason?: string; cancellationNote?: string; cancelledBy?: CancelledBy },
   ) {
     return this.bookingsService.adminCancelBooking(id, body);
   }
@@ -91,5 +114,14 @@ export class AdminBookingsController {
   @Patch(':id/refund')
   refund(@Param('id') id: string, @Body() body: { refundAmount: number }) {
     return this.bookingsService.refundBooking(id, body.refundAmount);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(adminUpdateBookingSchema))
+    body: z.infer<typeof adminUpdateBookingSchema>,
+  ) {
+    return this.bookingsService.updateAdminBooking(id, body);
   }
 }
