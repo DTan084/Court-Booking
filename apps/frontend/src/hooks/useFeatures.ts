@@ -6,8 +6,9 @@ export function useFeatures() {
   return useQuery({
     queryKey: queryKeys.features.list(),
     queryFn: async () => {
-      const response = await api.get<{ success: boolean; data: Feature[] }>('/features');
-      return response.data.data;
+      const response = await api.get<{ data?: Feature[] } | Feature[]>('/features');
+      const payload = response.data as { data?: Feature[] } | Feature[];
+      return Array.isArray(payload) ? payload : (payload.data ?? []);
     },
     staleTime: 5 * 60 * 1000,
   });

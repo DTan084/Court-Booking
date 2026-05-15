@@ -8,7 +8,9 @@ import {
   CopyPlus,
   Dumbbell,
   DollarSign,
+  Layers3,
   LayoutDashboard,
+  Trophy,
   Settings,
   Users,
 } from 'lucide-react';
@@ -22,6 +24,8 @@ const items = [
   { href: '/admin/revenue', label: 'Revenue', icon: DollarSign },
   { href: '/admin/customers', label: 'Customers', icon: Users },
   { href: '/admin/stats', label: 'Analytics', icon: BarChart3 },
+  { href: '/admin/features', label: 'Features', icon: Layers3 },
+  { href: '/admin/sport-types', label: 'Sport Types', icon: Trophy },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 

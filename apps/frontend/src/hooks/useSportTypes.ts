@@ -14,8 +14,9 @@ export function useSportTypes() {
   return useQuery({
     queryKey: queryKeys.sportTypes.list(),
     queryFn: async () => {
-      const response = await api.get<{ success: boolean; data: SportTypeItem[] }>('/sport-types');
-      return response.data.data;
+      const response = await api.get<{ data?: SportTypeItem[] } | SportTypeItem[]>('/sport-types');
+      const payload = response.data as { data?: SportTypeItem[] } | SportTypeItem[];
+      return Array.isArray(payload) ? payload : (payload.data ?? []);
     },
     staleTime: 5 * 60 * 1000,
   });
