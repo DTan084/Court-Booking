@@ -36,6 +36,7 @@ export default function AdminRevenuePage() {
 
   const monthlyBookings = useMemo(() => monthlyBookingsData?.data ?? [], [monthlyBookingsData]);
   const recentBookings = useMemo(() => recentBookingsData?.data ?? [], [recentBookingsData]);
+  type BookingWithPayment = (typeof recentBookings)[number] & { paymentMethod?: string | null };
   const recentMeta = recentBookingsData?.meta;
   const recentTotal = recentMeta?.total ?? 0;
   const recentPageCount = Math.max(1, recentMeta?.totalPages ?? 1);
@@ -227,7 +228,7 @@ export default function AdminRevenuePage() {
                     </span>
                   </td>
                   <td className="px-4 py-4 text-sm text-slate-600">
-                    {(b as any).paymentMethod ?? 'N/A'}
+                    {(b as BookingWithPayment).paymentMethod ?? 'N/A'}
                   </td>
                   <td className="px-8 py-4 text-right text-sm font-black text-slate-900">
                     {formatCurrency(Number(b.totalPrice))}
