@@ -8,6 +8,8 @@ import { useCreateAdminBooking } from '@/hooks/useBookings';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useTimeSlots } from '@/hooks/useTimeSlots';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { BookingSource } from '@court-booking/shared';
+import { toast } from 'sonner';
 
 type SelectedSlot = {
   startHour: number;
@@ -22,8 +24,9 @@ export default function AdminNewBookingPage() {
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [note, setNote] = useState('');
+  const [bookingSource, setBookingSource] = useState<BookingSource>(BookingSource.ADMIN);
 
-  const { data: courtsData } = useCourts({ page: 1, limit: 100 });
+  const { data: courtsData, isLoading: courtsLoading } = useCourts({ page: 1, limit: 50 });
   const courts = courtsData?.data ?? [];
   const { data: schedule } = useSchedule(courtId, date);
   const { data: timeSlots } = useTimeSlots(courtId);
@@ -50,16 +53,24 @@ export default function AdminNewBookingPage() {
   }, [timeSlots, date, bookedRanges]);
 
   const submit = () => {
-    if (!courtId || !selected) return;
+    if (!courtId || !selected) {
+      toast.error('Please select court and timeslot');
+      return;
+    }
+    if (!guestName.trim()) {
+      toast.error('Guest name is required for manual booking');
+      return;
+    }
     createAdminBooking({
       courtId,
       startTime: new Date(
         `${date}T${String(selected.startHour).padStart(2, '0')}:00:00`,
       ).toISOString(),
       endTime: new Date(`${date}T${String(selected.endHour).padStart(2, '0')}:00:00`).toISOString(),
-      guestName: guestName || undefined,
+      guestName: guestName.trim(),
       guestPhone: guestPhone || undefined,
       note: note || undefined,
+      bookingSource,
     });
   };
 
@@ -79,11 +90,21 @@ export default function AdminNewBookingPage() {
             className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
           >
             <option value="">Select court</option>
+            {courtsLoading && <option value="">Loading courts...</option>}
             {courts.map((court) => (
               <option key={court.id} value={court.id}>
                 {court.name}
+                {court.sportTypeName ? ` - ${court.sportTypeName}` : ''}
               </option>
             ))}
+          </select>
+          <select
+            value={bookingSource}
+            onChange={(e) => setBookingSource(e.target.value as BookingSource)}
+            className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+          >
+            <option value={BookingSource.ADMIN}>ADMIN</option>
+            <option value={BookingSource.WALK_IN}>WALK_IN</option>
           </select>
           <input
             type="date"
@@ -120,6 +141,9 @@ export default function AdminNewBookingPage() {
           <p className="mb-3 text-sm font-semibold text-slate-800">
             Available slots on selected date
           </p>
+          {!courtsLoading && courts.length === 0 && (
+            <p className="mb-3 text-sm text-rose-600">No courts found from DB.</p>
+          )}
           {availableSlots.length === 0 ? (
             <p className="text-sm text-slate-500">No available slot</p>
           ) : (

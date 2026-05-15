@@ -18,7 +18,8 @@ export function useSchedule(courtId: string, date: string) {
       }
       return [] as Booking[];
     },
-    staleTime: 0, // Always refetch schedule — bookings change frequently
+    staleTime: 0, // Always refetch schedule - bookings change frequently
     refetchOnWindowFocus: true,
+    enabled: !!courtId && !!date,
   });
 }
