@@ -53,7 +53,7 @@ export class BookingsController {
   @Patch(':id/cancel')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Cancel a booking (24h creation + 12h before start rule)' })
+  @ApiOperation({ summary: 'Cancel a booking (policy windows are configurable in settings)' })
   @ApiResponse({
     status: 200,
     description: 'Booking cancelled successfully',

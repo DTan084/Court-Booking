@@ -32,6 +32,7 @@ import { winstonConfig } from './config/winston.config';
 import { SportTypesModule } from './modules/sport-types/sport-types.module';
 import { FeaturesModule } from './modules/features/features.module';
 import { SlotTemplatesModule } from './modules/slot-templates/slot-templates.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { SlotTemplatesModule } from './modules/slot-templates/slot-templates.mod
     SportTypesModule,
     FeaturesModule,
     SlotTemplatesModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [],

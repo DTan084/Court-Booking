@@ -14,12 +14,9 @@ import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.ent
 import { UserEntity } from '../../database/entities/user.entity';
 import { BookingStatus, BookingSource, CancelledBy, NotificationType } from '@court-booking/shared';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
-
-const PAYMENT_DEADLINE_MINUTES = 30;
-const CANCEL_WITHIN_HOURS = 24; // Rule A: must be within 24h of creation
-const NO_CANCEL_BEFORE_HOURS = 12; // Rule B: must be > 12h before start
 
 @Injectable()
 export class BookingsService {
@@ -34,6 +31,7 @@ export class BookingsService {
     private readonly timeSlotRepository: Repository<CourtTimeSlotEntity>,
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
@@ -95,6 +93,11 @@ export class BookingsService {
     if (start.getMinutes() !== 0 || end.getMinutes() !== 0) {
       throw new BadRequestException('Booking must start and end on the hour (e.g. 08:00, 10:00)');
     }
+
+    const paymentDeadlineMinutes = await this.settingsService.getNumber(
+      'payment_deadline_minutes',
+      30,
+    );
 
     return this.dataSource.transaction(async (manager) => {
       // 1. Pessimistic Lock on Court
@@ -163,7 +166,7 @@ export class BookingsService {
 
       // 5. Create Booking — REQ-16.2: default PENDING_PAYMENT + paymentDeadline
       const now = new Date();
-      const paymentDeadline = new Date(now.getTime() + PAYMENT_DEADLINE_MINUTES * 60 * 1000);
+      const paymentDeadline = new Date(now.getTime() + paymentDeadlineMinutes * 60 * 1000);
 
       const booking = manager.create(BookingEntity, {
         courtId,
@@ -271,6 +274,9 @@ export class BookingsService {
    * REQ-19: Cancel policy — 24h creation window + 12h before start
    */
   async cancelBooking(id: string, userId: string): Promise<BookingEntity> {
+    const cancelWithinHours = await this.settingsService.getNumber('cancel_within_hours', 24);
+    const noCancelBeforeHours = await this.settingsService.getNumber('no_cancel_before_hours', 12);
+
     const savedBooking = await this.dataSource.transaction(async (manager) => {
       const booking = await manager.findOne(BookingEntity, {
         where: { id },
@@ -303,14 +309,18 @@ export class BookingsService {
 
       // REQ-19.3: Rule A — must cancel within 24h of creation
       const hoursSinceCreated = differenceInHours(now, booking.createdAt);
-      if (hoursSinceCreated >= CANCEL_WITHIN_HOURS) {
-        throw new BadRequestException('Chỉ có thể hủy trong vòng 24 giờ kể từ khi đặt');
+      if (hoursSinceCreated >= cancelWithinHours) {
+        throw new BadRequestException(
+          `Chi co the huy trong vong ${cancelWithinHours} gio ke tu khi dat`,
+        );
       }
 
       // REQ-19.2: Rule B — must be > 12h before start
       const hoursUntilStart = differenceInHours(booking.startTime, now);
-      if (hoursUntilStart <= NO_CANCEL_BEFORE_HOURS) {
-        throw new BadRequestException('Không thể hủy đặt sân trong vòng 12 giờ trước giờ chơi');
+      if (hoursUntilStart <= noCancelBeforeHours) {
+        throw new BadRequestException(
+          `Khong the huy dat san trong vong ${noCancelBeforeHours} gio truoc gio choi`,
+        );
       }
 
       booking.status = BookingStatus.CANCELLED;
@@ -340,6 +350,9 @@ export class BookingsService {
   }
 
   async findMyBookings(userId: string, query: GetMyBookingsDto) {
+    const cancelWithinHours = await this.settingsService.getNumber('cancel_within_hours', 24);
+    const noCancelBeforeHours = await this.settingsService.getNumber('no_cancel_before_hours', 12);
+
     const { page, limit, status, statusGroup, fromDate, toDate } = query;
     const skip = (page - 1) * limit;
 
@@ -373,10 +386,10 @@ export class BookingsService {
     // REQ-19.6: Compute cancellationDeadline + latestCancellableTime for each booking
     const enriched = items.map((b) => {
       const cancellationDeadline = new Date(b.createdAt);
-      cancellationDeadline.setHours(cancellationDeadline.getHours() + CANCEL_WITHIN_HOURS);
+      cancellationDeadline.setHours(cancellationDeadline.getHours() + cancelWithinHours);
 
       const latestCancellableTime = new Date(b.startTime);
-      latestCancellableTime.setHours(latestCancellableTime.getHours() - NO_CANCEL_BEFORE_HOURS);
+      latestCancellableTime.setHours(latestCancellableTime.getHours() - noCancelBeforeHours);
 
       return {
         ...b,
@@ -431,6 +444,9 @@ export class BookingsService {
     id: string,
     userId: string,
   ): Promise<BookingEntity & { cancellationDeadline: string; latestCancellableTime: string }> {
+    const cancelWithinHours = await this.settingsService.getNumber('cancel_within_hours', 24);
+    const noCancelBeforeHours = await this.settingsService.getNumber('no_cancel_before_hours', 12);
+
     const booking = await this.bookingRepository.findOne({
       where: { id, userId },
       relations: ['court', 'court.images'],
@@ -439,10 +455,10 @@ export class BookingsService {
     if (!booking) throw new NotFoundException('Booking not found');
 
     const cancellationDeadline = new Date(booking.createdAt);
-    cancellationDeadline.setHours(cancellationDeadline.getHours() + CANCEL_WITHIN_HOURS);
+    cancellationDeadline.setHours(cancellationDeadline.getHours() + cancelWithinHours);
 
     const latestCancellableTime = new Date(booking.startTime);
-    latestCancellableTime.setHours(latestCancellableTime.getHours() - NO_CANCEL_BEFORE_HOURS);
+    latestCancellableTime.setHours(latestCancellableTime.getHours() - noCancelBeforeHours);
 
     return {
       ...booking,
@@ -914,18 +930,27 @@ export class BookingsService {
     const avgUtilization =
       totalAvailableHours > 0 ? (totalBookedHours / totalAvailableHours) * 100 : 0;
 
+    const analyticsStartHour = await this.settingsService.getNumber('analytics_start_hour', 6);
+    const analyticsEndHour = await this.settingsService.getNumber('analytics_end_hour', 22);
+    const safeStartHour = Math.min(23, Math.max(0, analyticsStartHour));
+    const safeEndHour = Math.min(24, Math.max(safeStartHour + 1, analyticsEndHour));
+    const heatmapHourLength = safeEndHour - safeStartHour;
+
     const heatmap = Array.from({ length: 7 }, (_, day) => ({
       day,
-      hours: Array.from({ length: 18 }, (_, i) => ({ hour: i + 6, count: 0 })),
+      hours: Array.from({ length: heatmapHourLength }, (_, i) => ({
+        hour: i + safeStartHour,
+        count: 0,
+      })),
     }));
     for (const b of rows) {
       const start = new Date(b.startTime);
       const end = new Date(b.endTime);
       const day = start.getDay();
-      const fromHour = Math.max(6, start.getHours());
-      const toHour = Math.min(24, end.getHours() || 24);
+      const fromHour = Math.max(safeStartHour, start.getHours());
+      const toHour = Math.min(safeEndHour, end.getHours() || 24);
       for (let h = fromHour; h < toHour; h++) {
-        const idx = h - 6;
+        const idx = h - safeStartHour;
         if (idx >= 0 && idx < heatmap[day].hours.length) heatmap[day].hours[idx].count += 1;
       }
     }
@@ -1002,6 +1027,7 @@ export class BookingsService {
 
     return {
       window: { dateFrom, dateTo, courtId: courtId ?? null },
+      heatmapRange: { startHour: safeStartHour, endHour: safeEndHour },
       kpis: {
         totalRevenue: Number(totalRevenue.toFixed(0)),
         avgUtilization: Number(Math.min(100, avgUtilization).toFixed(1)),

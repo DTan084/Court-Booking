@@ -6,6 +6,7 @@ import { BookingsController } from './bookings.controller';
 import { AdminBookingsController } from './admin-bookings.controller';
 import { BookingsService } from './bookings.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SettingsModule } from '../settings/settings.module';
 import { BookingJobsProcessor } from './booking-jobs.processor';
 import { BookingJobsScheduler } from './booking-jobs.scheduler';
 import { BookingEntity } from '../../database/entities/booking.entity';
@@ -29,6 +30,7 @@ import { UserEntity } from '../../database/entities/user.entity';
     }),
     BullModule.registerQueue({ name: 'booking-jobs' }),
     NotificationsModule,
+    SettingsModule,
   ],
   controllers: [BookingsController, AdminBookingsController],
   providers: [BookingsService, BookingJobsProcessor, BookingJobsScheduler],
