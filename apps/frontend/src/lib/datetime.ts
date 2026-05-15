@@ -63,7 +63,7 @@ export function formatSlotRangeFromOffset(
   const d = String(date.getDate()).padStart(2, '0');
   const start = `${y}-${m}-${d}T${String(startHour).padStart(2, '0')}:00:00${sourceOffset}`;
 
-  let endDate = new Date(date);
+  const endDate = new Date(date);
   if (endHour === 24) {
     endDate.setDate(endDate.getDate() + 1);
   }

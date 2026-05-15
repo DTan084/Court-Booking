@@ -39,6 +39,17 @@ export interface CreateAdminBookingDto {
   paymentMethod?: string;
 }
 
+export interface AdminOverview {
+  window: { dateFrom: string; dateTo: string };
+  activeBookings: number;
+  newCustomers: number;
+  completedBookings: number;
+  totalRevenue: number;
+  bookedHours: number;
+  availableHours: number;
+  occupancyRate: number;
+}
+
 export type BookingWithCourt = Booking & { court: Court };
 
 type ApiErrorPayload = {
@@ -247,6 +258,17 @@ export function useAdminBookings(params: {
       return response.data.data;
     },
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminOverview(params: { dateFrom: string; dateTo: string }) {
+  return useQuery<AdminOverview>({
+    queryKey: ['admin-overview', params],
+    queryFn: async () => {
+      const response = await api.get('/admin/bookings/overview', { params });
+      return response.data.data;
+    },
+    staleTime: 60 * 1000,
   });
 }
 
