@@ -81,6 +81,7 @@ export interface Feature {
   name: string;
   icon: string | null;
   category: string | null;
+  isActive: boolean;
   createdAt: string;
 }
 

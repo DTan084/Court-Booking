@@ -14,6 +14,9 @@ export class FeatureEntity {
   @Column({ type: 'varchar', length: 50, nullable: true })
   category: string | null;
 
+  @Column({ type: 'boolean', name: 'is_active', default: true })
+  isActive: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }
