@@ -37,6 +37,7 @@ export interface CreateAdminBookingDto {
   guestPhone?: string;
   note?: string;
   paymentMethod?: string;
+  bookingSource?: BookingSource;
 }
 
 export interface AdminOverview {
@@ -246,12 +247,28 @@ export function useAdminBookings(params: {
   page: number;
   limit: number;
   status?: BookingStatus;
+  statusView?: 'CANCELLED_GROUP' | 'REFUND_PENDING';
   bookingSource?: BookingSource;
   courtId?: string;
   dateFrom?: string;
   dateTo?: string;
+  search?: string;
+  sportTypeId?: string;
+  day?: string;
 }) {
-  return useQuery<PaginatedResult<BookingWithCourt>>({
+  return useQuery<
+    PaginatedResult<BookingWithCourt> & {
+      summary?: {
+        total: number;
+        confirmed: number;
+        confirmedOrCompleted: number;
+        adminWalkIn: number;
+        cancelled: number;
+        liveSessions: number;
+        dailyRevenue: number;
+      };
+    }
+  >({
     queryKey: queryKeys.adminBookings.list(params),
     queryFn: async () => {
       const response = await api.get('/admin/bookings', { params });
