@@ -13,7 +13,9 @@ const createFeatureSchema = z.object({
   category: z.string().max(50).optional(),
 });
 
-const updateFeatureSchema = createFeatureSchema.partial();
+const updateFeatureSchema = createFeatureSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
 const syncCourtFeaturesSchema = z.object({
   featureIds: z.array(z.string().uuid()).default([]),
 });
@@ -25,6 +27,13 @@ export class FeaturesController {
   @Get('features')
   list() {
     return this.featuresService.list();
+  }
+
+  @Get('admin/features')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  listAdmin() {
+    return this.featuresService.listAdmin();
   }
 
   @Post('admin/features')
@@ -51,6 +60,13 @@ export class FeaturesController {
   @Roles(Role.ADMIN)
   remove(@Param('id') id: string) {
     return this.featuresService.remove(id);
+  }
+
+  @Delete('admin/features/:id/hard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  hardRemove(@Param('id') id: string) {
+    return this.featuresService.hardRemove(id);
   }
 
   @Put('courts/:id/features')

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { SportTypeEntity } from '../../database/entities/sport-type.entity';
 import { CourtEntity } from '../../database/entities/court.entity';
 
@@ -34,6 +34,7 @@ export class SportTypesService {
       .select('court.sport_type_id', 'sportTypeId')
       .addSelect('COUNT(*)', 'count')
       .where('court.sport_type_id IS NOT NULL')
+      .andWhere('court.deleted_at IS NULL')
       .groupBy('court.sport_type_id')
       .getRawMany<{ sportTypeId: string; count: string }>();
     const usageMap = new Map(usage.map((item) => [item.sportTypeId, Number(item.count)]));
@@ -47,14 +48,14 @@ export class SportTypesService {
     if (excludeId) qb.andWhere('sportType.id != :excludeId', { excludeId });
     const existed = await qb.getOne();
     if (existed) {
-      throw new ConflictException('Loại thể thao đã tồn tại');
+      throw new ConflictException('Loai the thao da ton tai');
     }
   }
 
   async create(payload: { name: string; icon?: string; color?: string; displayOrder?: number }) {
     await this.ensureUniqueName(payload.name);
     if (payload.color && !/^#[0-9A-Fa-f]{6}$/.test(payload.color)) {
-      throw new BadRequestException('Màu sắc phải theo định dạng #RRGGBB');
+      throw new BadRequestException('Mau sac phai theo dinh dang #RRGGBB');
     }
     return this.sportTypeRepo.save(
       this.sportTypeRepo.create({
@@ -80,7 +81,7 @@ export class SportTypesService {
     if (!item) throw new NotFoundException('Sport type not found');
     if (payload.name) await this.ensureUniqueName(payload.name, id);
     if (payload.color && !/^#[0-9A-Fa-f]{6}$/.test(payload.color)) {
-      throw new BadRequestException('Màu sắc phải theo định dạng #RRGGBB');
+      throw new BadRequestException('Mau sac phai theo dinh dang #RRGGBB');
     }
     Object.assign(item, payload);
     return this.sportTypeRepo.save(item);
@@ -89,9 +90,30 @@ export class SportTypesService {
   async remove(id: string) {
     const item = await this.sportTypeRepo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('Sport type not found');
-    const usage = await this.courtRepo.count({ where: { sportTypeId: id } });
+    item.isActive = false;
+    await this.sportTypeRepo.save(item);
+    const affectedCourts = await this.courtRepo.count({
+      where: { sportTypeId: id, deletedAt: IsNull() },
+    });
+    return {
+      message: 'Sport type da bi an khoi danh sach',
+      id,
+      affectedCourts,
+      warning:
+        affectedCourts > 0 ? `${affectedCourts} san hien tai van hoat dong binh thuong` : null,
+    };
+  }
+
+  async hardRemove(id: string) {
+    const item = await this.sportTypeRepo.findOne({ where: { id } });
+    if (!item) throw new NotFoundException('Sport type not found');
+    const usage = await this.courtRepo.count({
+      where: { sportTypeId: id, deletedAt: IsNull() },
+    });
     if (usage > 0) {
-      throw new ConflictException(`Không thể xóa loại thể thao đang được sử dụng bởi ${usage} sân`);
+      throw new ConflictException(
+        `Khong the xoa - co ${usage} san dang dung sport type nay. Hay chuyen san sang sport type khac hoac an sport type.`,
+      );
     }
     await this.sportTypeRepo.remove(item);
     return { id };

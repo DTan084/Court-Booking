@@ -59,4 +59,11 @@ export class SportTypesController {
   remove(@Param('id') id: string) {
     return this.sportTypesService.remove(id);
   }
+
+  @Delete('admin/sport-types/:id/hard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  hardRemove(@Param('id') id: string) {
+    return this.sportTypesService.hardRemove(id);
+  }
 }
