@@ -8,8 +8,8 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { SlotTemplatesService } from './slot-templates.service';
 
 const applySchema = z.object({
-  fromDate: z.string().optional(),
-  toDate: z.string().optional(),
+  confirmed: z.boolean().optional(),
+  option: z.enum(['SKIP_CONFLICTS', 'OVERWRITE_CONFLICTS']).optional(),
 });
 
 @Controller('admin/courts')
