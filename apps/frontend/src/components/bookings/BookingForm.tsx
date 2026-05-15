@@ -19,6 +19,7 @@ import { DoubleConfirmationDialog } from '@/components/shared/double-confirmatio
 import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import type { CourtTimeSlot, BookedRange } from '@/types';
+import { useRuntimeSettings, runtimeSettingDefaults } from '@/hooks/useRuntimeSettings';
 
 // ==================== TYPES & SCHEMA ====================
 
@@ -56,6 +57,7 @@ export function BookingForm({
   bookedRanges,
 }: BookingFormProps) {
   const { mutate: createBooking, isPending } = useCreateBooking();
+  const { data: settings } = useRuntimeSettings();
   const router = useRouter();
   const [priceBreakdown, setPriceBreakdown] = useState<{
     totalPrice: number;
@@ -186,7 +188,13 @@ export function BookingForm({
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-800 leading-relaxed">
                   <p className="font-bold mb-1">Chính sách hủy đặt sân:</p>
-                  <p>{getBookingTimeWarning(buildLocalISO(selectedDate, startHour))}</p>
+                  <p>
+                    {getBookingTimeWarning(
+                      buildLocalISO(selectedDate, startHour),
+                      new Date(),
+                      settings?.noCancelBeforeHours ?? runtimeSettingDefaults.noCancelBeforeHours,
+                    )}
+                  </p>
                 </div>
               </div>
             )}
@@ -299,8 +307,11 @@ export function BookingForm({
         }
         warning={
           pendingData
-            ? (getBookingTimeWarning(buildLocalISO(selectedDate, pendingData.startHour)) ??
-              undefined)
+            ? (getBookingTimeWarning(
+                buildLocalISO(selectedDate, pendingData.startHour),
+                new Date(),
+                settings?.noCancelBeforeHours ?? runtimeSettingDefaults.noCancelBeforeHours,
+              ) ?? undefined)
             : undefined
         }
       />

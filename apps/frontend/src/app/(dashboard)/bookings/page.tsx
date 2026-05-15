@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { CancelledBy } from '@court-booking/shared';
 import Image from 'next/image';
 import { formatDateByTimezone } from '@/lib/datetime';
+import { useRuntimeSettings, runtimeSettingDefaults } from '@/hooks/useRuntimeSettings';
 
 type BookingWithCourt = Booking & { court: Court };
 
@@ -34,7 +35,8 @@ type VenueStat = {
 // ==================== COMPONENT ====================
 
 function BookingsPageContent() {
-  const timezone = 'Asia/Ho_Chi_Minh';
+  const { data: settings } = useRuntimeSettings();
+  const timezone = settings?.defaultTimezone ?? runtimeSettingDefaults.defaultTimezone;
   const locale = 'vi-VN';
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [expandedSections, setExpandedSections] = useState<{

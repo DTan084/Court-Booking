@@ -25,6 +25,7 @@ import {
   formatDateTimeByTimezone,
   formatTimeByTimezone,
 } from '@/lib/datetime';
+import { useRuntimeSettings, runtimeSettingDefaults } from '@/hooks/useRuntimeSettings';
 
 export type BookingWithCourt = Booking & { court: Court };
 
@@ -67,7 +68,12 @@ const statusConfig: Record<
 export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const router = useRouter();
-  const timezone = 'Asia/Ho_Chi_Minh';
+  const { data: settings } = useRuntimeSettings();
+  const timezone = settings?.defaultTimezone ?? runtimeSettingDefaults.defaultTimezone;
+  const currency = settings?.currency ?? runtimeSettingDefaults.currency;
+  const cancelWithinHours = settings?.cancelWithinHours ?? runtimeSettingDefaults.cancelWithinHours;
+  const noCancelBeforeHours =
+    settings?.noCancelBeforeHours ?? runtimeSettingDefaults.noCancelBeforeHours;
   const locale = 'vi-VN';
 
   const startTime = new Date(booking.startTime);
@@ -82,7 +88,8 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
 
   const canCancel =
     booking.status === BookingStatus.PENDING_PAYMENT ||
-    (booking.status === BookingStatus.CONFIRMED && canCancelBooking(booking));
+    (booking.status === BookingStatus.CONFIRMED &&
+      canCancelBooking(booking, new Date(), cancelWithinHours, noCancelBeforeHours));
   const canPay = booking.status === BookingStatus.PENDING_PAYMENT;
   const isUpcoming = endTime >= new Date();
   const canAddToCalendar = booking.status === BookingStatus.CONFIRMED && isUpcoming;
@@ -206,7 +213,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
           )}
           {booking.status === BookingStatus.CONFIRMED && !canCancel && (
             <p className="mt-3 text-xs italic text-slate-400">
-              Da qua thoi han huy (24h sau dat & 12h truoc choi)
+              Da qua thoi han huy ({cancelWithinHours}h sau dat & {noCancelBeforeHours}h truoc choi)
             </p>
           )}
           {cancellationContext && (
@@ -226,7 +233,9 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
         </div>
 
         <div className="flex w-full flex-col items-end gap-3 md:w-auto">
-          <p className="text-2xl font-bold text-slate-900">{formatCurrency(booking.totalPrice)}</p>
+          <p className="text-2xl font-bold text-slate-900">
+            {formatCurrency(booking.totalPrice, currency)}
+          </p>
           <div className="flex gap-2">
             {canPay && (
               <div className="flex flex-col items-end gap-1">

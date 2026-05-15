@@ -6,10 +6,15 @@ import { Booking } from '@court-booking/shared';
  * Returns true only when:
  *   (now - createdAt) < 24h  AND  (startTime - now) > 12h
  */
-export function canCancelBooking(booking: Booking, now: Date = new Date()): boolean {
+export function canCancelBooking(
+  booking: Booking,
+  now: Date = new Date(),
+  cancelWithinHours = 24,
+  noCancelBeforeHours = 12,
+): boolean {
   const hoursSinceCreated = differenceInHours(now, new Date(booking.createdAt));
   const hoursUntilStart = differenceInHours(new Date(booking.startTime), now);
-  return hoursSinceCreated < 24 && hoursUntilStart > 12;
+  return hoursSinceCreated < cancelWithinHours && hoursUntilStart > noCancelBeforeHours;
 }
 
 /**
@@ -19,9 +24,10 @@ export function canCancelBooking(booking: Booking, now: Date = new Date()): bool
 export function getBookingTimeWarning(
   startTime: string,
   now: Date = new Date(),
+  noCancelBeforeHours = 12,
 ): 'within-12h' | null {
   const hours = differenceInHours(new Date(startTime), now);
-  return hours < 12 ? 'within-12h' : null;
+  return hours < noCancelBeforeHours ? 'within-12h' : null;
 }
 
 /**

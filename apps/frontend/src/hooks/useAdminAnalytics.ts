@@ -9,6 +9,7 @@ export interface AdminAnalyticsParams {
 
 export interface AdminAnalyticsData {
   window: { dateFrom: string; dateTo: string; courtId: string | null };
+  heatmapRange?: { startHour: number; endHour: number };
   kpis: {
     totalRevenue: number;
     avgUtilization: number;

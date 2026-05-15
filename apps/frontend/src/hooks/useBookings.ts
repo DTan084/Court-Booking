@@ -181,14 +181,7 @@ export function useCancelBooking() {
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const message = error.response?.data?.message || '';
-
-      if (message.includes('12 giờ')) {
-        toast.error('Không thể hủy đặt sân trong vòng 12 giờ trước giờ chơi');
-      } else if (message.includes('24 giờ')) {
-        toast.error('Chỉ có thể hủy trong vòng 24 giờ kể từ khi đặt');
-      } else {
-        toast.error('Không thể hủy đặt sân, vui lòng thử lại');
-      }
+      toast.error(message || 'Không thể hủy đặt sân, vui lòng thử lại');
     },
   });
 }

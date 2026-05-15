@@ -13,10 +13,15 @@ export function cn(...inputs: ClassValue[]) {
  * Format số tiền theo định dạng VND
  * Ví dụ: 150000 → "150.000 ₫"
  */
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number, currency?: string): string {
+  const resolvedCurrency =
+    currency ||
+    (typeof window !== 'undefined'
+      ? window.localStorage.getItem('runtime_currency') || 'VND'
+      : 'VND');
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
-    currency: 'VND',
+    currency: resolvedCurrency,
   }).format(amount);
 }
 

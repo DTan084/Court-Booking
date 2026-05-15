@@ -3,6 +3,7 @@
 import { useCancelBooking } from '@/hooks/useBookings';
 import { DoubleConfirmationDialog } from '@/components/shared/double-confirmation-dialog';
 import { getBookingTimeWarning } from '@/lib/booking-utils';
+import { useRuntimeSettings, runtimeSettingDefaults } from '@/hooks/useRuntimeSettings';
 import type { Booking, Court } from '@/types';
 import { formatDateTimeByTimezone } from '@/lib/datetime';
 
@@ -16,7 +17,8 @@ interface CancelDialogProps {
 
 export function CancelDialog({ open, onOpenChange, booking }: CancelDialogProps) {
   const { mutate: cancelBooking, isPending } = useCancelBooking();
-  const timezone = 'Asia/Ho_Chi_Minh';
+  const { data: settings } = useRuntimeSettings();
+  const timezone = settings?.defaultTimezone ?? runtimeSettingDefaults.defaultTimezone;
   const locale = 'vi-VN';
 
   const handleConfirm = () => {
@@ -42,7 +44,13 @@ export function CancelDialog({ open, onOpenChange, booking }: CancelDialogProps)
           <strong>{formatDateTimeByTimezone(booking.startTime, timezone, locale)}</strong>?
         </span>
       }
-      warning={getBookingTimeWarning(booking.startTime) ?? undefined}
+      warning={
+        getBookingTimeWarning(
+          booking.startTime,
+          new Date(),
+          settings?.noCancelBeforeHours ?? runtimeSettingDefaults.noCancelBeforeHours,
+        ) ?? undefined
+      }
     />
   );
 }

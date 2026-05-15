@@ -50,6 +50,10 @@ export default function AdminStatsPage() {
     [fromInput, toInput, courtId],
   );
   const { data, isLoading } = useAdminAnalytics(params);
+  const heatmapStartHour = data?.heatmapRange?.startHour ?? 6;
+  const heatmapEndHour = data?.heatmapRange?.endHour ?? 22;
+  const heatmapHourLength = Math.max(1, heatmapEndHour - heatmapStartHour);
+  const heatmapHours = Array.from({ length: heatmapHourLength }, (_, i) => i + heatmapStartHour);
   const revenueRows = data?.revenueByCourt ?? [];
   const revenueTotal = revenueRows.length;
   const revenueTotalPages = Math.max(1, Math.ceil(revenueTotal / revenueLimit));
@@ -161,11 +165,16 @@ export default function AdminStatsPage() {
                 </div>
               </div>
               <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                <div className="mb-2 grid grid-cols-[44px_repeat(18,minmax(0,1fr))] gap-1">
+                <div
+                  className="mb-2 grid gap-1"
+                  style={{
+                    gridTemplateColumns: `44px repeat(${heatmapHourLength}, minmax(0,1fr))`,
+                  }}
+                >
                   <div />
-                  {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => (
+                  {heatmapHours.map((h) => (
                     <div key={h} className="text-center text-[10px] text-slate-400">
-                      {h <= 12 ? `${h}a` : `${h - 12}p`}
+                      {`${String(h).padStart(2, '0')}:00`}
                     </div>
                   ))}
                 </div>
@@ -178,7 +187,10 @@ export default function AdminStatsPage() {
                     return data.heatmap.map((row) => (
                       <div
                         key={row.day}
-                        className="grid grid-cols-[44px_repeat(18,minmax(0,1fr))] gap-1"
+                        className="grid gap-1"
+                        style={{
+                          gridTemplateColumns: `44px repeat(${heatmapHourLength}, minmax(0,1fr))`,
+                        }}
                       >
                         <div className="text-[10px] font-bold uppercase text-slate-500">
                           {DAY_LABELS[row.day]}
