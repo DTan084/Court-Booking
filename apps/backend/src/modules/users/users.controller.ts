@@ -14,6 +14,8 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UpdateUserDto, updateUserSchema } from './dto/update-user.dto';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -22,6 +24,8 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import type { Request } from 'express';
+import { Role } from '@court-booking/shared';
+import { z } from 'zod';
 
 @ApiTags('Users')
 @Controller('users')
@@ -80,5 +84,36 @@ export class UsersController {
 
     const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/avatars/${file.filename}`;
     return { url: avatarUrl };
+  }
+
+  @Get('admin/list')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async listAdminUsers(@Req() req: Request) {
+    const q = req.query as { page?: string; limit?: string; search?: string };
+    return this.usersService.listAdminUsers({
+      page: Number(q.page ?? 1),
+      limit: Number(q.limit ?? 20),
+      search: q.search,
+    });
+  }
+
+  @Patch('admin/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UsePipes(
+    new ZodValidationPipe(
+      updateUserSchema.extend({
+        email: z.string().email('Email khong hop le').optional(),
+        role: z.nativeEnum(Role).optional(),
+      }),
+    ),
+  )
+  async updateByAdmin(
+    @Body() body: UpdateUserDto & { email?: string; role?: Role },
+    @Req() req: Request,
+  ) {
+    const id = (req.params as { id: string }).id;
+    return this.usersService.updateByAdmin(id, body);
   }
 }
