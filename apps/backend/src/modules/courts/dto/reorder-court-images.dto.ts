@@ -4,8 +4,8 @@ export const reorderCourtImagesSchema = z.object({
   images: z
     .array(
       z.object({
-        imageId: z.string().uuid(),
-        displayOrder: z.number().int().min(0),
+        imageId: z.string().min(1),
+        displayOrder: z.coerce.number().int().min(0),
       }),
     )
     .min(1),

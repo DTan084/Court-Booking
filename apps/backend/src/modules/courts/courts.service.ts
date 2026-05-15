@@ -16,7 +16,8 @@ import { UpsertTimeSlotsDto } from './dto/upsert-time-slots.dto';
 import { AddCourtImageDto } from './dto/add-court-image.dto';
 import { ReorderCourtImagesDto } from './dto/reorder-court-images.dto';
 import { BookingEntity } from '../../database/entities/booking.entity';
-import { BookingStatus } from '@court-booking/shared';
+import { BookingStatus, CancelledBy } from '@court-booking/shared';
+import { CourtStatus } from '../../database/entities/court.entity';
 
 @Injectable()
 export class CourtsService {
@@ -287,8 +288,15 @@ export class CourtsService {
     return result as CourtEntity;
   }
 
-  async update(id: string, updateCourtDto: UpdateCourtDto): Promise<CourtEntity> {
+  async update(
+    id: string,
+    updateCourtDto: UpdateCourtDto,
+  ): Promise<{
+    court: CourtEntity;
+    autoCancelledBookings: number;
+  }> {
     const court = await this.findOne(id);
+    const wasActive = court.status === CourtStatus.ACTIVE;
     let normalized = updateCourtDto;
     if (updateCourtDto.sportTypeId) {
       const resolvedSportTypeId = await this.resolveSportTypeId(updateCourtDto.sportTypeId);
@@ -297,11 +305,19 @@ export class CourtsService {
     Object.assign(court, normalized);
     const updated = await this.courtRepository.save(court);
 
+    let autoCancelledBookings = 0;
+    if (wasActive && updated.status === CourtStatus.INACTIVE) {
+      autoCancelledBookings = await this.cancelFutureBookingsForUnavailableCourt(
+        id,
+        'Court temporarily unavailable (inactive by admin)',
+      );
+    }
+
     // Invalidate cache
     await this.invalidateCourtCache(id);
     await this.invalidateCourtsListCache();
 
-    return updated;
+    return { court: updated, autoCancelledBookings };
   }
 
   async updateFeatured(id: string, isFeatured: boolean): Promise<CourtEntity> {
@@ -313,11 +329,78 @@ export class CourtsService {
     return updated;
   }
 
-  async softDelete(id: string): Promise<void> {
+  async softDelete(id: string): Promise<number> {
     await this.findOne(id);
+    const autoCancelledBookings = await this.cancelFutureBookingsForUnavailableCourt(
+      id,
+      'Court temporarily unavailable (deleted by admin)',
+    );
     await this.courtRepository.softDelete(id);
 
     // Invalidate cache
+    await this.invalidateCourtCache(id);
+    await this.invalidateCourtsListCache();
+    return autoCancelledBookings;
+  }
+
+  private async cancelFutureBookingsForUnavailableCourt(
+    courtId: string,
+    cancellationNote: string,
+  ): Promise<number> {
+    const now = new Date();
+    const targets = await this.dataSource.getRepository(BookingEntity).find({
+      where: [
+        { courtId, status: BookingStatus.PENDING_PAYMENT },
+        { courtId, status: BookingStatus.CONFIRMED },
+      ],
+    });
+
+    const futureTargets = targets.filter((b) => new Date(b.startTime) > now);
+    if (futureTargets.length === 0) return 0;
+
+    for (const booking of futureTargets) {
+      booking.status = BookingStatus.CANCELLED;
+      booking.cancelledAt = now;
+      booking.cancelledBy = CancelledBy.SYSTEM;
+      booking.cancelledReason = 'system_policy';
+      booking.cancellationNote = cancellationNote;
+      if (booking.paidAt) {
+        booking.refundAmount = booking.totalPrice;
+      }
+    }
+    await this.dataSource.getRepository(BookingEntity).save(futureTargets);
+    return futureTargets.length;
+  }
+
+  async findDeleted(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [deletedOnly, total] = await this.courtRepository
+      .createQueryBuilder('court')
+      .withDeleted()
+      .where('court.deletedAt IS NOT NULL')
+      .orderBy('court.deletedAt', 'DESC')
+      .addOrderBy('court.updatedAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+    return {
+      data: deletedOnly,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async restoreCourt(id: string): Promise<void> {
+    const found = await this.courtRepository.findOne({ where: { id }, withDeleted: true });
+    if (!found) throw new NotFoundException(`Court with ID ${id} not found`);
+    await this.courtRepository.restore(id);
+    await this.invalidateCourtCache(id);
+    await this.invalidateCourtsListCache();
+  }
+
+  async hardDelete(id: string): Promise<void> {
+    const found = await this.courtRepository.findOne({ where: { id }, withDeleted: true });
+    if (!found) throw new NotFoundException(`Court with ID ${id} not found`);
+    await this.courtRepository.delete(id);
     await this.invalidateCourtCache(id);
     await this.invalidateCourtsListCache();
   }
@@ -464,6 +547,23 @@ export class CourtsService {
     await this.courtImageRepository.remove(image);
     await this.invalidateCourtCache(courtId);
     await this.invalidateCourtsListCache();
+  }
+
+  async updateImageAltText(
+    courtId: string,
+    imageId: string,
+    altText?: string,
+  ): Promise<CourtImageEntity> {
+    await this.findOne(courtId);
+    const image = await this.courtImageRepository.findOne({ where: { id: imageId, courtId } });
+    if (!image) {
+      throw new NotFoundException(`Image with ID ${imageId} not found`);
+    }
+    image.altText = altText?.trim() ? altText.trim() : null;
+    const saved = await this.courtImageRepository.save(image);
+    await this.invalidateCourtCache(courtId);
+    await this.invalidateCourtsListCache();
+    return saved;
   }
 
   async reorderImages(courtId: string, dto: ReorderCourtImagesDto): Promise<CourtImageEntity[]> {

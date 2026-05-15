@@ -123,6 +123,14 @@ export class CourtsController {
     return this.courtsService.findAll(query);
   }
 
+  @Get('admin/deleted')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async findDeleted(@Query('page') page = '1', @Query('limit') limit = '20') {
+    return this.courtsService.findDeleted(Number(page), Number(limit));
+  }
+
   @Get('districts')
   @ApiOperation({ summary: 'Get distinct districts of active courts (REQ-21.4)' })
   @ApiResponse({
@@ -153,7 +161,11 @@ export class CourtsController {
   @Roles(Role.ADMIN)
   @UsePipes(new ZodValidationPipe(updateCourtSchema))
   async update(@Param('id', ParseUUIDPipe) id: string, @Body() updateCourtDto: UpdateCourtDto) {
-    return this.courtsService.update(id, updateCourtDto);
+    const result = await this.courtsService.update(id, updateCourtDto);
+    return {
+      ...result.court,
+      autoCancelledBookings: result.autoCancelledBookings,
+    };
   }
 
   @Patch(':id/featured')
@@ -181,8 +193,26 @@ export class CourtsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   async remove(@Param('id', ParseUUIDPipe) id: string) {
-    await this.courtsService.softDelete(id);
-    return { message: 'Court deleted successfully', id };
+    const autoCancelledBookings = await this.courtsService.softDelete(id);
+    return { message: 'Court deleted successfully', id, autoCancelledBookings };
+  }
+
+  @Patch(':id/restore')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async restore(@Param('id', ParseUUIDPipe) id: string) {
+    await this.courtsService.restoreCourt(id);
+    return { message: 'Court restored successfully', id };
+  }
+
+  @Delete(':id/hard')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async hardDelete(@Param('id', ParseUUIDPipe) id: string) {
+    await this.courtsService.hardDelete(id);
+    return { message: 'Court permanently deleted', id };
   }
 
   @Get(':id/schedule')
@@ -333,5 +363,18 @@ export class CourtsController {
   @UsePipes(new ZodValidationPipe(reorderCourtImagesSchema))
   async reorderImages(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReorderCourtImagesDto) {
     return this.courtsService.reorderImages(id, dto);
+  }
+
+  @Patch(':id/images/:imageId')
+  @ApiOperation({ summary: 'Update court image alt text (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async updateImageAltText(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+    @Body() body: { altText?: string },
+  ) {
+    return this.courtsService.updateImageAltText(id, imageId, body.altText);
   }
 }
