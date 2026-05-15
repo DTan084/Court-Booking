@@ -193,7 +193,8 @@ describe('CourtsService', () => {
 
       const result = await service.update('court-uuid', updateDto);
 
-      expect(result.name).toEqual('New Name');
+      expect(result.court.name).toEqual('New Name');
+      expect(result.autoCancelledBookings).toBe(0);
       expect(repository.save).toHaveBeenCalled();
     });
   });

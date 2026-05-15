@@ -613,10 +613,8 @@ export class BookingsService {
       qb.andWhere('booking.status IN (:...cancelledLike)', {
         cancelledLike: [BookingStatus.CANCELLED, BookingStatus.EXPIRED],
       })
-        .andWhere('booking.paidAt IS NOT NULL')
-        .andWhere(
-          '(booking.refundedAt IS NULL AND (booking.refundAmount IS NULL OR booking.refundAmount = 0))',
-        );
+        .andWhere('(booking.paidAt IS NOT NULL OR booking.refundAmount IS NOT NULL)')
+        .andWhere('booking.refundedAt IS NULL');
     }
     const [data, total] = await qb.getManyAndCount();
     const enriched = data.map((item: BookingEntity & { user?: { name?: string } }) => ({
@@ -692,8 +690,7 @@ export class BookingsService {
     const activeBookings = await this.bookingRepository
       .createQueryBuilder('booking')
       .where('booking.status = :status', { status: BookingStatus.CONFIRMED })
-      .andWhere('booking.startTime <= :now', { now })
-      .andWhere('booking.endTime >= :now', { now })
+      .andWhere('booking.endTime > :now', { now })
       .getCount();
 
     const completedInWindow = await this.bookingRepository

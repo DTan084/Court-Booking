@@ -61,9 +61,12 @@ export default function AdminBookingsPage() {
       day: day || undefined,
       sportTypeId: sportTypeId === 'ALL' ? undefined : sportTypeId,
     }),
-    [status, source, page, keyword, day, sportTypeId],
+    [status, statusView, source, page, keyword, day, sportTypeId],
   );
   const { data, refetch } = useAdminBookings(query);
+  type BookingWithPayment = (typeof data extends { data: infer T } ? T : never)[number] & {
+    paymentMethod?: string | null;
+  };
   const rows = useMemo(() => data?.data ?? [], [data]);
   const meta = data?.meta;
   const total = meta?.total ?? 0;
@@ -71,11 +74,8 @@ export default function AdminBookingsPage() {
   const end = total === 0 ? 0 : Math.min(start + rows.length - 1, total);
   const isCancelledLike = (statusValue: BookingStatus) =>
     statusValue === BookingStatus.CANCELLED || statusValue === BookingStatus.EXPIRED;
-  const isRefundedState = (
-    statusValue: BookingStatus,
-    refundedAt?: string | null,
-    refundAmount?: number | null,
-  ) => isCancelledLike(statusValue) && (!!refundedAt || Number(refundAmount ?? 0) > 0);
+  const isRefundedState = (statusValue: BookingStatus, refundedAt?: string | null) =>
+    isCancelledLike(statusValue) && !!refundedAt;
   const isRefundPending = (
     statusValue: BookingStatus,
     paidAt?: string | null,
@@ -83,10 +83,21 @@ export default function AdminBookingsPage() {
     refundAmount?: number | null,
   ) =>
     isCancelledLike(statusValue) &&
-    !!paidAt &&
-    !isRefundedState(statusValue, refundedAt, refundAmount);
+    (!!paidAt || Number(refundAmount ?? 0) > 0) &&
+    !isRefundedState(statusValue, refundedAt);
   const shouldShowCancelFields = (statusValue: BookingStatus) =>
     statusValue !== BookingStatus.COMPLETED && statusValue !== BookingStatus.EXPIRED;
+  const resolvePaymentMethod = (
+    row: (typeof rows)[number] & { payment_method?: string | null; paymentMethod?: string | null },
+  ) => {
+    const raw = row.paymentMethod ?? row.payment_method ?? null;
+    const normalized = (raw ?? '').trim();
+    if (normalized) return normalized;
+    if (row.status === BookingStatus.CONFIRMED || row.status === BookingStatus.COMPLETED) {
+      return 'AUTO';
+    }
+    return 'N/A';
+  };
 
   return (
     <AdminShell
@@ -272,7 +283,7 @@ export default function AdminBookingsPage() {
                       >
                         REFUND_PENDING
                       </button>
-                    ) : isRefundedState(row.status, row.refundedAt, row.refundAmount) ? (
+                    ) : isRefundedState(row.status, row.refundedAt) ? (
                       <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold tracking-wide text-emerald-700">
                         REFUNDED
                       </span>
@@ -307,7 +318,9 @@ export default function AdminBookingsPage() {
                           guestName: row.guestName ?? '',
                           guestPhone: row.guestPhone ?? '',
                           note: row.note ?? '',
-                          paymentMethod: (row as any).paymentMethod ?? '',
+                          paymentMethod: resolvePaymentMethod(
+                            row as BookingWithPayment & { payment_method?: string | null },
+                          ),
                           cancelledReason: row.cancelledReason ?? 'customer_request',
                           cancellationNote: row.cancellationNote ?? '',
                           cancelledBy: (row.cancelledBy as CancelledBy) ?? CancelledBy.ADMIN,

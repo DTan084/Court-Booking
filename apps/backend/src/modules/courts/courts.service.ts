@@ -359,12 +359,17 @@ export class CourtsService {
     if (futureTargets.length === 0) return 0;
 
     for (const booking of futureTargets) {
+      const prevStatus = booking.status;
       booking.status = BookingStatus.CANCELLED;
       booking.cancelledAt = now;
       booking.cancelledBy = CancelledBy.SYSTEM;
       booking.cancelledReason = 'system_policy';
       booking.cancellationNote = cancellationNote;
-      if (booking.paidAt) {
+      if (prevStatus === BookingStatus.CONFIRMED) {
+        booking.paidAt = booking.paidAt ?? now;
+        booking.paymentMethod = booking.paymentMethod ?? 'AUTO';
+        booking.refundAmount = Number(booking.totalPrice);
+      } else if (booking.paidAt) {
         booking.refundAmount = booking.totalPrice;
       }
     }
