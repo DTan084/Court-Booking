@@ -13,6 +13,9 @@ export interface CreateCourtDto {
   address: string;
   pricePerHour: number;
   description?: string;
+  district?: string;
+  maxPlayers?: number | null;
+  isFeatured?: boolean;
 }
 
 export interface UpdateCourtDto {
@@ -22,6 +25,9 @@ export interface UpdateCourtDto {
   address?: string;
   pricePerHour?: number;
   description?: string;
+  district?: string;
+  maxPlayers?: number | null;
+  isFeatured?: boolean;
   status?: CourtStatus;
 }
 
@@ -91,8 +97,11 @@ export function useUpdateCourt() {
 
   return useMutation({
     mutationFn: async ({ id, dto }: { id: string; dto: UpdateCourtDto }) => {
-      const response = await api.patch<{ success: boolean; data: Court }>(`/courts/${id}`, dto);
-      return response.data.data;
+      const response = await api.patch<Court & { autoCancelledBookings?: number }>(
+        `/courts/${id}`,
+        dto,
+      );
+      return response.data;
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
@@ -114,8 +123,12 @@ export function useDeleteCourt() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.delete<{ success: boolean; data: Court }>(`/courts/${id}`);
-      return response.data.data;
+      const response = await api.delete<{
+        message: string;
+        id: string;
+        autoCancelledBookings?: number;
+      }>(`/courts/${id}`);
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
@@ -131,6 +144,32 @@ export function useDeleteCourt() {
       } else {
         toast.error('Không thể xóa sân, vui lòng thử lại');
       }
+    },
+  });
+}
+
+export function useRestoreCourt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.patch(`/courts/${id}/restore`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
+      toast.success('Khôi phục sân thành công');
+    },
+  });
+}
+
+export function useHardDeleteCourt() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/courts/${id}/hard`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
+      toast.success('Đã xóa vĩnh viễn');
     },
   });
 }
@@ -215,6 +254,30 @@ export function useReorderCourtImages(courtId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
+    },
+    onError: (error: AxiosError<ApiErrorPayload>) => {
+      const message = error.response?.data?.error?.message || error.response?.data?.message || '';
+      toast.error(message || 'Không thể sắp xếp ảnh, vui lòng thử lại');
+      // Debug quickly in browser console when BE returns validation details.
+      // eslint-disable-next-line no-console
+      console.error('reorder court images failed:', error.response?.data);
+    },
+  });
+}
+
+export function useUpdateCourtImageAlt(courtId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ imageId, altText }: { imageId: string; altText?: string }) => {
+      const response = await api.patch<{ success: boolean; data: CourtImage }>(
+        `/courts/${courtId}/images/${imageId}`,
+        { altText },
+      );
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
+      toast.success('Đã cập nhật alt text');
     },
   });
 }

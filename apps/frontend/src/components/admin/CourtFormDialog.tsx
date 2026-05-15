@@ -20,7 +20,10 @@ const courtSchema = z.object({
   sportTypeId: z.string().uuid('Sport type is required'),
   courtType: z.nativeEnum(CourtType),
   address: z.string().min(5, 'Dia chi toi thieu 5 ky tu'),
+  district: z.string().max(100).optional(),
   pricePerHour: z.number().positive('Gia phai lon hon 0'),
+  maxPlayers: z.number().int().min(1).optional().nullable(),
+  isFeatured: z.boolean().optional(),
   description: z.string().max(5000).optional(),
   featureIds: z.array(z.string().uuid()).optional().default([]),
   status: z.nativeEnum(CourtStatus).optional(),
@@ -48,6 +51,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
 
   const isPending = isCreating || isUpdating;
   const [preview, setPreview] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState<CourtFormData | null>(null);
 
   const defaultSportTypeId = useMemo(() => sportTypes[0]?.id ?? '', [sportTypes]);
 
@@ -65,7 +69,10 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
       sportTypeId: '',
       courtType: CourtType.OUTDOOR,
       address: '',
+      district: '',
       pricePerHour: 0,
+      maxPlayers: null,
+      isFeatured: false,
       description: '',
       featureIds: [],
       status: CourtStatus.ACTIVE,
@@ -85,7 +92,10 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
         sportTypeId: editingCourt.sportTypeId,
         courtType: editingCourt.courtType,
         address: editingCourt.address,
+        district: editingCourt.district ?? '',
         pricePerHour: Number(editingCourt.pricePerHour),
+        maxPlayers: editingCourt.maxPlayers ?? null,
+        isFeatured: editingCourt.isFeatured ?? false,
         description: editingCourt.description ?? '',
         featureIds: (editingCourt.featureItems ?? []).map((item) => item.id),
         status: editingCourt.status,
@@ -98,7 +108,10 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
       sportTypeId: defaultSportTypeId,
       courtType: CourtType.OUTDOOR,
       address: '',
+      district: '',
       pricePerHour: 0,
+      maxPlayers: null,
+      isFeatured: false,
       description: '',
       featureIds: [],
       status: CourtStatus.ACTIVE,
@@ -112,7 +125,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
     setValue('featureIds', next);
   };
 
-  const onSubmit = (data: CourtFormData) => {
+  const doSubmit = (data: CourtFormData) => {
     const { featureIds: nextFeatureIds, ...courtPayload } = data;
 
     if (mode === 'create') {
@@ -137,6 +150,8 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
     );
   };
 
+  const onSubmit = (data: CourtFormData) => setPendingSubmit(data);
+
   if (!open) return null;
 
   return (
@@ -145,9 +160,9 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
       role="dialog"
       aria-modal="true"
     >
-      <div className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">
+      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+        <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
+          <h2 className="text-xl font-semibold text-slate-900">
             {mode === 'create' ? 'Tao san moi' : 'Chinh sua san'}
           </h2>
           <button
@@ -159,67 +174,141 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <input
-            {...register('name')}
-            placeholder="Ten san"
-            className="w-full rounded-md border px-3 py-2"
-          />
-          {errors.name && <p className="text-sm text-red-600">{errors.name.message}</p>}
-
-          <div className="grid grid-cols-2 gap-3">
-            <select {...register('sportTypeId')} className="rounded-md border px-3 py-2">
-              {sportTypes.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.name}
-                </option>
-              ))}
-            </select>
-            <select {...register('courtType')} className="rounded-md border px-3 py-2">
-              <option value={CourtType.INDOOR}>Trong nha</option>
-              <option value={CourtType.OUTDOOR}>Ngoai troi</option>
-            </select>
-          </div>
-
-          <input
-            {...register('address')}
-            placeholder="Dia chi"
-            className="w-full rounded-md border px-3 py-2"
-          />
-          <input
-            type="number"
-            {...register('pricePerHour', { valueAsNumber: true })}
-            placeholder="Gia/gio"
-            className="w-full rounded-md border px-3 py-2"
-          />
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium">Mo ta san</span>
-              <button
-                type="button"
-                className="text-sm text-[#944a00]"
-                onClick={() => setPreview((v) => !v)}
-              >
-                {preview ? 'Nhap' : 'Xem truoc'}
-              </button>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <section className="rounded-lg border border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Basic Info
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Court Name
+                </span>
+                <input
+                  {...register('name')}
+                  placeholder="Ten san"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+                {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Sport Type
+                </span>
+                <select {...register('sportTypeId')} className="w-full rounded-md border px-3 py-2">
+                  {sportTypes.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Court Type
+                </span>
+                <select {...register('courtType')} className="w-full rounded-md border px-3 py-2">
+                  <option value={CourtType.INDOOR}>Trong nha</option>
+                  <option value={CourtType.OUTDOOR}>Ngoai troi</option>
+                </select>
+              </label>
             </div>
-            {!preview ? (
-              <textarea
-                {...register('description')}
-                rows={5}
-                placeholder="Nhap mo ta san (ho tro Markdown)..."
-                className="w-full rounded-md border px-3 py-2"
-              />
-            ) : (
-              <div className="prose min-h-[120px] rounded-md border p-3">
-                <ReactMarkdown>{description || '_Chua co noi dung_'}</ReactMarkdown>
-              </div>
-            )}
-            <p className="mt-1 text-xs text-slate-500">{description.length}/5000</p>
-          </div>
+          </section>
 
-          <div>
+          <section className="rounded-lg border border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Pricing & Capacity
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Price per Hour
+                </span>
+                <input
+                  type="number"
+                  {...register('pricePerHour', { valueAsNumber: true })}
+                  placeholder="Gia/gio"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Max Players
+                </span>
+                <input
+                  type="number"
+                  {...register('maxPlayers', { valueAsNumber: true })}
+                  placeholder="So nguoi toi da"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm md:col-span-2">
+                <input type="checkbox" {...register('isFeatured')} />
+                Noi bat (Featured)
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Location
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Address
+                </span>
+                <input
+                  {...register('address')}
+                  placeholder="Dia chi"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  District
+                </span>
+                <input
+                  {...register('district')}
+                  placeholder="Quan/Huyen"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Description
+            </h3>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium">Mo ta san</span>
+                <button
+                  type="button"
+                  className="text-sm text-[#944a00]"
+                  onClick={() => setPreview((v) => !v)}
+                >
+                  {preview ? 'Nhap' : 'Xem truoc'}
+                </button>
+              </div>
+              {!preview ? (
+                <textarea
+                  {...register('description')}
+                  rows={5}
+                  placeholder="Nhap mo ta san (ho tro Markdown)..."
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              ) : (
+                <div className="prose min-h-[120px] rounded-md border p-3">
+                  <ReactMarkdown>{description || '_Chua co noi dung_'}</ReactMarkdown>
+                </div>
+              )}
+              <p className="mt-1 text-xs text-slate-500">{description.length}/5000</p>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4">
             <p className="mb-2 text-sm font-medium">Tien ich san</p>
             <div className="grid grid-cols-2 gap-2">
               {features.map((feature) => (
@@ -237,16 +326,19 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
                 </label>
               ))}
             </div>
-          </div>
+          </section>
 
           {mode === 'edit' && (
-            <select {...register('status')} className="w-full rounded-md border px-3 py-2">
-              <option value={CourtStatus.ACTIVE}>Hoat dong</option>
-              <option value={CourtStatus.INACTIVE}>Tam ngung</option>
-            </select>
+            <section className="rounded-lg border border-slate-200 p-4">
+              <p className="mb-2 text-sm font-medium">Trang thai</p>
+              <select {...register('status')} className="w-full rounded-md border px-3 py-2">
+                <option value={CourtStatus.ACTIVE}>Hoat dong</option>
+                <option value={CourtStatus.INACTIVE}>Tam ngung</option>
+              </select>
+            </section>
           )}
 
-          <div className="flex gap-3 pt-2">
+          <div className="sticky bottom-0 flex gap-3 border-t border-slate-100 bg-white pt-4">
             <Button
               type="button"
               variant="outline"
@@ -262,6 +354,40 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
           </div>
         </form>
       </div>
+      {pendingSubmit && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-8 shadow-2xl">
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+              <span className="text-2xl text-red-500">!</span>
+            </div>
+            <h3 className="mb-3 text-center text-4 font-bold text-slate-900">
+              Xác nhận cập nhật sân
+            </h3>
+            <p className="mb-6 text-center text-slate-600">
+              {mode === 'edit' &&
+              court?.status !== CourtStatus.INACTIVE &&
+              pendingSubmit.status === CourtStatus.INACTIVE
+                ? 'Sân sẽ chuyển sang Tạm ngưng và auto-cancel các booking tương lai (SYSTEM CANCELLED).'
+                : 'Bạn có chắc muốn cập nhật thông tin sân này?'}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={() => setPendingSubmit(null)}>
+                Hủy bỏ
+              </Button>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={() => {
+                  const payload = pendingSubmit;
+                  setPendingSubmit(null);
+                  doSubmit(payload);
+                }}
+              >
+                Xác nhận cập nhật
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

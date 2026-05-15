@@ -8,6 +8,7 @@ import {
   useAddCourtImage,
   useDeleteCourtImage,
   useReorderCourtImages,
+  useUpdateCourtImageAlt,
 } from '@/hooks/useAdminCourts';
 import { Button } from '@/components/ui/button';
 import { DoubleConfirmationDialog } from '@/components/shared/double-confirmation-dialog';
@@ -17,10 +18,12 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
   const { mutate: addImage, isPending: isAdding } = useAddCourtImage(courtId);
   const { mutate: deleteImage } = useDeleteCourtImage(courtId);
   const { mutate: reorder } = useReorderCourtImages(courtId);
+  const { mutate: updateAlt, isPending: isUpdatingAlt } = useUpdateCourtImageAlt(courtId);
   const [file, setFile] = useState<File | null>(null);
   const [altText, setAltText] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [altDrafts, setAltDrafts] = useState<Record<string, string>>({});
 
   const images = useMemo(
     () => [...(court?.images ?? [])].sort((a, b) => a.displayOrder - b.displayOrder),
@@ -96,6 +99,30 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
               className="mb-3 h-36 w-full rounded object-cover"
             />
             <p className="mb-2 truncate text-xs text-slate-500">{img.url}</p>
+            <div className="mb-3 flex gap-2">
+              <input
+                value={altDrafts[img.id] ?? img.altText ?? ''}
+                onChange={(e) =>
+                  setAltDrafts((prev) => ({
+                    ...prev,
+                    [img.id]: e.target.value,
+                  }))
+                }
+                placeholder="Alt text"
+                className="w-full rounded-md border px-2 py-1.5 text-xs"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isUpdatingAlt}
+                onClick={() => {
+                  const nextAlt = (altDrafts[img.id] ?? img.altText ?? '').trim();
+                  updateAlt({ imageId: img.id, altText: nextAlt || undefined });
+                }}
+              >
+                Save
+              </Button>
+            </div>
             <p className="mb-3 text-xs text-slate-400">Kéo thả để sắp xếp</p>
             <div className="flex gap-2">
               <Button
