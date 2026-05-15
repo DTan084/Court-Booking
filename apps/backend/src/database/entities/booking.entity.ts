@@ -15,10 +15,6 @@ import { BookingStatus, BookingSource, CancelledBy } from '@court-booking/shared
 
 @Entity('bookings')
 @Index(['courtId', 'startTime', 'status'])
-@Index('UQ_bookings_transaction_id_not_null', ['transactionId'], {
-  unique: true,
-  where: `"transaction_id" IS NOT NULL`,
-})
 @Check(`"user_id" IS NOT NULL OR "guest_name" IS NOT NULL`)
 export class BookingEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -65,9 +61,6 @@ export class BookingEntity {
   @Column({ type: 'varchar', name: 'payment_method', nullable: true })
   paymentMethod: string | null;
 
-  @Column({ type: 'varchar', name: 'payment_ref', nullable: true })
-  paymentRef: string | null;
-
   @Column({ type: 'timestamp with time zone', name: 'expired_at', nullable: true })
   expiredAt: Date | null;
 
@@ -85,9 +78,6 @@ export class BookingEntity {
     default: BookingSource.ONLINE,
   })
   bookingSource: BookingSource;
-
-  @Column({ type: 'varchar', length: 20, name: 'transaction_id', nullable: true })
-  transactionId: string | null;
 
   @Column({ type: 'timestamp with time zone', name: 'checked_in_at', nullable: true })
   checkedInAt: Date | null;

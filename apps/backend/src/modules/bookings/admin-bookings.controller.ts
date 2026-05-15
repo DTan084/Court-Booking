@@ -20,12 +20,17 @@ const adminCreateBookingSchema = z.object({
 
 const adminBookingsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+  limit: z.coerce.number().int().min(1).max(500).optional().default(10),
   status: z.nativeEnum(BookingStatus).optional(),
   bookingSource: z.nativeEnum(BookingSource).optional(),
   courtId: z.string().uuid().optional(),
   dateFrom: z.string().datetime({ offset: true }).optional(),
   dateTo: z.string().datetime({ offset: true }).optional(),
+});
+
+const adminOverviewQuerySchema = z.object({
+  dateFrom: z.string().datetime({ offset: true }),
+  dateTo: z.string().datetime({ offset: true }),
 });
 
 @Controller('admin/bookings')
@@ -60,6 +65,14 @@ export class AdminBookingsController {
         dateTo?: string;
       },
     );
+  }
+
+  @Get('overview')
+  overview(
+    @Query(new ZodValidationPipe(adminOverviewQuerySchema))
+    query: z.infer<typeof adminOverviewQuerySchema>,
+  ) {
+    return this.bookingsService.getAdminOverview(query.dateFrom, query.dateTo);
   }
 
   @Patch(':id/check-in')

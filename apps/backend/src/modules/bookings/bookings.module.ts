@@ -11,10 +11,11 @@ import { BookingJobsScheduler } from './booking-jobs.scheduler';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
+import { UserEntity } from '../../database/entities/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BookingEntity, CourtEntity, CourtTimeSlotEntity]),
+    TypeOrmModule.forFeature([BookingEntity, CourtEntity, CourtTimeSlotEntity, UserEntity]),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

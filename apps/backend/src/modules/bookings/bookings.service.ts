@@ -11,6 +11,7 @@ import { differenceInHours } from 'date-fns';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
+import { UserEntity } from '../../database/entities/user.entity';
 import { BookingStatus, BookingSource, CancelledBy, NotificationType } from '@court-booking/shared';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -25,6 +26,8 @@ export class BookingsService {
   constructor(
     @InjectRepository(BookingEntity)
     private readonly bookingRepository: Repository<BookingEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(CourtEntity)
     private readonly courtRepository: Repository<CourtEntity>,
     @InjectRepository(CourtTimeSlotEntity)
@@ -32,22 +35,6 @@ export class BookingsService {
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
   ) {}
-
-  private async generateUniqueTransactionId(manager: any): Promise<string> {
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    for (let i = 0; i < 20; i += 1) {
-      const suffix = Array.from({ length: 4 })
-        .map(() => alphabet[Math.floor(Math.random() * alphabet.length)])
-        .join('');
-      const transactionId = `TRX-${suffix}`;
-      const existed = await manager.findOne(BookingEntity, {
-        where: { transactionId },
-        select: { id: true },
-      });
-      if (!existed) return transactionId;
-    }
-    throw new ConflictException('Không thể tạo mã giao dịch duy nhất, vui lòng thử lại');
-  }
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
     const startDate = new Date(`${date}T00:00:00`);
@@ -237,8 +224,7 @@ export class BookingsService {
       // REQ-17.3: PENDING_PAYMENT → CONFIRMED
       booking.status = BookingStatus.CONFIRMED;
       booking.paidAt = new Date();
-      booking.transactionId =
-        booking.transactionId ?? (await this.generateUniqueTransactionId(manager));
+      booking.paymentMethod = booking.paymentMethod ?? 'AUTO';
       return manager.save(booking);
     });
 
@@ -536,7 +522,6 @@ export class BookingsService {
         guestName: guestName ?? null,
         guestPhone: guestPhone ?? null,
         note: note ?? null,
-        transactionId: await this.generateUniqueTransactionId(manager),
       });
       const saved = await manager.save(booking);
 
@@ -570,6 +555,7 @@ export class BookingsService {
     const qb = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.court', 'court')
+      .leftJoinAndSelect('booking.user', 'user')
       .orderBy('booking.startTime', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -582,7 +568,98 @@ export class BookingsService {
     if (query.dateTo)
       qb.andWhere('booking.startTime <= :dateTo', { dateTo: new Date(query.dateTo) });
     const [data, total] = await qb.getManyAndCount();
-    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+    const enriched = data.map((item: BookingEntity & { user?: { name?: string } }) => ({
+      ...item,
+      customerName: item.guestName || item.user?.name || 'Member',
+    }));
+    return { data: enriched, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getAdminOverview(dateFrom: string, dateTo: string) {
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from >= to) {
+      throw new BadRequestException('Invalid date range');
+    }
+
+    const now = new Date();
+
+    const activeBookings = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .where('booking.status = :status', { status: BookingStatus.CONFIRMED })
+      .andWhere('booking.startTime <= :now', { now })
+      .andWhere('booking.endTime >= :now', { now })
+      .getCount();
+
+    const completedInWindow = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .where('booking.status = :completed', { completed: BookingStatus.COMPLETED })
+      .andWhere('booking.startTime >= :from', { from })
+      .andWhere('booking.startTime <= :to', { to })
+      .getCount();
+
+    const bookableStatuses = [BookingStatus.CONFIRMED, BookingStatus.COMPLETED];
+    const bookingRows = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .select(['booking.startTime', 'booking.endTime', 'booking.totalPrice', 'booking.status'])
+      .where('booking.status IN (:...statuses)', { statuses: bookableStatuses })
+      .andWhere('booking.startTime < :to', { to })
+      .andWhere('booking.endTime > :from', { from })
+      .getMany();
+
+    let bookedHours = 0;
+    let totalRevenue = 0;
+    for (const b of bookingRows) {
+      totalRevenue += Number(b.totalPrice);
+      const overlapStart = Math.max(new Date(b.startTime).getTime(), from.getTime());
+      const overlapEnd = Math.min(new Date(b.endTime).getTime(), to.getTime());
+      if (overlapEnd > overlapStart) {
+        bookedHours += (overlapEnd - overlapStart) / (1000 * 60 * 60);
+      }
+    }
+
+    const activeCourts = await this.courtRepository.find({
+      where: { status: CourtStatus.ACTIVE },
+      select: { id: true },
+    });
+    const courtIds = activeCourts.map((c) => c.id);
+
+    const slots =
+      courtIds.length > 0
+        ? await this.timeSlotRepository.find({
+            where: courtIds.map((courtId) => ({ courtId })),
+            select: { courtId: true, dayOfWeek: true, startHour: true, endHour: true },
+          })
+        : [];
+
+    const hoursPerDay = new Map<number, number>();
+    for (const slot of slots) {
+      const d = slot.dayOfWeek;
+      hoursPerDay.set(d, (hoursPerDay.get(d) ?? 0) + (slot.endHour - slot.startHour));
+    }
+
+    let availableHours = 0;
+    for (let d = new Date(from); d < to; d.setDate(d.getDate() + 1)) {
+      availableHours += hoursPerDay.get(d.getDay()) ?? 0;
+    }
+
+    const occupancyRate = availableHours > 0 ? (bookedHours / availableHours) * 100 : 0;
+    const newCustomers = await this.userRepository
+      .createQueryBuilder('user')
+      .where('user.createdAt >= :from', { from })
+      .andWhere('user.createdAt <= :to', { to })
+      .getCount();
+
+    return {
+      window: { dateFrom, dateTo },
+      activeBookings,
+      newCustomers,
+      completedBookings: completedInWindow,
+      totalRevenue,
+      bookedHours: Number(bookedHours.toFixed(2)),
+      availableHours: Number(availableHours.toFixed(2)),
+      occupancyRate: Number(Math.min(100, occupancyRate).toFixed(1)),
+    };
   }
 
   async checkInBooking(bookingId: string): Promise<BookingEntity> {

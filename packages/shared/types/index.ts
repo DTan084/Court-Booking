@@ -146,7 +146,6 @@ export interface Booking {
   paymentDeadline: string | null;
   paidAt: string | null;
   bookingSource?: BookingSource;
-  transactionId?: string | null;
   note?: string | null;
   checkedInAt?: string | null;
   cancelledBy?: CancelledBy | null;
