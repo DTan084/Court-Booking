@@ -201,9 +201,11 @@ function BookingsPageContent() {
           ? 'System Cancelled'
           : isUserCancelled
             ? 'Cancelled by User'
-            : booking.status === BookingStatus.CANCELLED
-              ? 'Cancelled'
-              : booking.status;
+            : isAdminCancelled
+              ? 'Admin Cancelled'
+              : booking.status === BookingStatus.CANCELLED
+                ? 'Cancelled'
+                : booking.status;
         const cancellationText =
           booking.cancellationNote || booking.cancelledReason || 'No reason provided';
 
@@ -249,6 +251,7 @@ function BookingsPageContent() {
                       booking.status === BookingStatus.EXPIRED &&
                         'border-red-100 bg-red-50 text-red-600',
                       isSystemCancelled && 'border-red-100 bg-red-50 text-red-600',
+                      isAdminCancelled && 'border-rose-100 bg-rose-50 text-rose-600',
                       isUserCancelled && 'border-slate-200 bg-slate-50 text-slate-500',
                     )}
                   >
@@ -273,7 +276,9 @@ function BookingsPageContent() {
                       <span
                         className={cn(
                           'italic',
-                          isSystemCancelled ? 'text-red-500/80' : 'text-slate-500',
+                          isSystemCancelled || isAdminCancelled
+                            ? 'text-red-500/80'
+                            : 'text-slate-500',
                         )}
                       >
                         {cancellationText}

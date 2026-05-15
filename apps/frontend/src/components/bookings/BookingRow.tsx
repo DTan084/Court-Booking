@@ -123,6 +123,8 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
         ? 'Payment expired'
         : null;
   const statusLabel = isSystemCancelled ? 'System Cancelled' : statusInfo.label;
+  const isAdminCancelled =
+    booking.status === BookingStatus.CANCELLED && booking.cancelledBy === CancelledBy.ADMIN;
 
   return (
     <>
@@ -147,9 +149,10 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
                 booking.status === BookingStatus.CANCELLED &&
                   'border-slate-300 bg-white text-slate-600',
                 isSystemCancelled && 'border-red-100 bg-red-50 text-red-600',
+                isAdminCancelled && 'border-rose-100 bg-rose-50 text-rose-700',
               )}
             >
-              {statusLabel}
+              {isAdminCancelled ? 'Admin Cancelled' : statusLabel}
             </span>
             {refundPending && (
               <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-orange-700">
@@ -210,7 +213,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
             <div
               className={cn(
                 'mt-3 inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs',
-                isSystemCancelled
+                isSystemCancelled || isAdminCancelled
                   ? 'border-red-100 bg-red-50 text-red-700'
                   : 'border-slate-200 bg-white text-slate-600',
               )}
