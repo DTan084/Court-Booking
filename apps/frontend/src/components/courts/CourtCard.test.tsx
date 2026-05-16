@@ -1,15 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import { CourtCard } from './CourtCard';
-import type { Court, SportType, CourtStatus } from '@/types';
+import { CourtStatus, CourtType } from '@/types';
+import type { Court } from '@/types';
 
 describe('CourtCard', () => {
   const mockCourt: Court = {
     id: '1',
-    name: 'Sân Cầu Lông A1',
-    sportType: 'badminton' as SportType,
-    address: '123 Đường ABC, Quận 1, TP.HCM',
+    name: 'San Cau Long A1',
+    sportTypeId: 'sport-type-1',
+    courtType: CourtType.INDOOR,
+    address: '123 Duong ABC, Quan 1, TP.HCM',
+    district: 'Quan 1',
+    description: null,
+    featureItems: [],
+    images: [],
     pricePerHour: 150000,
-    status: 'ACTIVE' as CourtStatus,
+    status: CourtStatus.ACTIVE,
     deletedAt: null,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-01T00:00:00Z',
@@ -17,17 +23,12 @@ describe('CourtCard', () => {
 
   it('should render court name', () => {
     render(<CourtCard court={mockCourt} />);
-    expect(screen.getByText('Sân Cầu Lông A1')).toBeInTheDocument();
-  });
-
-  it('should render sport type badge', () => {
-    render(<CourtCard court={mockCourt} />);
-    expect(screen.getByText('Cầu lông')).toBeInTheDocument();
+    expect(screen.getByText('San Cau Long A1')).toBeInTheDocument();
   });
 
   it('should render address', () => {
     render(<CourtCard court={mockCourt} />);
-    expect(screen.getByText('123 Đường ABC, Quận 1, TP.HCM')).toBeInTheDocument();
+    expect(screen.getByText('123 Duong ABC, Quan 1, TP.HCM')).toBeInTheDocument();
   });
 
   it('should render price formatted', () => {
@@ -35,15 +36,10 @@ describe('CourtCard', () => {
     expect(screen.getByText(/150\.000/)).toBeInTheDocument();
   });
 
-  it('should render status badge for active court', () => {
-    render(<CourtCard court={mockCourt} />);
-    expect(screen.getByText('Hoạt động')).toBeInTheDocument();
-  });
-
   it('should render status badge for inactive court', () => {
-    const inactiveCourt = { ...mockCourt, status: 'INACTIVE' as CourtStatus };
+    const inactiveCourt = { ...mockCourt, status: CourtStatus.INACTIVE };
     render(<CourtCard court={inactiveCourt} />);
-    expect(screen.getByText('Tạm ngưng')).toBeInTheDocument();
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
   });
 
   it('should have link to court detail page', () => {

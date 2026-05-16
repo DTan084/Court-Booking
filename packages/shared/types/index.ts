@@ -3,22 +3,46 @@
 // ── Enums ──────────────────────────────────────
 
 export enum Role {
-  USER = 'user',
-  ADMIN = 'admin',
+  USER = 'USER',
+  ADMIN = 'ADMIN',
 }
 
 export enum BookingStatus {
-  CONFIRMED = 'confirmed',
-  CANCELLED = 'cancelled',
-  COMPLETED = 'completed',
+  PENDING_PAYMENT = 'PENDING_PAYMENT',
+  CONFIRMED = 'CONFIRMED',
+  CANCELLED = 'CANCELLED',
+  COMPLETED = 'COMPLETED',
+  EXPIRED = 'EXPIRED',
 }
 
-export enum SportType {
-  BADMINTON = 'badminton',
-  TENNIS = 'tennis',
-  FOOTBALL = 'football',
-  BASKETBALL = 'basketball',
-  VOLLEYBALL = 'volleyball',
+export enum NotificationType {
+  BOOKING_CONFIRMED = 'BOOKING_CONFIRMED',
+  PAYMENT_REMINDER = 'PAYMENT_REMINDER',
+  BOOKING_REMINDER = 'BOOKING_REMINDER',
+  BOOKING_EXPIRED = 'BOOKING_EXPIRED',
+  BOOKING_CANCELLED = 'BOOKING_CANCELLED',
+}
+
+export enum BookingSource {
+  ONLINE = 'ONLINE',
+  ADMIN = 'ADMIN',
+  WALK_IN = 'WALK_IN',
+}
+
+export enum CancelledBy {
+  USER = 'USER',
+  SYSTEM = 'SYSTEM',
+  ADMIN = 'ADMIN',
+}
+
+export enum CourtStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
+
+export enum CourtType {
+  INDOOR = 'INDOOR',
+  OUTDOOR = 'OUTDOOR',
 }
 
 // ── Base Types ─────────────────────────────────
@@ -27,20 +51,86 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  phone?: string;
+  phone: string | null;
+  avatarUrl: string | null;
+  dob: string | null;
   role: Role;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface CourtImage {
+  id: string;
+  url: string;
+  altText: string | null;
+  displayOrder: number;
+}
+
+export interface SportTypeModel {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  isActive: boolean;
+  displayOrder: number;
+  createdAt: string;
+}
+
+export interface Feature {
+  id: string;
+  name: string;
+  icon: string | null;
+  category: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface SlotTemplateItem {
+  id: string;
+  templateId: string;
+  dayOfWeek: number;
+  startHour: string;
+  endHour: string;
+  price: number;
+}
+
+export interface SlotTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  items?: SlotTemplateItem[];
+}
+
 export interface Court {
   id: string;
   name: string;
-  sportType: SportType;
+  sportTypeId: string;
+  courtType: CourtType;
   address: string;
-  description?: string;
+  district: string | null;
+  description: string | null;
+  sportTypeName?: string;
+  sportTypeRef?: SportTypeModel;
+  featureItems?: Feature[];
+  isFeatured?: boolean;
+  maxPlayers?: number | null;
+  images: CourtImage[];
   pricePerHour: number;
-  isActive: boolean;
+  status: CourtStatus;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CourtTimeSlot {
+  id: string;
+  courtId: string;
+  dayOfWeek: number;
+  startHour: number;
+  endHour: number;
+  price: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -49,12 +139,44 @@ export interface Booking {
   id: string;
   courtId: string;
   userId: string;
+  court?: Court;
   startTime: string;
   endTime: string;
   status: BookingStatus;
   totalPrice: number;
+  paymentDeadline: string | null;
+  paidAt: string | null;
+  bookingSource?: BookingSource;
+  note?: string | null;
+  checkedInAt?: string | null;
+  cancelledBy?: CancelledBy | null;
+  cancelledReason?: string | null;
+  cancellationNote?: string | null;
+  refundedAt?: string | null;
+  refundAmount?: number | null;
+  guestName?: string | null;
+  guestPhone?: string | null;
+  cancelledAt: string | null;
+  cancellationDeadline: string | null; // createdAt + 24h
+  latestCancellableTime: string | null; // startTime - 12h
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  bookingId: string | null;
+  createdAt: string;
+}
+
+export interface UserSettings {
+  timezone: string;
+  locale: string;
 }
 
 // ── API Response Types ─────────────────────────

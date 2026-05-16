@@ -1,4 +1,10 @@
-import { Injectable, ConflictException, UnauthorizedException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  Inject,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -13,6 +19,7 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
@@ -24,10 +31,14 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { name, email, password } = registerDto;
+    const { name, password } = registerDto;
+    const email = registerDto.email.toLowerCase().trim();
+
+    this.logger.debug(`Registration attempt for email: ${email}`);
 
     const existingUser = await this.userRepository.findOne({ where: { email } });
     if (existingUser) {
+      this.logger.warn(`Registration failed: Email already in use [${email}]`);
       throw new ConflictException('Email already in use');
     }
 
@@ -52,7 +63,10 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const { email, password } = loginDto;
+    const email = loginDto.email.toLowerCase().trim();
+    const { password } = loginDto;
+
+    this.logger.debug(`Login attempt for email: ${email}`);
 
     // 1. Check if locked out
     await this.checkLockout(email);
@@ -64,15 +78,21 @@ export class AuthService {
     });
 
     if (!user) {
+      this.logger.warn(`Login failed: User not found for email [${email}]`);
       await this.incrementFailedAttempts(email);
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
+
+    this.logger.debug(`User found for email [${email}], comparing passwords...`);
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      this.logger.warn(`Login failed: Invalid password for email [${email}]`);
       await this.incrementFailedAttempts(email);
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
+
+    this.logger.log(`Login successful for user: ${email} (${user.id})`);
 
     // Success - Reset failed attempts
     await this.resetFailedAttempts(email);
@@ -86,7 +106,9 @@ export class AuthService {
     const lockoutKey = `lockout:${email}`;
     const isLocked = await this.redis.get(lockoutKey);
     if (isLocked) {
-      throw new UnauthorizedException('Account is temporarily locked. Please try again later.');
+      throw new UnauthorizedException(
+        'Tài khoản đã bị tạm khóa do nhập sai nhiều lần. Vui lòng thử lại sau 15 phút.',
+      );
     }
   }
 

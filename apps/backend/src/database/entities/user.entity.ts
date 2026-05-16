@@ -29,15 +29,24 @@ export class UserEntity {
   @Column({ type: 'enum', enum: Role, default: Role.USER })
   role: Role;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phone: string | null;
+
+  @Column({ type: 'varchar', length: 500, name: 'avatar_url', nullable: true })
+  avatarUrl: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  dob: string | null;
+
   @OneToMany(() => BookingEntity, (booking) => booking.user)
   bookings: BookingEntity[];
 
   @OneToMany(() => RefreshTokenEntity, (token) => token.user)
   refreshTokens: RefreshTokenEntity[];
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

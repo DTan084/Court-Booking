@@ -1,28 +1,35 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { CourtStatus, CourtType } from '@court-booking/shared';
 import { Button } from '@/components/ui/button';
-import { useCreateCourt, useUpdateCourt } from '@/hooks/useAdminCourts';
-import { SportType, CourtStatus } from '@/types';
+import { useCreateCourt, useSyncCourtFeatures, useUpdateCourt } from '@/hooks/useAdminCourts';
+import { useCourt } from '@/hooks/useCourt';
+import { useFeatures } from '@/hooks/useFeatures';
+import { useSportTypes } from '@/hooks/useSportTypes';
+import { resolveFeatureIcon } from '@/lib/feature-icons';
 import type { Court } from '@/types';
 
-// ==================== SCHEMA ====================
-
 const courtSchema = z.object({
-  name: z.string().min(2, 'Tên sân tối thiểu 2 ký tự'),
-  sportType: z.nativeEnum(SportType, { required_error: 'Vui lòng chọn loại thể thao' }),
-  address: z.string().min(5, 'Địa chỉ tối thiểu 5 ký tự'),
-  pricePerHour: z.number({ invalid_type_error: 'Giá phải là số' }).positive('Giá phải lớn hơn 0'),
+  name: z.string().min(2, 'Ten san toi thieu 2 ky tu'),
+  sportTypeId: z.string().uuid('Sport type is required'),
+  courtType: z.nativeEnum(CourtType),
+  address: z.string().min(5, 'Dia chi toi thieu 5 ky tu'),
+  district: z.string().max(100).optional(),
+  pricePerHour: z.number().positive('Gia phai lon hon 0'),
+  maxPlayers: z.number().int().min(1).optional().nullable(),
+  isFeatured: z.boolean().optional(),
+  description: z.string().max(5000).optional(),
+  featureIds: z.array(z.string().uuid()).optional().default([]),
   status: z.nativeEnum(CourtStatus).optional(),
 });
 
 type CourtFormData = z.infer<typeof courtSchema>;
-
-// ==================== TYPES ====================
 
 interface CourtFormDialogProps {
   open: boolean;
@@ -31,100 +38,119 @@ interface CourtFormDialogProps {
   mode: 'create' | 'edit';
 }
 
-// ==================== CONSTANTS ====================
-
-const sportTypeOptions = [
-  { value: SportType.BADMINTON, label: 'Cầu lông' },
-  { value: SportType.TENNIS, label: 'Tennis' },
-  { value: SportType.FOOTBALL, label: 'Bóng đá' },
-  { value: SportType.BASKETBALL, label: 'Bóng rổ' },
-  { value: SportType.VOLLEYBALL, label: 'Bóng chuyền' },
-];
-
-const statusOptions = [
-  { value: CourtStatus.ACTIVE, label: 'Hoạt động' },
-  { value: CourtStatus.INACTIVE, label: 'Tạm ngưng' },
-];
-
-// ==================== COMPONENT ====================
-
 export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDialogProps) {
   const { mutate: createCourt, isPending: isCreating } = useCreateCourt();
   const { mutate: updateCourt, isPending: isUpdating } = useUpdateCourt();
+  const { mutateAsync: syncCourtFeatures } = useSyncCourtFeatures();
+  const { data: sportTypes = [] } = useSportTypes();
+  const { data: features = [] } = useFeatures();
+  const { data: courtDetail } = useCourt(
+    court?.id ?? '',
+    open && mode === 'edit' && Boolean(court?.id),
+  );
+
   const isPending = isCreating || isUpdating;
+  const [preview, setPreview] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState<CourtFormData | null>(null);
+
+  const defaultSportTypeId = useMemo(() => sportTypes[0]?.id ?? '', [sportTypes]);
 
   const {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<CourtFormData>({
     resolver: zodResolver(courtSchema),
     defaultValues: {
       name: '',
-      sportType: SportType.BADMINTON,
+      sportTypeId: '',
+      courtType: CourtType.OUTDOOR,
       address: '',
+      district: '',
       pricePerHour: 0,
+      maxPlayers: null,
+      isFeatured: false,
+      description: '',
+      featureIds: [],
       status: CourtStatus.ACTIVE,
     },
   });
 
-  // Populate form when editing
+  const featureIds = watch('featureIds') ?? [];
+  const description = watch('description') ?? '';
+  const editingCourt = mode === 'edit' ? (courtDetail ?? court) : undefined;
+
   useEffect(() => {
-    if (open && court && mode === 'edit') {
-      reset({
-        name: court.name,
-        sportType: court.sportType,
-        address: court.address,
-        pricePerHour: court.pricePerHour,
-        status: court.status,
-      });
-    } else if (open && mode === 'create') {
-      reset({
-        name: '',
-        sportType: SportType.BADMINTON,
-        address: '',
-        pricePerHour: 0,
-        status: CourtStatus.ACTIVE,
-      });
-    }
-  }, [open, court, mode, reset]);
+    if (!open) return;
 
-  const onSubmit = (data: CourtFormData) => {
+    if (editingCourt && mode === 'edit') {
+      reset({
+        name: editingCourt.name,
+        sportTypeId: editingCourt.sportTypeId,
+        courtType: editingCourt.courtType,
+        address: editingCourt.address,
+        district: editingCourt.district ?? '',
+        pricePerHour: Number(editingCourt.pricePerHour),
+        maxPlayers: editingCourt.maxPlayers ?? null,
+        isFeatured: editingCourt.isFeatured ?? false,
+        description: editingCourt.description ?? '',
+        featureIds: (editingCourt.featureItems ?? []).map((item) => item.id),
+        status: editingCourt.status,
+      });
+      return;
+    }
+
+    reset({
+      name: '',
+      sportTypeId: defaultSportTypeId,
+      courtType: CourtType.OUTDOOR,
+      address: '',
+      district: '',
+      pricePerHour: 0,
+      maxPlayers: null,
+      isFeatured: false,
+      description: '',
+      featureIds: [],
+      status: CourtStatus.ACTIVE,
+    });
+  }, [open, editingCourt, mode, reset, defaultSportTypeId]);
+
+  const toggleFeature = (featureId: string) => {
+    const next = featureIds.includes(featureId)
+      ? featureIds.filter((id) => id !== featureId)
+      : [...featureIds, featureId];
+    setValue('featureIds', next);
+  };
+
+  const doSubmit = (data: CourtFormData) => {
+    const { featureIds: nextFeatureIds, ...courtPayload } = data;
+
     if (mode === 'create') {
-      createCourt(
-        {
-          name: data.name,
-          sportType: data.sportType,
-          address: data.address,
-          pricePerHour: data.pricePerHour,
+      createCourt(courtPayload, {
+        onSuccess: async (createdCourt) => {
+          await syncCourtFeatures({ courtId: createdCourt.id, featureIds: nextFeatureIds });
+          onOpenChange(false);
         },
-        {
-          onSuccess: () => {
-            onOpenChange(false);
-            reset();
-          },
-        },
-      );
-    } else if (court) {
-      updateCourt(
-        { id: court.id, dto: data },
-        {
-          onSuccess: () => {
-            onOpenChange(false);
-            reset();
-          },
-        },
-      );
+      });
+      return;
     }
+
+    if (!court) return;
+    updateCourt(
+      { id: court.id, dto: courtPayload },
+      {
+        onSuccess: async () => {
+          await syncCourtFeatures({ courtId: court.id, featureIds: nextFeatureIds });
+          onOpenChange(false);
+        },
+      },
+    );
   };
 
-  const handleClose = () => {
-    if (!isPending) {
-      onOpenChange(false);
-      reset();
-    }
-  };
+  const onSubmit = (data: CourtFormData) => setPendingSubmit(data);
 
   if (!open) return null;
 
@@ -133,153 +159,235 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="court-form-title"
     >
-      <div className="relative w-full max-w-lg rounded-lg bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="mb-5 flex items-center justify-between">
-          <h2 id="court-form-title" className="text-xl font-semibold text-gray-900">
-            {mode === 'create' ? 'Tạo sân mới' : 'Chỉnh sửa sân'}
+      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+        <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
+          <h2 className="text-xl font-semibold text-slate-900">
+            {mode === 'create' ? 'Tao san moi' : 'Chinh sua san'}
           </h2>
           <button
-            onClick={handleClose}
+            onClick={() => onOpenChange(false)}
             disabled={isPending}
-            className="rounded-lg p-1 hover:bg-gray-100 disabled:opacity-50"
-            aria-label="Đóng"
+            className="rounded-lg p-1 hover:bg-gray-100"
           >
             <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Name */}
-          <div>
-            <label htmlFor="court-name" className="block text-sm font-medium text-gray-700">
-              Tên sân <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="court-name"
-              type="text"
-              {...register('name')}
-              placeholder="Ví dụ: Sân cầu lông Hà Nội"
-              disabled={isPending}
-              aria-describedby={errors.name ? 'court-name-error' : undefined}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            />
-            {errors.name && (
-              <p id="court-name-error" className="mt-1 text-sm text-red-600" role="alert">
-                {errors.name.message}
-              </p>
-            )}
-          </div>
-
-          {/* Sport Type */}
-          <div>
-            <label htmlFor="court-sport-type" className="block text-sm font-medium text-gray-700">
-              Loại thể thao <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="court-sport-type"
-              {...register('sportType')}
-              disabled={isPending}
-              aria-describedby={errors.sportType ? 'court-sport-type-error' : undefined}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {sportTypeOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            {errors.sportType && (
-              <p id="court-sport-type-error" className="mt-1 text-sm text-red-600" role="alert">
-                {errors.sportType.message}
-              </p>
-            )}
-          </div>
-
-          {/* Address */}
-          <div>
-            <label htmlFor="court-address" className="block text-sm font-medium text-gray-700">
-              Địa chỉ <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="court-address"
-              type="text"
-              {...register('address')}
-              placeholder="Ví dụ: 123 Đường ABC, Quận 1, TP.HCM"
-              disabled={isPending}
-              aria-describedby={errors.address ? 'court-address-error' : undefined}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            />
-            {errors.address && (
-              <p id="court-address-error" className="mt-1 text-sm text-red-600" role="alert">
-                {errors.address.message}
-              </p>
-            )}
-          </div>
-
-          {/* Price Per Hour */}
-          <div>
-            <label htmlFor="court-price" className="block text-sm font-medium text-gray-700">
-              Giá tham khảo (VND/giờ) <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="court-price"
-              type="number"
-              min={0}
-              step={1000}
-              {...register('pricePerHour', { valueAsNumber: true })}
-              placeholder="150000"
-              disabled={isPending}
-              aria-describedby={errors.pricePerHour ? 'court-price-error' : undefined}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            />
-            {errors.pricePerHour && (
-              <p id="court-price-error" className="mt-1 text-sm text-red-600" role="alert">
-                {errors.pricePerHour.message}
-              </p>
-            )}
-          </div>
-
-          {/* Status (edit only) */}
-          {mode === 'edit' && (
-            <div>
-              <label htmlFor="court-status" className="block text-sm font-medium text-gray-700">
-                Trạng thái
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <section className="rounded-lg border border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Basic Info
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Court Name
+                </span>
+                <input
+                  {...register('name')}
+                  placeholder="Ten san"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+                {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
               </label>
-              <select
-                id="court-status"
-                {...register('status')}
-                disabled={isPending}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-              >
-                {statusOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Sport Type
+                </span>
+                <select {...register('sportTypeId')} className="w-full rounded-md border px-3 py-2">
+                  {sportTypes.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Court Type
+                </span>
+                <select {...register('courtType')} className="w-full rounded-md border px-3 py-2">
+                  <option value={CourtType.INDOOR}>Trong nha</option>
+                  <option value={CourtType.OUTDOOR}>Ngoai troi</option>
+                </select>
+              </label>
             </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Pricing & Capacity
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Price per Hour
+                </span>
+                <input
+                  type="number"
+                  {...register('pricePerHour', { valueAsNumber: true })}
+                  placeholder="Gia/gio"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Max Players
+                </span>
+                <input
+                  type="number"
+                  {...register('maxPlayers', { valueAsNumber: true })}
+                  placeholder="So nguoi toi da"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm md:col-span-2">
+                <input type="checkbox" {...register('isFeatured')} />
+                Noi bat (Featured)
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Location
+            </h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm md:col-span-2">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Address
+                </span>
+                <input
+                  {...register('address')}
+                  placeholder="Dia chi"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  District
+                </span>
+                <input
+                  {...register('district')}
+                  placeholder="Quan/Huyen"
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Description
+            </h3>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium">Mo ta san</span>
+                <button
+                  type="button"
+                  className="text-sm text-[#944a00]"
+                  onClick={() => setPreview((v) => !v)}
+                >
+                  {preview ? 'Nhap' : 'Xem truoc'}
+                </button>
+              </div>
+              {!preview ? (
+                <textarea
+                  {...register('description')}
+                  rows={5}
+                  placeholder="Nhap mo ta san (ho tro Markdown)..."
+                  className="w-full rounded-md border px-3 py-2"
+                />
+              ) : (
+                <div className="prose min-h-[120px] rounded-md border p-3">
+                  <ReactMarkdown>{description || '_Chua co noi dung_'}</ReactMarkdown>
+                </div>
+              )}
+              <p className="mt-1 text-xs text-slate-500">{description.length}/5000</p>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-slate-200 p-4">
+            <p className="mb-2 text-sm font-medium">Tien ich san</p>
+            <div className="grid grid-cols-2 gap-2">
+              {features.map((feature) => (
+                <label key={feature.id} className="flex items-center gap-2 text-sm">
+                  {(() => {
+                    const Icon = resolveFeatureIcon({ icon: feature.icon, name: feature.name });
+                    return Icon ? <Icon className="h-3.5 w-3.5 text-slate-500" /> : null;
+                  })()}
+                  <input
+                    type="checkbox"
+                    checked={featureIds.includes(feature.id)}
+                    onChange={() => toggleFeature(feature.id)}
+                  />
+                  <span>{feature.name}</span>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          {mode === 'edit' && (
+            <section className="rounded-lg border border-slate-200 p-4">
+              <p className="mb-2 text-sm font-medium">Trang thai</p>
+              <select {...register('status')} className="w-full rounded-md border px-3 py-2">
+                <option value={CourtStatus.ACTIVE}>Hoat dong</option>
+                <option value={CourtStatus.INACTIVE}>Tam ngung</option>
+              </select>
+            </section>
           )}
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-2">
+          <div className="sticky bottom-0 flex gap-3 border-t border-slate-100 bg-white pt-4">
             <Button
               type="button"
               variant="outline"
-              onClick={handleClose}
+              onClick={() => onOpenChange(false)}
               disabled={isPending}
               className="flex-1"
             >
-              Hủy
+              Huy
             </Button>
             <Button type="submit" disabled={isPending} className="flex-1">
-              {isPending ? 'Đang xử lý...' : mode === 'create' ? 'Tạo sân' : 'Cập nhật'}
+              {isPending ? 'Dang xu ly...' : mode === 'create' ? 'Tao san' : 'Cap nhat'}
             </Button>
           </div>
         </form>
       </div>
+      {pendingSubmit && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-8 shadow-2xl">
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+              <span className="text-2xl text-red-500">!</span>
+            </div>
+            <h3 className="mb-3 text-center text-4 font-bold text-slate-900">
+              Xác nhận cập nhật sân
+            </h3>
+            <p className="mb-6 text-center text-slate-600">
+              {mode === 'edit' &&
+              court?.status !== CourtStatus.INACTIVE &&
+              pendingSubmit.status === CourtStatus.INACTIVE
+                ? 'Sân sẽ chuyển sang Tạm ngưng và auto-cancel các booking tương lai (SYSTEM CANCELLED).'
+                : 'Bạn có chắc muốn cập nhật thông tin sân này?'}
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={() => setPendingSubmit(null)}>
+                Hủy bỏ
+              </Button>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={() => {
+                  const payload = pendingSubmit;
+                  setPendingSubmit(null);
+                  doSubmit(payload);
+                }}
+              >
+                Xác nhận cập nhật
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,10 @@ import {
   Patch,
   Put,
   ParseUUIDPipe,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -28,11 +32,18 @@ import { GetCourtsDto, getCourtsSchema } from './dto/get-courts.dto';
 import { UpdateCourtDto, updateCourtSchema } from './dto/update-court.dto';
 import { GetCourtStatsDto, getCourtStatsSchema } from './dto/get-court-stats.dto';
 import { UpsertTimeSlotsDto, upsertTimeSlotsSchema } from './dto/upsert-time-slots.dto';
+import { AddCourtImageDto, addCourtImageSchema } from './dto/add-court-image.dto';
+import { ReorderCourtImagesDto, reorderCourtImagesSchema } from './dto/reorder-court-images.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import type { Request } from 'express';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { Role, SportType } from '@court-booking/shared';
+import { Role } from '@court-booking/shared';
 import { BookingsService } from '../bookings/bookings.service';
 import { getScheduleSchema, GetScheduleDto } from '../bookings/dto/get-schedule.dto';
 import { ApiErrorResponse } from '../../common/swagger/api-response.swagger';
@@ -76,12 +87,59 @@ export class CourtsController {
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'name', required: false, type: String })
-  @ApiQuery({ name: 'sportType', required: false, enum: SportType })
+  @ApiQuery({ name: 'sportTypeId', required: false, type: String })
   @ApiQuery({ name: 'address', required: false, type: String })
+  @ApiQuery({
+    name: 'district',
+    required: false,
+    type: String,
+    description: 'Exact match (case-insensitive)',
+  })
+  @ApiQuery({
+    name: 'location',
+    required: false,
+    type: String,
+    description: 'ILIKE search in address',
+  })
+  @ApiQuery({
+    name: 'featureIds',
+    required: false,
+    type: String,
+    description: 'Comma separated feature UUIDs; AND logic',
+  })
+  @ApiQuery({ name: 'minPrice', required: false, type: Number })
+  @ApiQuery({ name: 'maxPrice', required: false, type: Number })
+  @ApiQuery({ name: 'minPlayers', required: false, type: Number })
+  @ApiQuery({ name: 'maxPlayers', required: false, type: Number })
+  @ApiQuery({
+    name: 'availableToday',
+    required: false,
+    type: Boolean,
+    description: 'Only courts with at least one free slot today',
+  })
   @ApiResponse({ status: 200, description: 'Paginated list of courts', type: CourtsListResponse })
   @UsePipes(new ZodValidationPipe(getCourtsSchema))
   async findAll(@Query() query: GetCourtsDto) {
     return this.courtsService.findAll(query);
+  }
+
+  @Get('admin/deleted')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async findDeleted(@Query('page') page = '1', @Query('limit') limit = '20') {
+    return this.courtsService.findDeleted(Number(page), Number(limit));
+  }
+
+  @Get('districts')
+  @ApiOperation({ summary: 'Get distinct districts of active courts (REQ-21.4)' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of districts',
+    schema: { type: 'array', items: { type: 'string' } },
+  })
+  async getDistricts() {
+    return this.courtsService.getDistricts();
   }
 
   @Get(':id')
@@ -103,7 +161,23 @@ export class CourtsController {
   @Roles(Role.ADMIN)
   @UsePipes(new ZodValidationPipe(updateCourtSchema))
   async update(@Param('id', ParseUUIDPipe) id: string, @Body() updateCourtDto: UpdateCourtDto) {
-    return this.courtsService.update(id, updateCourtDto);
+    const result = await this.courtsService.update(id, updateCourtDto);
+    return {
+      ...result.court,
+      autoCancelledBookings: result.autoCancelledBookings,
+    };
+  }
+
+  @Patch(':id/featured')
+  @ApiOperation({ summary: 'Toggle featured status for a court (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async updateFeatured(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { isFeatured: boolean },
+  ) {
+    return this.courtsService.updateFeatured(id, body.isFeatured);
   }
 
   @Delete(':id')
@@ -119,8 +193,26 @@ export class CourtsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   async remove(@Param('id', ParseUUIDPipe) id: string) {
-    await this.courtsService.softDelete(id);
-    return { message: 'Court deleted successfully', id };
+    const autoCancelledBookings = await this.courtsService.softDelete(id);
+    return { message: 'Court deleted successfully', id, autoCancelledBookings };
+  }
+
+  @Patch(':id/restore')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async restore(@Param('id', ParseUUIDPipe) id: string) {
+    await this.courtsService.restoreCourt(id);
+    return { message: 'Court restored successfully', id };
+  }
+
+  @Delete(':id/hard')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async hardDelete(@Param('id', ParseUUIDPipe) id: string) {
+    await this.courtsService.hardDelete(id);
+    return { message: 'Court permanently deleted', id };
   }
 
   @Get(':id/schedule')
@@ -197,5 +289,92 @@ export class CourtsController {
     @Body(new ZodValidationPipe(upsertTimeSlotsSchema)) body: UpsertTimeSlotsDto,
   ) {
     return this.courtsService.upsertTimeSlots(id, body);
+  }
+
+  @Post(':id/images')
+  @ApiOperation({ summary: 'Add court image (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (_req: any, _file: any, cb: any) => {
+          const targetDir = join(process.cwd(), 'uploads', 'courts');
+          if (!existsSync(targetDir)) {
+            mkdirSync(targetDir, { recursive: true });
+          }
+          cb(null, targetDir);
+        },
+        filename: (_req: any, file: any, cb: any) => {
+          const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (_req: any, file: any, cb: any) => {
+        if (!file.mimetype.startsWith('image/')) {
+          cb(new BadRequestException('File upload phải là hình ảnh'), false);
+          return;
+        }
+        cb(null, true);
+      },
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  async addImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: any,
+    @Body() body: { altText?: string; displayOrder?: string },
+    @Req() req: Request,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn file ảnh để upload');
+    }
+
+    const dto: AddCourtImageDto = addCourtImageSchema.parse({
+      url: `${req.protocol}://${req.get('host')}/uploads/courts/${file.filename}`,
+      altText: body.altText,
+      displayOrder:
+        body.displayOrder !== undefined && body.displayOrder !== ''
+          ? Number(body.displayOrder)
+          : undefined,
+    });
+    return this.courtsService.addImage(id, dto);
+  }
+
+  @Delete(':id/images/:imageId')
+  @ApiOperation({ summary: 'Delete court image (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async removeImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+  ) {
+    await this.courtsService.removeImage(id, imageId);
+    return { message: 'Image deleted successfully', imageId };
+  }
+
+  @Patch(':id/images/reorder')
+  @ApiOperation({ summary: 'Reorder court images (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UsePipes(new ZodValidationPipe(reorderCourtImagesSchema))
+  async reorderImages(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ReorderCourtImagesDto) {
+    return this.courtsService.reorderImages(id, dto);
+  }
+
+  @Patch(':id/images/:imageId')
+  @ApiOperation({ summary: 'Update court image alt text (Admin only)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async updateImageAltText(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+    @Body() body: { altText?: string },
+  ) {
+    return this.courtsService.updateImageAltText(id, imageId, body.altText);
   }
 }

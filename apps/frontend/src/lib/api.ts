@@ -115,9 +115,23 @@ export const queryKeys = {
     stats: (id: string, params: Record<string, unknown>) =>
       ['courts', id, 'stats', params] as const,
   },
+  features: {
+    list: () => ['features', 'list'] as const,
+  },
+  sportTypes: {
+    list: () => ['sport-types', 'list'] as const,
+  },
+  slotTemplates: {
+    list: () => ['slot-templates', 'list'] as const,
+    detail: (id: string) => ['slot-templates', id] as const,
+  },
+  adminBookings: {
+    list: (params: Record<string, unknown>) => ['admin-bookings', 'list', params] as const,
+  },
   bookings: {
     all: ['bookings'] as const,
     myList: (params: Record<string, unknown>) => ['bookings', 'me', params] as const,
+    detail: (id: string) => ['bookings', id] as const,
   },
   auth: {
     me: ['auth', 'me'] as const,

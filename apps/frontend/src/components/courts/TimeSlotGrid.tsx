@@ -9,7 +9,7 @@ interface TimeSlotGridProps {
   bookedRanges: BookedRange[];
   selectedStart?: number;
   selectedEnd?: number;
-  currentHour?: number; // If provided (today), slots at or before this hour are marked past
+  currentHour?: number;
   onSlotClick?: (startHour: number, endHour: number) => void;
   onSlotSelect?: (startHour: number, endHour: number) => void;
 }
@@ -33,7 +33,6 @@ export function TimeSlotGrid({
         const unavailable = booked || isPast;
         const clickable = !unavailable && (onSlotClick || onSlotSelect);
 
-        // Check if this slot is in the selected range
         const isSelected =
           selectedStart !== undefined &&
           selectedEnd !== undefined &&
@@ -57,9 +56,9 @@ export function TimeSlotGrid({
             className={cn(
               'rounded-lg border p-4 text-left transition-all',
               isPast
-                ? 'cursor-not-allowed border-gray-100 bg-gray-50 opacity-40'
+                ? 'cursor-not-allowed border-gray-100 bg-gray-50 opacity-50'
                 : booked
-                  ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
+                  ? 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-70'
                   : isSelected
                     ? 'cursor-pointer border-blue-400 bg-blue-100 ring-2 ring-blue-300 hover:bg-blue-200'
                     : clickable
@@ -67,7 +66,6 @@ export function TimeSlotGrid({
                       : 'border-gray-200 bg-white',
             )}
           >
-            {/* Time Range */}
             <div className="mb-2 flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium text-foreground">
@@ -76,28 +74,30 @@ export function TimeSlotGrid({
               </span>
             </div>
 
-            {/* Price */}
-            <div className="mb-2 text-lg font-semibold text-primary">
-              {formatCurrency(slot.price)}
-            </div>
+            {!unavailable ? (
+              <div className="mb-2 text-lg font-semibold text-primary">
+                {formatCurrency(slot.price)}
+              </div>
+            ) : (
+              <div className="mb-2 text-sm font-medium text-slate-500">Khong kha dung</div>
+            )}
 
-            {/* Status Badge */}
             <div>
               {isPast ? (
-                <span className="inline-block rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-500">
-                  Đã qua
+                <span className="inline-block rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">
+                  Da qua
                 </span>
               ) : booked ? (
                 <span className="inline-block rounded-full bg-gray-200 px-2 py-1 text-xs font-medium text-gray-700">
-                  Đã đặt
+                  Da dat
                 </span>
               ) : isSelected ? (
                 <span className="inline-block rounded-full bg-blue-200 px-2 py-1 text-xs font-medium text-blue-700">
-                  Đang chọn
+                  Dang chon
                 </span>
               ) : (
                 <span className="inline-block rounded-full bg-green-200 px-2 py-1 text-xs font-medium text-green-700">
-                  Còn trống
+                  Con trong
                 </span>
               )}
             </div>

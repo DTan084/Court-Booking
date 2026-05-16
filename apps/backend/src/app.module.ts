@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+﻿import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
@@ -7,6 +7,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CourtsModule } from './modules/courts/courts.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { HealthModule } from './modules/health/health.module';
+import { UsersModule } from './modules/users/users.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import databaseConfig from './config/database.config';
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
@@ -17,8 +19,20 @@ import { CourtEntity } from './database/entities/court.entity';
 import { CourtTimeSlotEntity } from './database/entities/court-time-slot.entity';
 import { BookingEntity } from './database/entities/booking.entity';
 import { RefreshTokenEntity } from './database/entities/refresh-token.entity';
+import { NotificationEntity } from './database/entities/notification.entity';
+import { CourtImageEntity } from './database/entities/court-image.entity';
+import { SportTypeEntity } from './database/entities/sport-type.entity';
+import { FeatureEntity } from './database/entities/feature.entity';
+import { CourtFeatureEntity } from './database/entities/court-feature.entity';
+import { SlotTemplateEntity } from './database/entities/slot-template.entity';
+import { SlotTemplateItemEntity } from './database/entities/slot-template-item.entity';
+import { SystemSettingEntity } from './database/entities/system-setting.entity';
 import { RedisModule } from './common/redis/redis.module';
 import { winstonConfig } from './config/winston.config';
+import { SportTypesModule } from './modules/sport-types/sport-types.module';
+import { FeaturesModule } from './modules/features/features.module';
+import { SlotTemplatesModule } from './modules/slot-templates/slot-templates.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -38,7 +52,21 @@ import { winstonConfig } from './config/winston.config';
         username: configService.get<string>('database.user'),
         password: configService.get<string>('database.password'),
         database: configService.get<string>('database.name'),
-        entities: [UserEntity, CourtEntity, CourtTimeSlotEntity, BookingEntity, RefreshTokenEntity],
+        entities: [
+          UserEntity,
+          CourtEntity,
+          CourtTimeSlotEntity,
+          BookingEntity,
+          RefreshTokenEntity,
+          NotificationEntity,
+          CourtImageEntity,
+          SportTypeEntity,
+          FeatureEntity,
+          CourtFeatureEntity,
+          SlotTemplateEntity,
+          SlotTemplateItemEntity,
+          SystemSettingEntity,
+        ],
         synchronize: configService.get<boolean>('database.synchronize', false),
         logging: configService.get<boolean>('database.logging', false),
         maxQueryExecutionTime: configService.get<number>('database.maxQueryExecutionTime', 5000),
@@ -55,6 +83,12 @@ import { winstonConfig } from './config/winston.config';
     CourtsModule,
     BookingsModule,
     HealthModule,
+    UsersModule,
+    NotificationsModule,
+    SportTypesModule,
+    FeaturesModule,
+    SlotTemplatesModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [],

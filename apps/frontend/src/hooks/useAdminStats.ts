@@ -19,6 +19,12 @@ export interface CourtStatsParams {
   [key: string]: unknown;
 }
 
+export interface TopCourt {
+  courtId: string;
+  courtName: string;
+  bookingCount: number;
+}
+
 // ==================== HOOK ====================
 
 /**

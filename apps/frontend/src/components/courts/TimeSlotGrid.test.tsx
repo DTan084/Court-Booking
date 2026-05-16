@@ -12,6 +12,8 @@ describe('TimeSlotGrid', () => {
       startHour: 8,
       endHour: 10,
       price: 150000,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
     },
     {
       id: '2',
@@ -20,6 +22,8 @@ describe('TimeSlotGrid', () => {
       startHour: 10,
       endHour: 12,
       price: 200000,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
     },
     {
       id: '3',
@@ -28,6 +32,8 @@ describe('TimeSlotGrid', () => {
       startHour: 14,
       endHour: 16,
       price: 180000,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
     },
   ];
 

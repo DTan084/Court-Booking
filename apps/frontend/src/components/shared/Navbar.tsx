@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,8 +16,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { LogOut, Shield } from 'lucide-react';
+import { LogOut, Shield, User as UserIcon } from 'lucide-react';
 import { Role } from '@/types';
+import { NotificationBell } from './notification-bell';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -32,25 +33,16 @@ export function Navbar() {
 
   const handleLogout = async () => {
     try {
-      // Call logout API (optional - to invalidate refresh token)
-      await api.post('/auth/logout').catch(() => {
-        // Ignore error
-      });
-
-      // Clear user from store
+      await api.post('/auth/logout').catch(() => undefined);
       clearUser();
-
-      // Redirect to login
-      toast.success('Đăng xuất thành công');
+      toast.success('Logged out successfully');
       router.push('/login');
     } catch {
-      toast.error('Đã xảy ra lỗi khi đăng xuất');
+      toast.error('Failed to log out');
     }
   };
 
-  const isActive = (path: string) => {
-    return pathname === path || pathname.startsWith(path + '/');
-  };
+  const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/');
 
   const getInitials = (name: string) => {
     if (!name) return '??';
@@ -62,16 +54,15 @@ export function Navbar() {
       .slice(0, 2);
   };
 
-  // Prevent hydration mismatch
   if (!isMounted) {
     return (
       <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center space-x-2 font-bold text-xl">
-            <span className="text-primary">🎾</span>
+            <span className="text-primary">CB</span>
             <span>Court Booking</span>
           </Link>
-          <div className="h-10 w-10" /> {/* Placeholder */}
+          <div className="h-10 w-10" />
         </div>
       </nav>
     );
@@ -80,13 +71,11 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        {/* Logo */}
         <Link href="/" className="flex items-center space-x-2 font-bold text-xl">
-          <span className="text-primary">🎾</span>
+          <span className="text-primary">CB</span>
           <span>Court Booking</span>
         </Link>
 
-        {/* Navigation Links */}
         <div className="flex items-center space-x-6">
           <Link
             href="/courts"
@@ -94,10 +83,9 @@ export function Navbar() {
               isActive('/courts') ? 'text-foreground' : 'text-muted-foreground'
             }`}
           >
-            Danh sách sân
+            Courts
           </Link>
 
-          {/* Only show for logged-in users */}
           {user && (
             <Link
               href="/bookings"
@@ -105,11 +93,10 @@ export function Navbar() {
                 isActive('/bookings') ? 'text-foreground' : 'text-muted-foreground'
               }`}
             >
-              Lịch đặt của tôi
+              My Bookings
             </Link>
           )}
 
-          {/* Admin Dropdown */}
           {user?.role === Role.ADMIN && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -121,18 +108,43 @@ export function Navbar() {
                   }`}
                 >
                   <Shield className="mr-2 h-4 w-4" />
-                  Quản trị
+                  Admin
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
+                  <Link href="/admin" className="cursor-pointer">
+                    Overview
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
                   <Link href="/admin/courts" className="cursor-pointer">
-                    Quản lý sân
+                    Courts
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/bookings" className="cursor-pointer">
+                    Bookings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/revenue" className="cursor-pointer">
+                    Revenue
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/customers" className="cursor-pointer">
+                    Customers
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/admin/stats" className="cursor-pointer">
-                    Thống kê
+                    Analytics
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/settings" className="cursor-pointer">
+                    Settings
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -140,39 +152,52 @@ export function Navbar() {
           )}
         </div>
 
-        {/* User Avatar Dropdown or Login Button */}
         {user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                <Avatar>
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {getInitials(user?.name || '')}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user.name}</p>
-                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Đăng xuất</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="relative h-10 w-10 rounded-full border-2 border-primary/20 transition-all hover:border-primary/50 overflow-hidden"
+                >
+                  <Avatar>
+                    <AvatarImage src={user.avatarUrl || ''} alt={user.name} />
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {getInitials(user?.name || '')}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link href="/profile" className="flex w-full items-center">
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    <span>My Profile</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         ) : (
           <div className="flex items-center space-x-2">
             <Button asChild variant="ghost" size="sm">
-              <Link href="/login">Đăng nhập</Link>
+              <Link href="/login">Login</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/register">Đăng ký</Link>
+              <Link href="/register">Register</Link>
             </Button>
           </div>
         )}

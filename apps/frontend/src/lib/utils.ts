@@ -13,10 +13,15 @@ export function cn(...inputs: ClassValue[]) {
  * Format số tiền theo định dạng VND
  * Ví dụ: 150000 → "150.000 ₫"
  */
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number, currency?: string): string {
+  const resolvedCurrency =
+    currency ||
+    (typeof window !== 'undefined'
+      ? window.localStorage.getItem('runtime_currency') || 'VND'
+      : 'VND');
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
-    currency: 'VND',
+    currency: resolvedCurrency,
   }).format(amount);
 }
 
@@ -52,16 +57,6 @@ export function calculateBookingPrice(
   }
 
   return null; // gap hoặc không bao phủ đủ
-}
-
-/**
- * Kiểm tra booking có thể hủy không (còn hơn 2 giờ)
- */
-export function canCancelBooking(startTime: string): boolean {
-  const start = new Date(startTime);
-  const now = new Date();
-  const diffMs = start.getTime() - now.getTime();
-  return diffMs > 2 * 60 * 60 * 1000;
 }
 
 /**

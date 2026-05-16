@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { Role, SportType } from '@court-booking/shared';
+import { Role } from '@court-booking/shared';
 import { DataSource } from 'typeorm';
 
 describe('CourtsController (e2e)', () => {
@@ -10,6 +10,7 @@ describe('CourtsController (e2e)', () => {
   let dataSource: DataSource;
   let adminToken: string;
   let createdCourtId: string;
+  let sportTypeId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -41,6 +42,10 @@ describe('CourtsController (e2e)', () => {
     });
 
     adminToken = loginRes.body.access_token;
+    const [firstSportType] = await dataSource.query(
+      'SELECT id FROM sport_types WHERE is_active = true ORDER BY display_order ASC, created_at ASC LIMIT 1',
+    );
+    sportTypeId = firstSportType?.id;
   });
 
   afterAll(async () => {
@@ -63,7 +68,8 @@ describe('CourtsController (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           name: 'Sân E2E Test',
-          sportType: SportType.BADMINTON,
+          sportTypeId,
+          courtType: 'INDOOR',
           address: 'Địa chỉ E2E',
           pricePerHour: 100000,
         });

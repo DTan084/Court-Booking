@@ -1,4 +1,4 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { CourtEntity } from './court.entity';
+import { SlotTemplateEntity } from './slot-template.entity';
 
 export enum DayOfWeek {
   MONDAY = 1,
@@ -48,9 +49,16 @@ export class CourtTimeSlotEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ type: 'uuid', name: 'template_id', nullable: true })
+  templateId: string | null;
+
+  @ManyToOne(() => SlotTemplateEntity, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'template_id' })
+  template: SlotTemplateEntity | null;
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

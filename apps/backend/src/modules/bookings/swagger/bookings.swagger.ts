@@ -22,8 +22,8 @@ export class BookingCourtData {
   @ApiProperty({ example: 'Sân Cầu Lông ABC' })
   name: string;
 
-  @ApiProperty({ example: 'BADMINTON' })
-  sportType: string;
+  @ApiProperty({ example: '3faffe20-5fd1-47f5-87d9-bcc9869422b6' })
+  sportTypeId: string;
 }
 
 export class BookingData {

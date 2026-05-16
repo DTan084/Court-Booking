@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { api, queryKeys } from '@/lib/api';
 import { toast } from 'sonner';
 import type { AxiosError } from 'axios';
-import type { Booking, Court, PaginatedResult, BookingStatus } from '@/types';
+import type { Booking, Court, PaginatedResult, BookingStatus, BookingSource } from '@/types';
 
 // ==================== TYPES ====================
 
@@ -10,15 +10,45 @@ export interface GetBookingsParams {
   page: number;
   limit: number;
   status?: BookingStatus;
+  statusGroup?: 'failed';
   fromDate?: string; // YYYY-MM-DD
   toDate?: string; // YYYY-MM-DD
   [key: string]: unknown; // Add index signature
+}
+
+export interface MyBookingStats {
+  totalBookings: number;
+  upcomingBookings: number;
+  totalSpend: number;
 }
 
 export interface CreateBookingDto {
   courtId: string;
   startTime: string; // ISO 8601
   endTime: string; // ISO 8601
+}
+
+export interface CreateAdminBookingDto {
+  courtId: string;
+  startTime: string;
+  endTime: string;
+  userId?: string | null;
+  guestName?: string;
+  guestPhone?: string;
+  note?: string;
+  paymentMethod?: string;
+  bookingSource?: BookingSource;
+}
+
+export interface AdminOverview {
+  window: { dateFrom: string; dateTo: string };
+  activeBookings: number;
+  newCustomers: number;
+  completedBookings: number;
+  totalRevenue: number;
+  bookedHours: number;
+  availableHours: number;
+  occupancyRate: number;
 }
 
 export type BookingWithCourt = Booking & { court: Court };
@@ -63,6 +93,17 @@ export function useMyBookings(params: GetBookingsParams) {
   });
 }
 
+export function useMyBookingStats() {
+  return useQuery<MyBookingStats>({
+    queryKey: ['bookings', 'me', 'stats'],
+    queryFn: async () => {
+      const response = await api.get('/bookings/me/stats');
+      return response.data?.data ?? response.data;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
 /**
  * Hook to create a new booking
  */
@@ -71,8 +112,11 @@ export function useCreateBooking() {
 
   return useMutation({
     mutationFn: async (dto: CreateBookingDto) => {
-      const response = await api.post('/bookings', dto);
-      return response.data;
+      const response = await api.post<{ success: boolean; data: BookingWithCourt }>(
+        '/bookings',
+        dto,
+      );
+      return response.data.data;
     },
     onSuccess: (data, variables) => {
       // Build date string from UTC parts of startTime (matches backend query format)
@@ -125,31 +169,129 @@ export function useCancelBooking() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.patch(`/bookings/${id}/cancel`);
-      return response.data;
+      const response = await api.patch<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}/cancel`,
+      );
+      return response.data.data;
     },
     onSuccess: () => {
-      // Invalidate user's booking list
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.bookings.all,
-      });
-
-      // Invalidate all court schedules (we don't know which court was affected)
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.courts.all,
-      });
-
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
       toast.success('Hủy đặt sân thành công');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
-      const status = error.response?.status;
-      const message = error.response?.data?.error?.message || error.response?.data?.message || '';
+      const message = error.response?.data?.message || '';
+      toast.error(message || 'Không thể hủy đặt sân, vui lòng thử lại');
+    },
+  });
+}
 
-      if (status === 400 && message.toLowerCase().includes('2 hour')) {
-        toast.error('Không thể hủy đặt sân trong vòng 2 giờ trước giờ chơi');
+/**
+ * Hook to fetch a single booking detail (REQ-18.10)
+ */
+export function useBooking(id: string, options?: { refetchInterval?: number }) {
+  return useQuery<BookingWithCourt>({
+    queryKey: queryKeys.bookings.detail(id),
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}`,
+      );
+      return response.data.data;
+    },
+    enabled: !!id,
+    ...options,
+  });
+}
+
+/**
+ * Hook to confirm payment (REQ-17)
+ */
+export function useConfirmPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}/confirm-payment`,
+      );
+      return response.data.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+      toast.success('Thanh toán thành công!');
+    },
+    onError: (error: AxiosError<ApiErrorPayload>) => {
+      const status = error.response?.status;
+      const message = error.response?.data?.message || '';
+
+      if (status === 400 && message.includes('hết hạn')) {
+        toast.error('Booking đã hết hạn thanh toán');
+      } else if (status === 409) {
+        toast.error('Booking này đã được thanh toán');
       } else {
-        toast.error('Không thể hủy đặt sân, vui lòng thử lại');
+        toast.error('Không thể xác nhận thanh toán, vui lòng thử lại');
       }
+    },
+  });
+}
+
+export function useAdminBookings(params: {
+  page: number;
+  limit: number;
+  status?: BookingStatus;
+  statusView?: 'CANCELLED_GROUP' | 'REFUND_PENDING';
+  bookingSource?: BookingSource;
+  courtId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+  sportTypeId?: string;
+  day?: string;
+}) {
+  return useQuery<
+    PaginatedResult<BookingWithCourt> & {
+      summary?: {
+        total: number;
+        confirmed: number;
+        confirmedOrCompleted: number;
+        adminWalkIn: number;
+        cancelled: number;
+        liveSessions: number;
+        dailyRevenue: number;
+      };
+    }
+  >({
+    queryKey: queryKeys.adminBookings.list(params),
+    queryFn: async () => {
+      const response = await api.get('/admin/bookings', { params });
+      return response.data.data;
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminOverview(params: { dateFrom: string; dateTo: string }) {
+  return useQuery<AdminOverview>({
+    queryKey: ['admin-overview', params],
+    queryFn: async () => {
+      const response = await api.get('/admin/bookings/overview', { params });
+      return response.data.data;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCreateAdminBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: CreateAdminBookingDto) => {
+      const response = await api.post('/admin/bookings', dto);
+      return response.data.data as BookingWithCourt;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      toast.success('Đã tạo booking hộ');
     },
   });
 }

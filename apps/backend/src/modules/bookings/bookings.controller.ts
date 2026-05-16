@@ -53,17 +53,13 @@ export class BookingsController {
   @Patch(':id/cancel')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Cancel a booking' })
+  @ApiOperation({ summary: 'Cancel a booking (policy windows are configurable in settings)' })
   @ApiResponse({
     status: 200,
     description: 'Booking cancelled successfully',
     type: BookingResponse,
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Cannot cancel (too close to start time)',
-    type: ApiErrorResponse,
-  })
+  @ApiResponse({ status: 400, description: 'Cancel policy violation', type: ApiErrorResponse })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - not the booking owner',
@@ -74,13 +70,44 @@ export class BookingsController {
     return this.bookingsService.cancelBooking(id, user.id);
   }
 
+  @Post(':id/confirm-payment')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Confirm payment for a PENDING_PAYMENT booking' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment confirmed, booking is now CONFIRMED',
+    type: BookingResponse,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Booking expired or invalid state',
+    type: ApiErrorResponse,
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden', type: ApiErrorResponse })
+  @ApiResponse({ status: 404, description: 'Booking not found', type: ApiErrorResponse })
+  @ApiResponse({ status: 409, description: 'Already confirmed', type: ApiErrorResponse })
+  async confirmPayment(@Param('id') id: string, @CurrentUser() user: UserEntity) {
+    return this.bookingsService.confirmPayment(id, user.id);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user booking history' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
-  @ApiQuery({ name: 'status', required: false, enum: ['CONFIRMED', 'CANCELLED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['PENDING_PAYMENT', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'EXPIRED'],
+  })
+  @ApiQuery({
+    name: 'statusGroup',
+    required: false,
+    enum: ['failed'],
+    description: 'failed = CANCELLED + EXPIRED',
+  })
   @ApiQuery({ name: 'fromDate', required: false, type: String, description: 'ISO 8601 date' })
   @ApiQuery({ name: 'toDate', required: false, type: String, description: 'ISO 8601 date' })
   @ApiResponse({ status: 200, description: 'Paginated booking history', type: MyBookingsResponse })
@@ -89,5 +116,24 @@ export class BookingsController {
     @CurrentUser() user: UserEntity,
   ) {
     return this.bookingsService.findMyBookings(user.id, query);
+  }
+
+  @Get('me/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user booking stats' })
+  @ApiResponse({ status: 200, description: 'Booking stats retrieved successfully' })
+  async getMyBookingStats(@CurrentUser() user: UserEntity) {
+    return this.bookingsService.getMyBookingStats(user.id);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a single booking by ID (owner only)' })
+  @ApiResponse({ status: 200, description: 'Booking detail', type: BookingResponse })
+  @ApiResponse({ status: 404, description: 'Booking not found', type: ApiErrorResponse })
+  async getBooking(@Param('id') id: string, @CurrentUser() user: UserEntity) {
+    return this.bookingsService.findOne(id, user.id);
   }
 }

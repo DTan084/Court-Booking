@@ -1,83 +1,90 @@
 import Link from 'next/link';
-import { MapPin, DollarSign } from 'lucide-react';
+import Image from 'next/image';
+import { MapPin } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
-import type { Court, SportType, CourtStatus } from '@/types';
+import { CourtStatus } from '@/types';
+import type { Court, Feature } from '@/types';
+import { CourtTypeBadge } from './CourtTypeBadge';
+import { FacilityFeatureTags } from './FacilityFeatureTags';
 
 interface CourtCardProps {
   court: Court;
 }
 
-// Sport type labels in Vietnamese
-const sportTypeLabels: Record<SportType, string> = {
-  badminton: 'Cầu lông',
-  tennis: 'Tennis',
-  football: 'Bóng đá',
-  basketball: 'Bóng rổ',
-  volleyball: 'Bóng chuyền',
-};
-
-// Sport type colors
-const sportTypeColors: Record<SportType, string> = {
-  badminton: 'bg-blue-100 text-blue-700',
-  tennis: 'bg-green-100 text-green-700',
-  football: 'bg-orange-100 text-orange-700',
-  basketball: 'bg-purple-100 text-purple-700',
-  volleyball: 'bg-pink-100 text-pink-700',
-};
-
-// Status labels and colors
-const statusConfig: Record<CourtStatus, { label: string; color: string }> = {
-  ACTIVE: { label: 'Hoạt động', color: 'bg-green-100 text-green-700' },
-  INACTIVE: { label: 'Tạm ngưng', color: 'bg-gray-100 text-gray-700' },
-};
+const placeholderImage =
+  'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?auto=format&fit=crop&w=1200&q=80';
 
 export function CourtCard({ court }: CourtCardProps) {
-  const sportLabel = sportTypeLabels[court.sportType];
-  const sportColor = sportTypeColors[court.sportType];
-  const statusInfo = statusConfig[court.status];
+  const inactive = court.status === CourtStatus.INACTIVE;
+  const displayFeatures: Array<Feature> = (court.featureItems ?? []) as Feature[];
 
   return (
     <Link
       href={`/courts/${court.id}`}
       className={cn(
-        'group block rounded-lg border bg-card p-6 shadow-sm transition-all',
-        'hover:shadow-md hover:border-primary/50',
-        court.status === 'INACTIVE' && 'opacity-75',
+        'group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg',
+        inactive && 'opacity-70',
       )}
     >
-      {/* Header: Name and Status */}
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
-          {court.name}
-        </h3>
-        <span
-          className={cn('shrink-0 rounded-full px-2 py-1 text-xs font-medium', statusInfo.color)}
-        >
-          {statusInfo.label}
-        </span>
-      </div>
-
-      {/* Sport Type Badge */}
-      <div className="mb-3">
-        <span className={cn('inline-block rounded-full px-3 py-1 text-xs font-medium', sportColor)}>
-          {sportLabel}
-        </span>
-      </div>
-
-      {/* Address */}
-      <div className="mb-4 flex items-start gap-2 text-sm text-muted-foreground">
-        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-        <p className="line-clamp-2">{court.address}</p>
-      </div>
-
-      {/* Price */}
-      <div className="flex items-center justify-between border-t pt-4">
-        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-          <DollarSign className="h-4 w-4" />
-          <span>Giá tham khảo</span>
+      <div className="relative h-52 overflow-hidden">
+        <Image
+          src={court.images?.[0]?.url ?? placeholderImage}
+          alt={court.name}
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+        <div className="absolute left-4 top-4 flex items-center gap-2">
+          <CourtTypeBadge courtType={court.courtType} />
+          {court.isFeatured && (
+            <span className="rounded-full bg-[#fd933d] px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-[#301400]">
+              Featured
+            </span>
+          )}
         </div>
-        <div className="text-lg font-semibold text-primary">
-          {formatCurrency(court.pricePerHour)}/giờ
+        {inactive && (
+          <span className="absolute right-4 top-4 rounded-full bg-slate-900/85 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+            Inactive
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col p-5">
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <h3 className="line-clamp-1 text-xl font-bold text-[#0b1c30]">{court.name}</h3>
+        </div>
+
+        <div className="mb-3 flex items-start gap-2 text-sm text-slate-600">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="line-clamp-2">{court.address}</p>
+        </div>
+        {court.description?.trim() && (
+          <p className="mb-2 line-clamp-2 text-sm text-slate-600">
+            {court.description.length > 50
+              ? `${court.description.slice(0, 50).trim()}...`
+              : court.description}
+          </p>
+        )}
+        <FacilityFeatureTags
+          features={displayFeatures}
+          maxVisible={2}
+          className="mb-4 min-h-[32px]"
+        />
+
+        <div className="mt-auto flex flex-col gap-3 border-t border-slate-100 pt-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              Starting From
+            </p>
+            <p className="text-xl font-black text-[#0b1c30]">
+              {formatCurrency(court.pricePerHour)}
+              <span className="ml-1 text-sm font-medium text-slate-500">/hour</span>
+            </p>
+          </div>
+          <span className="inline-flex w-full items-center justify-center rounded-lg bg-[#131b2e] px-3 py-2 text-xs font-bold uppercase tracking-wide text-white">
+            View Schedule
+          </span>
         </div>
       </div>
     </Link>

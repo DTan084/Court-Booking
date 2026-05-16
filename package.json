@@ -15,7 +15,7 @@
     "test:cov": "pnpm --filter @court-booking/backend run test:cov",
     "lint": "pnpm -r run lint",
     "format": "pnpm -r run format",
-    "clean": "pnpm -r exec rm -rf node_modules dist .next .turbo",
+    "clean": "pnpm -r exec powershell -Command \"Remove-Item -Recurse -Force -ErrorAction SilentlyContinue node_modules, dist, .next, .turbo\"",
     "prepare": "node -e \"if (process.env.HUSKY === '0') process.exit(0)\" || husky"
   },
   "engines": {
