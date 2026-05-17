@@ -1,4 +1,4 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -70,6 +70,10 @@ describe('CourtsService', () => {
         }),
       }),
       transaction: jest.fn(),
+      getRepository: jest.fn().mockReturnValue({
+        find: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue({ affected: 0 }),
+      }),
     };
 
     const mockCourtFeatureRepo = {

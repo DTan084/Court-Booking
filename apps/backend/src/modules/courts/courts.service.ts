@@ -603,8 +603,14 @@ export class CourtsService {
   private async invalidateCourtsListCache(): Promise<void> {
     const pattern = `${this.COURTS_LIST_PREFIX}*`;
     try {
-      const keys = await this.redis.keys(pattern);
-      await this.safeCacheDel(...keys);
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = nextCursor;
+        if (keys.length > 0) {
+          await this.safeCacheDel(...keys);
+        }
+      } while (cursor !== '0');
     } catch {
       // no-op
     }
