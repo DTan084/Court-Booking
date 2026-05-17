@@ -1,4 +1,6 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
@@ -41,6 +43,12 @@ import { SettingsModule } from './modules/settings/settings.module';
       envFilePath: '../../.env',
       load: [appConfig, databaseConfig, jwtConfig, redisConfig, bookingConfig],
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60000 ms = 1 minute (NestJS Throttler v6 uses ms, not seconds)
+        limit: 100, // 100 requests per minute
+      },
+    ]),
     WinstonModule.forRoot(winstonConfig),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -91,6 +99,11 @@ import { SettingsModule } from './modules/settings/settings.module';
     SettingsModule,
   ],
   controllers: [AppController],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

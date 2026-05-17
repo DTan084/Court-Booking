@@ -14,7 +14,7 @@ import { RefreshTokenEntity } from '../../database/entities/refresh-token.entity
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -163,8 +163,10 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is required');
     }
 
+    const hashedToken = createHash('sha256').update(refreshToken).digest('hex');
+
     const existingToken = await this.refreshTokenRepository.findOne({
-      where: { token: refreshToken, revoked: false },
+      where: { token: hashedToken, revoked: false },
     });
 
     if (!existingToken) {
@@ -188,7 +190,8 @@ export class AuthService {
 
   async revokeRefreshToken(refreshToken: string) {
     if (!refreshToken) return;
-    await this.refreshTokenRepository.update({ token: refreshToken }, { revoked: true });
+    const hashedToken = createHash('sha256').update(refreshToken).digest('hex');
+    await this.refreshTokenRepository.update({ token: hashedToken }, { revoked: true });
   }
 
   private parseExpiresInToSeconds(expiresIn: string): number {
@@ -201,9 +204,10 @@ export class AuthService {
   }
 
   async storeRefreshToken(userId: string, token: string, expiresAt: Date) {
+    const hashedToken = createHash('sha256').update(token).digest('hex');
     const refreshToken = this.refreshTokenRepository.create({
       userId,
-      token,
+      token: hashedToken,
       expiresAt,
     });
 
