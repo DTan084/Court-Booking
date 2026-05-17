@@ -76,7 +76,7 @@ describe('Bookings Concurrency (e2e)', () => {
       .post('/api/courts')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        name: 'Sân Conc Test',
+        name: 'Concurrency Test Court',
         sportTypeId,
         courtType: 'INDOOR',
         address: 'Conc Address',

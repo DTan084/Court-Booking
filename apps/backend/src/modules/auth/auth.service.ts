@@ -80,7 +80,7 @@ export class AuthService {
     if (!user) {
       this.logger.warn(`Login failed: User not found for email [${email}]`);
       await this.incrementFailedAttempts(email);
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     this.logger.debug(`User found for email [${email}], comparing passwords...`);
@@ -89,7 +89,7 @@ export class AuthService {
     if (!isPasswordValid) {
       this.logger.warn(`Login failed: Invalid password for email [${email}]`);
       await this.incrementFailedAttempts(email);
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     this.logger.log(`Login successful for user: ${email} (${user.id})`);
@@ -107,7 +107,7 @@ export class AuthService {
     const isLocked = await this.redis.get(lockoutKey);
     if (isLocked) {
       throw new UnauthorizedException(
-        'Tài khoản đã bị tạm khóa do nhập sai nhiều lần. Vui lòng thử lại sau 15 phút.',
+        'Account has been temporarily locked due to multiple failed login attempts. Please try again after 15 minutes.',
       );
     }
   }

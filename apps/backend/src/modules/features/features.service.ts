@@ -47,7 +47,7 @@ export class FeaturesService {
       .createQueryBuilder('feature')
       .where('LOWER(feature.name) = LOWER(:name)', { name: payload.name })
       .getOne();
-    if (existed) throw new ConflictException('Tiện ích đã tồn tại');
+    if (existed) throw new ConflictException('Feature already exists');
     return this.featureRepo.save(
       this.featureRepo.create({
         name: payload.name.trim(),
@@ -70,7 +70,7 @@ export class FeaturesService {
         .where('LOWER(feature.name) = LOWER(:name)', { name: payload.name })
         .andWhere('feature.id != :id', { id })
         .getOne();
-      if (existed) throw new ConflictException('Tiện ích đã tồn tại');
+      if (existed) throw new ConflictException('Feature already exists');
     }
     Object.assign(item, payload);
     return this.featureRepo.save(item);
@@ -83,11 +83,13 @@ export class FeaturesService {
     item.isActive = false;
     await this.featureRepo.save(item);
     return {
-      message: 'Feature da bi an khoi UI',
+      message: 'Feature has been hidden from UI',
       id,
       affectedCourts: usage,
       warning:
-        usage > 0 ? `${usage} san dang su dung feature nay - van hien thi tren san da gan` : null,
+        usage > 0
+          ? `${usage} courts are currently using this feature. It remains visible on assigned courts.`
+          : null,
     };
   }
 
@@ -96,7 +98,7 @@ export class FeaturesService {
     if (!item) throw new NotFoundException('Feature not found');
     const usage = await this.courtFeatureRepo.count({ where: { featureId: id } });
     if (usage > 0) {
-      throw new ConflictException(`Khong the xoa feature dang duoc su dung boi ${usage} san`);
+      throw new ConflictException(`Cannot delete feature currently in use by ${usage} courts`);
     }
     await this.featureRepo.remove(item);
     return { id };
@@ -110,7 +112,7 @@ export class FeaturesService {
       const features = await this.featureRepo.findBy({ id: In(featureIds), isActive: true });
       const foundSet = new Set(features.map((f) => f.id));
       const missing = featureIds.find((id) => !foundSet.has(id));
-      if (missing) throw new BadRequestException(`Feature khong hop le hoac da bi an: ${missing}`);
+      if (missing) throw new BadRequestException(`Invalid or inactive feature ID: ${missing}`);
     }
 
     const current = await this.courtFeatureRepo.find({ where: { courtId } });

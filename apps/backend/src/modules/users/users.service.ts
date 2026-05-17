@@ -162,7 +162,11 @@ export class UsersService {
   }
 
   private async assertProfileUpdateAllowed(user: UserEntity) {
-    if (!user.updatedAt) return;
+    if (!user.updatedAt || !user.createdAt) return;
+
+    // Allow the first update after registration (where updatedAt is identical or within 5s of createdAt)
+    const isFirstTime = Math.abs(user.updatedAt.getTime() - user.createdAt.getTime()) < 5000;
+    if (isFirstTime) return;
 
     const cooldownDays = await this.settingsService.getNumber('profile_update_cooldown_days', 30);
     const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
@@ -170,7 +174,7 @@ export class UsersService {
 
     if (Date.now() < nextAllowedAt.getTime()) {
       throw new HttpException(
-        `Ban chi duoc cap nhat ho so ${cooldownDays} ngay 1 lan. Thu lai sau: ${nextAllowedAt.toISOString()}`,
+        `Profile updates are restricted to once every ${cooldownDays} days. Try again after: ${nextAllowedAt.toISOString()}`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }

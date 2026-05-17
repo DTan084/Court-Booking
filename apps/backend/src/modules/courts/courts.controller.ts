@@ -313,7 +313,7 @@ export class CourtsController {
       }),
       fileFilter: (_req: any, file: any, cb: any) => {
         if (!file.mimetype.startsWith('image/')) {
-          cb(new BadRequestException('File upload phải là hình ảnh'), false);
+          cb(new BadRequestException('Uploaded file must be an image'), false);
           return;
         }
         cb(null, true);
@@ -328,7 +328,7 @@ export class CourtsController {
     @Req() req: Request,
   ) {
     if (!file) {
-      throw new BadRequestException('Vui lòng chọn file ảnh để upload');
+      throw new BadRequestException('Please select an image file to upload');
     }
 
     const dto: AddCourtImageDto = addCourtImageSchema.parse({

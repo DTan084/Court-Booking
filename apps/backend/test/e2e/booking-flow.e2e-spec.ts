@@ -53,7 +53,7 @@ describe('Booking Flow (e2e)', () => {
       .post('/api/courts')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        name: 'Sân Flow Test',
+        name: 'Flow Test Court',
         sportTypeId,
         courtType: 'INDOOR',
         address: 'Flow Address',

@@ -48,14 +48,14 @@ export class SportTypesService {
     if (excludeId) qb.andWhere('sportType.id != :excludeId', { excludeId });
     const existed = await qb.getOne();
     if (existed) {
-      throw new ConflictException('Loai the thao da ton tai');
+      throw new ConflictException('Sport type already exists');
     }
   }
 
   async create(payload: { name: string; icon?: string; color?: string; displayOrder?: number }) {
     await this.ensureUniqueName(payload.name);
     if (payload.color && !/^#[0-9A-Fa-f]{6}$/.test(payload.color)) {
-      throw new BadRequestException('Mau sac phai theo dinh dang #RRGGBB');
+      throw new BadRequestException('Color must be in #RRGGBB format');
     }
     return this.sportTypeRepo.save(
       this.sportTypeRepo.create({
@@ -81,7 +81,7 @@ export class SportTypesService {
     if (!item) throw new NotFoundException('Sport type not found');
     if (payload.name) await this.ensureUniqueName(payload.name, id);
     if (payload.color && !/^#[0-9A-Fa-f]{6}$/.test(payload.color)) {
-      throw new BadRequestException('Mau sac phai theo dinh dang #RRGGBB');
+      throw new BadRequestException('Color must be in #RRGGBB format');
     }
     Object.assign(item, payload);
     return this.sportTypeRepo.save(item);
@@ -96,11 +96,10 @@ export class SportTypesService {
       where: { sportTypeId: id, deletedAt: IsNull() },
     });
     return {
-      message: 'Sport type da bi an khoi danh sach',
+      message: 'Sport type has been hidden from list',
       id,
       affectedCourts,
-      warning:
-        affectedCourts > 0 ? `${affectedCourts} san hien tai van hoat dong binh thuong` : null,
+      warning: affectedCourts > 0 ? `${affectedCourts} courts are still active normally` : null,
     };
   }
 
@@ -112,7 +111,7 @@ export class SportTypesService {
     });
     if (usage > 0) {
       throw new ConflictException(
-        `Khong the xoa - co ${usage} san dang dung sport type nay. Hay chuyen san sang sport type khac hoac an sport type.`,
+        `Cannot delete - there are ${usage} courts currently using this sport type. Please assign those courts to another sport type or hide this sport type instead.`,
       );
     }
     await this.sportTypeRepo.remove(item);

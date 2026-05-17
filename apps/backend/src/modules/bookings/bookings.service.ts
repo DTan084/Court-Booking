@@ -203,7 +203,7 @@ export class BookingsService {
 
   /**
    * REQ-17: POST /bookings/:id/confirm-payment
-   * Chuyển PENDING_PAYMENT → CONFIRMED khi deadline chưa qua.
+   * Transition PENDING_PAYMENT -> CONFIRMED when the deadline has not expired.
    */
   async confirmPayment(bookingId: string, userId: string): Promise<BookingEntity> {
     const savedBooking = await this.dataSource.transaction(async (manager) => {
@@ -217,12 +217,12 @@ export class BookingsService {
 
       // REQ-17.5: already confirmed
       if (booking.status === BookingStatus.CONFIRMED) {
-        throw new ConflictException('Booking đã được thanh toán');
+        throw new ConflictException('Booking is already paid');
       }
 
       // REQ-17.4: expired
       if (booking.status === BookingStatus.EXPIRED) {
-        throw new BadRequestException('Booking đã hết hạn thanh toán');
+        throw new BadRequestException('Booking payment window has expired');
       }
 
       // REQ-16.6: terminal states
@@ -230,7 +230,7 @@ export class BookingsService {
         booking.status === BookingStatus.COMPLETED ||
         booking.status === BookingStatus.CANCELLED
       ) {
-        throw new BadRequestException(`Không thể xác nhận booking ở trạng thái ${booking.status}`);
+        throw new BadRequestException(`Cannot confirm booking in state ${booking.status}`);
       }
 
       // Double check deadline hasn't passed (job may not have run yet)
@@ -238,7 +238,7 @@ export class BookingsService {
         booking.status = BookingStatus.EXPIRED;
         booking.expiredAt = new Date();
         await manager.save(booking);
-        throw new BadRequestException('Booking đã hết hạn thanh toán');
+        throw new BadRequestException('Booking payment window has expired');
       }
 
       // REQ-17.3: PENDING_PAYMENT → CONFIRMED
@@ -259,8 +259,8 @@ export class BookingsService {
       .create({
         userId: savedBooking.userId!,
         type: NotificationType.BOOKING_CONFIRMED,
-        title: 'Đặt sân thành công',
-        message: `Bạn đã đặt thành công sân ${savedBooking.court?.name || 'thể thao'} lúc ${startTimeStr} ngày ${startDateStr}.`,
+        title: 'Booking Confirmed',
+        message: `You have successfully booked court ${savedBooking.court?.name || 'sport'} at ${startTimeStr} on ${startDateStr}.`,
         bookingId: savedBooking.id,
       })
       .catch(console.error);
@@ -328,7 +328,7 @@ export class BookingsService {
       const hoursSinceCreated = differenceInHours(now, booking.createdAt);
       if (hoursSinceCreated >= cancelWithinHours) {
         throw new BadRequestException(
-          `Chi co the huy trong vong ${cancelWithinHours} gio ke tu khi dat`,
+          `Only cancellations within ${cancelWithinHours} hours of booking are allowed`,
         );
       }
 
@@ -336,7 +336,7 @@ export class BookingsService {
       const hoursUntilStart = differenceInHours(booking.startTime, now);
       if (hoursUntilStart <= noCancelBeforeHours) {
         throw new BadRequestException(
-          `Khong the huy dat san trong vong ${noCancelBeforeHours} gio truoc gio choi`,
+          `Cannot cancel booking within ${noCancelBeforeHours} hours of the scheduled playtime`,
         );
       }
 
@@ -357,8 +357,8 @@ export class BookingsService {
       .create({
         userId: savedBooking.userId!,
         type: NotificationType.BOOKING_CANCELLED,
-        title: 'Đặt sân đã bị hủy',
-        message: `Lịch đặt sân ${savedBooking.court?.name || ''} lúc ${startTimeStr} ngày ${startDateStr} của bạn đã được hủy thành công.`,
+        title: 'Booking Cancelled',
+        message: `Your booking for ${savedBooking.court?.name || ''} at ${startTimeStr} on ${startDateStr} has been successfully cancelled.`,
         bookingId: savedBooking.id,
       })
       .catch(console.error);
@@ -507,7 +507,7 @@ export class BookingsService {
       bookingSource,
     } = payload;
     if (!userId && !guestName?.trim()) {
-      throw new BadRequestException('Phải cung cấp user_id hoặc guest_name');
+      throw new BadRequestException('Must provide user_id or guest_name');
     }
 
     const start = new Date(startTime);
@@ -548,7 +548,7 @@ export class BookingsService {
         .getCount();
 
       if (overlapping > 0) {
-        throw new ConflictException('Sân đã được đặt trong khung giờ này');
+        throw new ConflictException('The requested court is already booked for this time slot');
       }
 
       const zonedStart = toZonedTime(start, BUSINESS_TIMEZONE);
@@ -591,8 +591,8 @@ export class BookingsService {
           .create({
             userId: saved.userId,
             type: NotificationType.BOOKING_CONFIRMED,
-            title: 'Đặt sân thành công',
-            message: 'Lịch đặt sân của bạn đã được nhân viên xác nhận.',
+            title: 'Booking Confirmed',
+            message: 'Your booking has been confirmed by our staff.',
             bookingId: saved.id,
           })
           .catch(console.error);
@@ -819,7 +819,7 @@ export class BookingsService {
     const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.status !== BookingStatus.CONFIRMED) {
-      throw new BadRequestException('Chỉ có thể check-in booking đã xác nhận');
+      throw new BadRequestException('Only confirmed bookings can be checked in');
     }
     booking.checkedInAt = new Date();
     return this.bookingRepository.save(booking);
@@ -832,7 +832,7 @@ export class BookingsService {
     const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.status === BookingStatus.COMPLETED) {
-      throw new BadRequestException('Không thể hủy booking đã hoàn thành');
+      throw new BadRequestException('Cannot cancel a completed booking');
     }
     booking.status = BookingStatus.CANCELLED;
     booking.cancelledAt = new Date();
@@ -845,16 +845,18 @@ export class BookingsService {
   async refundBooking(bookingId: string, refundAmount: number): Promise<BookingEntity> {
     const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.refundedAt) throw new ConflictException('Booking da duoc hoan tien');
+    if (booking.refundedAt) throw new ConflictException('Booking has already been refunded');
 
     if (![BookingStatus.CANCELLED, BookingStatus.EXPIRED].includes(booking.status)) {
-      throw new BadRequestException('Chi hoan tien cho booking da huy hoac het han');
+      throw new BadRequestException(
+        'Refunds can only be processed for cancelled or expired bookings',
+      );
     }
     if (!booking.paidAt) {
-      throw new BadRequestException('Booking chua thanh toan, khong the hoan tien');
+      throw new BadRequestException('Cannot refund an unpaid booking');
     }
     if (refundAmount > Number(booking.totalPrice)) {
-      throw new BadRequestException('Số tiền hoàn trả không được vượt quá tổng giá trị booking');
+      throw new BadRequestException('Refund amount cannot exceed the total booking price');
     }
     booking.refundedAt = new Date();
     booking.refundAmount = refundAmount;
