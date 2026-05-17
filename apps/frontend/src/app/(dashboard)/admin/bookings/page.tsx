@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
@@ -109,21 +109,25 @@ export default function AdminBookingsPage() {
           title="Total"
           value={String(data?.summary?.total ?? total)}
           icon={<CalendarCheck2 className="h-5 w-5" />}
+          hint="Bookings in selected filter"
         />
         <MetricCard
           title="Confirmed"
           value={`${data?.summary?.confirmed ?? 0}/${data?.summary?.confirmedOrCompleted ?? 0}`}
           icon={<Clock3 className="h-5 w-5" />}
+          hint="Active / total valid bookings"
         />
         <MetricCard
           title="Admin/Walk-in"
           value={String(data?.summary?.adminWalkIn ?? 0)}
           icon={<CalendarCheck2 className="h-5 w-5" />}
+          hint="Offline administrative entries"
         />
         <MetricCard
           title="Cancelled"
           value={String(data?.summary?.cancelled ?? 0)}
           icon={<Clock3 className="h-5 w-5" />}
+          hint="Cancelled or expired bookings"
         />
       </div>
       <div className="mt-2 grid gap-4 md:grid-cols-2">
@@ -131,11 +135,13 @@ export default function AdminBookingsPage() {
           title="Live Sessions"
           value={String(data?.summary?.liveSessions ?? 0)}
           icon={<Clock3 className="h-5 w-5" />}
+          hint="Currently active court usages"
         />
         <MetricCard
           title="Daily Revenue"
           value={formatCurrency(data?.summary?.dailyRevenue ?? 0)}
           icon={<CalendarCheck2 className="h-5 w-5" />}
+          hint="Revenue generated today"
         />
       </div>
 

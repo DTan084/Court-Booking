@@ -16,12 +16,12 @@ import { resolveFeatureIcon } from '@/lib/feature-icons';
 import type { Court } from '@/types';
 
 const courtSchema = z.object({
-  name: z.string().min(2, 'Ten san toi thieu 2 ky tu'),
+  name: z.string().min(2, 'Court name must be at least 2 characters'),
   sportTypeId: z.string().uuid('Sport type is required'),
   courtType: z.nativeEnum(CourtType),
-  address: z.string().min(5, 'Dia chi toi thieu 5 ky tu'),
+  address: z.string().min(5, 'Address must be at least 5 characters'),
   district: z.string().max(100).optional(),
-  pricePerHour: z.number().positive('Gia phai lon hon 0'),
+  pricePerHour: z.number().positive('Price must be greater than 0'),
   maxPlayers: z.number().int().min(1).optional().nullable(),
   isFeatured: z.boolean().optional(),
   description: z.string().max(5000).optional(),
@@ -163,7 +163,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
       <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">
           <h2 className="text-xl font-semibold text-slate-900">
-            {mode === 'create' ? 'Tao san moi' : 'Chinh sua san'}
+            {mode === 'create' ? 'Create New Court' : 'Edit Court'}
           </h2>
           <button
             onClick={() => onOpenChange(false)}
@@ -186,7 +186,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
                 </span>
                 <input
                   {...register('name')}
-                  placeholder="Ten san"
+                  placeholder="Court Name"
                   className="w-full rounded-md border px-3 py-2"
                 />
                 {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
@@ -208,8 +208,8 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
                   Court Type
                 </span>
                 <select {...register('courtType')} className="w-full rounded-md border px-3 py-2">
-                  <option value={CourtType.INDOOR}>Trong nha</option>
-                  <option value={CourtType.OUTDOOR}>Ngoai troi</option>
+                  <option value={CourtType.INDOOR}>Indoor</option>
+                  <option value={CourtType.OUTDOOR}>Outdoor</option>
                 </select>
               </label>
             </div>
@@ -227,7 +227,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
                 <input
                   type="number"
                   {...register('pricePerHour', { valueAsNumber: true })}
-                  placeholder="Gia/gio"
+                  placeholder="Price per hour"
                   className="w-full rounded-md border px-3 py-2"
                 />
               </label>
@@ -238,13 +238,13 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
                 <input
                   type="number"
                   {...register('maxPlayers', { valueAsNumber: true })}
-                  placeholder="So nguoi toi da"
+                  placeholder="Max players"
                   className="w-full rounded-md border px-3 py-2"
                 />
               </label>
               <label className="flex items-center gap-2 text-sm md:col-span-2">
                 <input type="checkbox" {...register('isFeatured')} />
-                Noi bat (Featured)
+                Featured
               </label>
             </div>
           </section>
@@ -260,7 +260,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
                 </span>
                 <input
                   {...register('address')}
-                  placeholder="Dia chi"
+                  placeholder="Address"
                   className="w-full rounded-md border px-3 py-2"
                 />
               </label>
@@ -270,7 +270,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
                 </span>
                 <input
                   {...register('district')}
-                  placeholder="Quan/Huyen"
+                  placeholder="District"
                   className="w-full rounded-md border px-3 py-2"
                 />
               </label>
@@ -283,25 +283,25 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
             </h3>
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium">Mo ta san</span>
+                <span className="text-sm font-medium">Court Description</span>
                 <button
                   type="button"
                   className="text-sm text-[#944a00]"
                   onClick={() => setPreview((v) => !v)}
                 >
-                  {preview ? 'Nhap' : 'Xem truoc'}
+                  {preview ? 'Edit' : 'Preview'}
                 </button>
               </div>
               {!preview ? (
                 <textarea
                   {...register('description')}
                   rows={5}
-                  placeholder="Nhap mo ta san (ho tro Markdown)..."
+                  placeholder="Enter court description (Markdown supported)..."
                   className="w-full rounded-md border px-3 py-2"
                 />
               ) : (
                 <div className="prose min-h-[120px] rounded-md border p-3">
-                  <ReactMarkdown>{description || '_Chua co noi dung_'}</ReactMarkdown>
+                  <ReactMarkdown>{description || '_No content_'}</ReactMarkdown>
                 </div>
               )}
               <p className="mt-1 text-xs text-slate-500">{description.length}/5000</p>
@@ -309,7 +309,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
           </section>
 
           <section className="rounded-lg border border-slate-200 p-4">
-            <p className="mb-2 text-sm font-medium">Tien ich san</p>
+            <p className="mb-2 text-sm font-medium">Court Utilities/Features</p>
             <div className="grid grid-cols-2 gap-2">
               {features.map((feature) => (
                 <label key={feature.id} className="flex items-center gap-2 text-sm">
@@ -330,10 +330,10 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
 
           {mode === 'edit' && (
             <section className="rounded-lg border border-slate-200 p-4">
-              <p className="mb-2 text-sm font-medium">Trang thai</p>
+              <p className="mb-2 text-sm font-medium">Status</p>
               <select {...register('status')} className="w-full rounded-md border px-3 py-2">
-                <option value={CourtStatus.ACTIVE}>Hoat dong</option>
-                <option value={CourtStatus.INACTIVE}>Tam ngung</option>
+                <option value={CourtStatus.ACTIVE}>Active</option>
+                <option value={CourtStatus.INACTIVE}>Inactive</option>
               </select>
             </section>
           )}
@@ -349,7 +349,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
               Huy
             </Button>
             <Button type="submit" disabled={isPending} className="flex-1">
-              {isPending ? 'Dang xu ly...' : mode === 'create' ? 'Tao san' : 'Cap nhat'}
+              {isPending ? 'Processing...' : mode === 'create' ? 'Create Court' : 'Update'}
             </Button>
           </div>
         </form>
@@ -361,18 +361,18 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
               <span className="text-2xl text-red-500">!</span>
             </div>
             <h3 className="mb-3 text-center text-4 font-bold text-slate-900">
-              Xác nhận cập nhật sân
+              Confirm Court Update
             </h3>
             <p className="mb-6 text-center text-slate-600">
               {mode === 'edit' &&
               court?.status !== CourtStatus.INACTIVE &&
               pendingSubmit.status === CourtStatus.INACTIVE
-                ? 'Sân sẽ chuyển sang Tạm ngưng và auto-cancel các booking tương lai (SYSTEM CANCELLED).'
-                : 'Bạn có chắc muốn cập nhật thông tin sân này?'}
+                ? 'The court status will be set to Inactive, automatically cancelling all future bookings (SYSTEM CANCELLED).'
+                : "Are you sure you want to update this court's information?"}
             </p>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" onClick={() => setPendingSubmit(null)}>
-                Hủy bỏ
+                Cancel
               </Button>
               <Button
                 className="bg-red-600 text-white hover:bg-red-700"
@@ -382,7 +382,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
                   doSubmit(payload);
                 }}
               >
-                Xác nhận cập nhật
+                Confirm Update
               </Button>
             </div>
           </div>

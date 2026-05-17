@@ -23,18 +23,18 @@ export function DeleteCourtDialog({ open, onOpenChange, court }: DeleteCourtDial
             <AlertTriangle className="h-8 w-8 text-red-500" />
           </div>
         </div>
-        <h2 className="mb-4 text-center text-4 font-bold text-slate-900">Xác nhận xóa sân</h2>
+        <h2 className="mb-4 text-center text-4 font-bold text-slate-900">Confirm Court Deletion</h2>
         <p className="mb-8 text-center text-2 text-slate-600">
-          Bạn có chắc muốn xóa sân{' '}
+          Are you sure you want to delete court{' '}
           <span className="font-semibold text-slate-900">{court.name}</span>?{' '}
           <span className="text-red-500">
-            Hành động này không thể hoàn tác và sẽ auto-cancel các booking tương lai (SYSTEM
+            This action cannot be undone and will automatically cancel all future bookings (SYSTEM
             CANCELLED).
           </span>
         </p>
         <div className="grid grid-cols-2 gap-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
-            Hủy bỏ
+            Cancel
           </Button>
           <Button
             className="bg-red-600 text-white hover:bg-red-700"
@@ -45,7 +45,7 @@ export function DeleteCourtDialog({ open, onOpenChange, court }: DeleteCourtDial
               })
             }
           >
-            {isPending ? 'Đang xóa...' : 'Xác nhận xóa'}
+            {isPending ? 'Deleting...' : 'Confirm Delete'}
           </Button>
         </div>
       </div>

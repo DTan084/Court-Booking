@@ -25,8 +25,8 @@ const sportTypeColors = [
 ];
 
 const statusConfig: Record<CourtStatus, { label: string; variant: 'success' | 'muted' }> = {
-  ACTIVE: { label: 'Hoat dong', variant: 'success' },
-  INACTIVE: { label: 'Tam ngung', variant: 'muted' },
+  ACTIVE: { label: 'Active', variant: 'success' },
+  INACTIVE: { label: 'Inactive', variant: 'muted' },
 };
 
 interface CourtTableProps {
@@ -47,7 +47,9 @@ export function CourtTable({ courts, onEdit, onDelete }: CourtTableProps) {
   if (courts.length === 0) {
     return (
       <div className="rounded-lg border bg-card p-12 text-center">
-        <p className="text-muted-foreground">Chua co san nao. Hay tao san dau tien!</p>
+        <p className="text-muted-foreground">
+          {"No courts available. Let's create your first court!"}
+        </p>
       </div>
     );
   }
@@ -57,12 +59,12 @@ export function CourtTable({ courts, onEdit, onDelete }: CourtTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Ten san</TableHead>
-            <TableHead>Loai the thao</TableHead>
-            <TableHead className="hidden md:table-cell">Dia chi</TableHead>
-            <TableHead className="hidden sm:table-cell">Gia/gio</TableHead>
-            <TableHead>Trang thai</TableHead>
-            <TableHead className="text-right">Hanh dong</TableHead>
+            <TableHead>Court Name</TableHead>
+            <TableHead>Sport Type</TableHead>
+            <TableHead className="hidden md:table-cell">Address</TableHead>
+            <TableHead className="hidden sm:table-cell">Price/hour</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -86,22 +88,22 @@ export function CourtTable({ courts, onEdit, onDelete }: CourtTableProps) {
                   {court.address}
                 </TableCell>
                 <TableCell className="hidden text-sm sm:table-cell">
-                  {formatCurrency(court.pricePerHour)}/gio
+                  {formatCurrency(court.pricePerHour)}/hr
                 </TableCell>
                 <TableCell>
                   <Badge variant={status.variant}>{status.label}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => onEdit(court)} title="Sua">
+                    <Button variant="ghost" size="icon" onClick={() => onEdit(court)} title="Edit">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" asChild title="Quan ly khung gio">
+                    <Button variant="ghost" size="icon" asChild title="Manage Timeslots">
                       <Link href={`/admin/courts/${court.id}/time-slots`}>
                         <Clock className="h-4 w-4" />
                       </Link>
                     </Button>
-                    <Button variant="ghost" size="icon" asChild title="Quan ly hinh anh">
+                    <Button variant="ghost" size="icon" asChild title="Manage Images">
                       <Link href={`/admin/courts/${court.id}/edit`}>
                         <ImageIcon className="h-4 w-4" />
                       </Link>
@@ -110,7 +112,7 @@ export function CourtTable({ courts, onEdit, onDelete }: CourtTableProps) {
                       variant="ghost"
                       size="icon"
                       onClick={() => onDelete(court)}
-                      title="Xoa"
+                      title="Delete"
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />

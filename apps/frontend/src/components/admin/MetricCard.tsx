@@ -13,11 +13,12 @@ interface MetricCardProps {
     isPositive: boolean;
   };
   highlight?: boolean; // e.g. utilization > 80%
+  hint?: string;
 }
 
 // ==================== COMPONENT ====================
 
-export function MetricCard({ title, value, icon, trend, highlight }: MetricCardProps) {
+export function MetricCard({ title, value, icon, trend, highlight, hint }: MetricCardProps) {
   return (
     <div
       className={cn(
@@ -61,6 +62,7 @@ export function MetricCard({ title, value, icon, trend, highlight }: MetricCardP
               </span>
             </div>
           )}
+          {hint && <p className="mt-2 text-xs text-muted-foreground">{hint}</p>}
         </div>
         {icon && (
           <div

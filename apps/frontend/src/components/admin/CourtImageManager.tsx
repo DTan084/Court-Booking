@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
@@ -54,7 +54,7 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
   return (
     <div className="space-y-6">
       <div className="rounded-lg border bg-white p-4">
-        <h3 className="mb-3 font-semibold">Thêm ảnh mới</h3>
+        <h3 className="mb-3 font-semibold">Add New Image</h3>
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <input
             type="file"
@@ -77,7 +77,7 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
               setAltText('');
             }}
           >
-            Thêm ảnh
+            Add Image
           </Button>
         </div>
       </div>
@@ -123,7 +123,7 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
                 Save
               </Button>
             </div>
-            <p className="mb-3 text-xs text-slate-400">Kéo thả để sắp xếp</p>
+            <p className="mb-3 text-xs text-slate-400">Drag and drop to reorder</p>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -151,9 +151,9 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
       <DoubleConfirmationDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="Bạn có chắc muốn xóa hình ảnh này?"
-        description="Hành động này không thể hoàn tác."
-        confirmText="Xóa ảnh"
+        title="Are you sure you want to delete this image?"
+        description="This action cannot be undone."
+        confirmText="Delete Image"
         variant="destructive"
         onConfirm={() => {
           if (deleteId) deleteImage(deleteId);
