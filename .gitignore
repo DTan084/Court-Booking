@@ -34,5 +34,7 @@ logs/
 .turbo/
 *.tsbuildinfo
 
-
+# Documentation files (local only)
+docs/
+/apps/backend/uploads/
 
