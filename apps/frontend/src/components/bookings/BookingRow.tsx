@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
   const cancelWithinHours = settings?.cancelWithinHours ?? runtimeSettingDefaults.cancelWithinHours;
   const noCancelBeforeHours =
     settings?.noCancelBeforeHours ?? runtimeSettingDefaults.noCancelBeforeHours;
-  const locale = 'vi-VN';
+  const locale = 'en-US';
 
   const startTime = new Date(booking.startTime);
   const endTime = new Date(booking.endTime);
@@ -200,7 +200,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
 
           {booking.status === BookingStatus.CONFIRMED && canCancel && (
             <p className="mt-3 text-xs font-medium text-green-600">
-              Co the huy truoc{' '}
+              Cancellable before{' '}
               {booking.latestCancellableTime
                 ? formatDateTimeByTimezone(booking.latestCancellableTime, timezone, locale, {
                     hour: '2-digit',
@@ -213,7 +213,8 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
           )}
           {booking.status === BookingStatus.CONFIRMED && !canCancel && (
             <p className="mt-3 text-xs italic text-slate-400">
-              Da qua thoi han huy ({cancelWithinHours}h sau dat & {noCancelBeforeHours}h truoc choi)
+              Cancellation period expired ({cancelWithinHours}h post-booking & {noCancelBeforeHours}
+              h pre-match)
             </p>
           )}
           {cancellationContext && (
@@ -247,7 +248,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
                   Pay Now
                 </Button>
                 <p className="text-[10px] font-bold uppercase tracking-tight text-orange-600">
-                  Het han sau {formatCountdown(booking.paymentDeadline ?? '')}
+                  Expires in {formatCountdown(booking.paymentDeadline ?? '')}
                 </p>
               </div>
             )}
@@ -258,7 +259,7 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
                 onClick={() => setIsCancelDialogOpen(true)}
                 className="rounded-lg border border-red-200 px-5 py-2.5 font-semibold text-red-600 transition-all hover:bg-red-50"
               >
-                Huy dat
+                Cancel Booking
               </Button>
             )}
 

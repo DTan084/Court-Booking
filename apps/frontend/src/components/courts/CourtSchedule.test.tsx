@@ -104,7 +104,7 @@ describe('CourtSchedule', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Không có khung giờ nào cho ngày này')).toBeInTheDocument();
+      expect(screen.getByText('No time slots available for this date')).toBeInTheDocument();
     });
   });
 

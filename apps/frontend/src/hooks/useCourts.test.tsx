@@ -70,9 +70,12 @@ describe('useCourts', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.get).toHaveBeenCalledWith('/courts', {
-      params: { page: 1, limit: 12 },
-    });
+    expect(api.get).toHaveBeenCalledWith(
+      '/courts',
+      expect.objectContaining({
+        params: { page: 1, limit: 12 },
+      }),
+    );
     expect(result.current.data).toEqual(mockData);
   });
 
@@ -100,7 +103,7 @@ describe('useCourts', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.get).toHaveBeenCalledWith('/courts', { params });
+    expect(api.get).toHaveBeenCalledWith('/courts', expect.objectContaining({ params }));
   });
 
   it('should have correct staleTime configuration', () => {

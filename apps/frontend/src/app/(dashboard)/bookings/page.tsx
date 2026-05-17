@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { Suspense, useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -430,8 +430,8 @@ function BookingsPageContent() {
         </>
       ) : (
         <EmptyState
-          title="ChÆ°a cÃ³ sÃ¢n Ä‘Ã£ chÆ¡i"
-          description="Venue Ä‘Ã£ chÆ¡i sáº½ xuáº¥t hiá»‡n sau khi cÃ³ booking quÃ¡ khá»©."
+          title="No visited venues yet"
+          description="Venues you have played at will appear here once you have past bookings."
         />
       )}
     </section>
@@ -493,8 +493,8 @@ function BookingsPageContent() {
                     </>
                   ) : (
                     <EmptyState
-                      title="KhÃ´ng cÃ³ lá»‹ch sáº¯p tá»›i"
-                      description="Báº¡n chÆ°a cÃ³ booking pending/confirmed trong thá»i gian tá»›i."
+                      title="No upcoming bookings"
+                      description="You do not have any pending or confirmed bookings in the near future."
                     />
                   )}
                 </section>
@@ -522,8 +522,8 @@ function BookingsPageContent() {
                     </>
                   ) : (
                     <EmptyState
-                      title="ChÆ°a cÃ³ lá»‹ch sá»­"
-                      description="CÃ¡c booking Ä‘Ã£ káº¿t thÃºc/há»§y/háº¿t háº¡n sáº½ hiá»ƒn thá»‹ á»Ÿ Ä‘Ã¢y."
+                      title="No booking history"
+                      description="Completed, cancelled, or expired bookings will be displayed here."
                     />
                   )}
                 </section>
@@ -547,10 +547,10 @@ function BookingsPageContent() {
                     renderBookingRowPreview(bookings, 'pending', 'Pending Entries')
                   ) : (
                     <EmptyState
-                      title="KhÃ´ng cÃ³ booking chá» thanh toÃ¡n"
-                      description="Báº¡n chÆ°a cÃ³ booking nÃ o cáº§n thanh toÃ¡n. Äáº·t sÃ¢n má»›i Ä‘á»ƒ tiáº¿p tá»¥c."
+                      title="No pending payments"
+                      description="You don't have any bookings waiting for payment. Book a new court to continue."
                       action={{
-                        label: 'Äáº·t sÃ¢n ngay',
+                        label: 'Book Now',
                         href: '/courts',
                       }}
                     />
@@ -569,12 +569,12 @@ function BookingsPageContent() {
                       <EmptyState
                         title={
                           activeTab === 'completed'
-                            ? 'KhÃ´ng cÃ³ booking Ä‘Ã£ hoÃ n táº¥t'
-                            : 'KhÃ´ng cÃ³ booking huá»·/háº¿t háº¡n'
+                            ? 'No completed bookings'
+                            : 'No cancelled/expired bookings'
                         }
-                        description="ChÆ°a cÃ³ dá»¯ liá»‡u phÃ¹ há»£p vá»›i bá»™ lá»c hiá»‡n táº¡i. Báº¡n cÃ³ thá»ƒ Ä‘áº·t sÃ¢n má»›i."
+                        description="No data matching the current filter. You can book a new court to get started."
                         action={{
-                          label: 'Äáº·t sÃ¢n ngay',
+                          label: 'Book Now',
                           href: '/courts',
                         }}
                       />

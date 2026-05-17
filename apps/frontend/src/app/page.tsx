@@ -31,8 +31,12 @@ const sportImageByName: Record<string, string> = {
 };
 
 async function getFeaturedCourts() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!apiUrl) return [] as Court[];
+  const apiUrl =
+    typeof window === 'undefined'
+      ? process.env.NEXT_PUBLIC_API_URL === 'http://localhost'
+        ? 'http://backend:3001'
+        : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      : process.env.NEXT_PUBLIC_API_URL || 'http://localhost';
   try {
     const res = await fetch(`${apiUrl}/api/v1/courts?page=1&limit=6`, { cache: 'no-store' });
     if (!res.ok) return [] as Court[];
@@ -45,8 +49,12 @@ async function getFeaturedCourts() {
 }
 
 async function getSportTypes() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!apiUrl) return [] as SportTypeItem[];
+  const apiUrl =
+    typeof window === 'undefined'
+      ? process.env.NEXT_PUBLIC_API_URL === 'http://localhost'
+        ? 'http://backend:3001'
+        : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      : process.env.NEXT_PUBLIC_API_URL || 'http://localhost';
   try {
     const res = await fetch(`${apiUrl}/api/v1/sport-types`, { cache: 'no-store' });
     if (!res.ok) return [] as SportTypeItem[];
@@ -130,7 +138,7 @@ export default async function HomePage() {
             <div>
               <h2 className="text-4xl font-extrabold text-black">World-Class Facilities</h2>
               <p className="mt-3 max-w-2xl text-slate-600">
-                Danh sách này lấy trực tiếp từ dữ liệu sân trong hệ thống.
+                Our premier courts and sports facilities available for immediate booking.
               </p>
             </div>
             <Link
@@ -142,7 +150,7 @@ export default async function HomePage() {
           </div>
           {priorityCourts.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-600">
-              Chưa có dữ liệu sân để hiển thị.
+              No court data available to display.
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-3">
@@ -153,7 +161,7 @@ export default async function HomePage() {
                 >
                   <Link
                     href={`/courts/${court.id}`}
-                    aria-label={`Xem chi tiết sân ${court.name}`}
+                    aria-label={`View details of ${court.name}`}
                     className="block h-full w-full"
                   >
                     {(() => {

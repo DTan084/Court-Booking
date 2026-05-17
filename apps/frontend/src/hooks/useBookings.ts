@@ -142,20 +142,20 @@ export function useCreateBooking() {
         queryKey: queryKeys.bookings.all,
       });
 
-      toast.success('Đặt sân thành công!');
+      toast.success('Booking created successfully!');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const status = error.response?.status;
       const message = error.response?.data?.error?.message || error.response?.data?.message || '';
 
       if (status === 409) {
-        toast.error('Khung giờ này đã được đặt, vui lòng chọn giờ khác');
+        toast.error('This time slot is already booked, please select another time');
       } else if (status === 400 && message.toLowerCase().includes('time slot')) {
-        toast.error('Khung giờ không hợp lệ theo lịch hoạt động của sân');
+        toast.error("Invalid time slot for this court's schedule");
       } else if (status === 400) {
-        toast.error(`Lỗi: ${message || 'Dữ liệu không hợp lệ'}`);
+        toast.error(`Error: ${message || 'Invalid input data'}`);
       } else {
-        toast.error('Không thể đặt sân, vui lòng thử lại');
+        toast.error('Failed to create booking, please try again');
       }
     },
   });
@@ -177,11 +177,11 @@ export function useCancelBooking() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
-      toast.success('Hủy đặt sân thành công');
+      toast.success('Booking cancelled successfully');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const message = error.response?.data?.message || '';
-      toast.error(message || 'Không thể hủy đặt sân, vui lòng thử lại');
+      toast.error(message || 'Failed to cancel booking, please try again');
     },
   });
 }
@@ -219,18 +219,18 @@ export function useConfirmPayment() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(data.id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
-      toast.success('Thanh toán thành công!');
+      toast.success('Payment confirmed successfully!');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const status = error.response?.status;
       const message = error.response?.data?.message || '';
 
-      if (status === 400 && message.includes('hết hạn')) {
-        toast.error('Booking đã hết hạn thanh toán');
+      if (status === 400 && message.toLowerCase().includes('expired')) {
+        toast.error('Booking payment window has expired');
       } else if (status === 409) {
-        toast.error('Booking này đã được thanh toán');
+        toast.error('This booking is already paid');
       } else {
-        toast.error('Không thể xác nhận thanh toán, vui lòng thử lại');
+        toast.error('Failed to confirm payment, please try again');
       }
     },
   });
@@ -291,7 +291,7 @@ export function useCreateAdminBooking() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
-      toast.success('Đã tạo booking hộ');
+      toast.success('Admin booking created successfully');
     },
   });
 }

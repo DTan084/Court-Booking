@@ -29,7 +29,7 @@ const bookingSchema = z
     endHour: z.number().min(1).max(24),
   })
   .refine((data) => data.startHour < data.endHour, {
-    message: 'Giờ kết thúc phải sau giờ bắt đầu',
+    message: 'End hour must be after start hour',
     path: ['endHour'],
   });
 
@@ -162,7 +162,7 @@ export function BookingForm({
         {/* Header */}
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Đặt sân</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Book Court</h2>
             <p className="mt-1 text-sm text-gray-600">
               {courtName} — {formatDate(selectedDate)}
             </p>
@@ -178,7 +178,7 @@ export function BookingForm({
 
         {uniqueStartHours.length === 0 ? (
           <div className="rounded-lg bg-yellow-50 p-4 text-center text-sm text-yellow-700">
-            Không còn khung giờ trống cho ngày này.
+            No available time slots for this date.
           </div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -187,7 +187,7 @@ export function BookingForm({
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-800 leading-relaxed">
-                  <p className="font-bold mb-1">Chính sách hủy đặt sân:</p>
+                  <p className="font-bold mb-1">Cancellation Policy:</p>
                   <p>
                     {getBookingTimeWarning(
                       buildLocalISO(selectedDate, startHour),
@@ -201,7 +201,7 @@ export function BookingForm({
             {/* Start Hour */}
             <div>
               <label htmlFor="startHour" className="block text-sm font-medium text-gray-700">
-                Giờ bắt đầu
+                Start Time
               </label>
               <select
                 id="startHour"
@@ -223,7 +223,7 @@ export function BookingForm({
             {/* End Hour */}
             <div>
               <label htmlFor="endHour" className="block text-sm font-medium text-gray-700">
-                Giờ kết thúc
+                End Time
               </label>
               <select
                 id="endHour"
@@ -245,7 +245,7 @@ export function BookingForm({
             {/* Price Breakdown */}
             {priceBreakdown ? (
               <div className="rounded-lg bg-blue-50 p-4">
-                <h3 className="mb-2 text-sm font-medium text-gray-900">Chi tiết giá</h3>
+                <h3 className="mb-2 text-sm font-medium text-gray-900">Price Breakdown</h3>
                 <div className="space-y-1">
                   {priceBreakdown.coveredSlots.map((slot, i) => (
                     <div key={i} className="flex justify-between text-sm text-gray-700">
@@ -257,7 +257,7 @@ export function BookingForm({
                     </div>
                   ))}
                   <div className="mt-2 flex justify-between border-t border-blue-200 pt-2 font-semibold text-gray-900">
-                    <span>Tổng cộng</span>
+                    <span>Total</span>
                     <span className="text-blue-600">
                       {formatCurrency(priceBreakdown.totalPrice)}
                     </span>
@@ -267,7 +267,7 @@ export function BookingForm({
             ) : (
               <div className="rounded-lg bg-red-50 p-4">
                 <p className="text-sm text-red-600">
-                  Khung giờ không hợp lệ. Vui lòng chọn các khung giờ liên tiếp.
+                  Invalid time range. Please select continuous slots.
                 </p>
               </div>
             )}
@@ -281,10 +281,10 @@ export function BookingForm({
                 disabled={isPending}
                 className="flex-1"
               >
-                Hủy
+                Cancel
               </Button>
               <Button type="submit" disabled={isPending || !priceBreakdown} className="flex-1">
-                {isPending ? 'Đang xử lý...' : 'Xác nhận đặt sân'}
+                {isPending ? 'Processing...' : 'Confirm Booking'}
               </Button>
             </div>
           </form>
@@ -296,12 +296,12 @@ export function BookingForm({
         onClose={() => setIsConfirmOpen(false)}
         onConfirm={handleConfirmedSubmit}
         isLoading={isPending}
-        title="Xác nhận đặt sân"
+        title="Confirm Booking"
         description={
           <span>
-            Bạn đang đặt sân <strong>{courtName}</strong> từ{' '}
-            <strong>{String(pendingData?.startHour).padStart(2, '0')}:00</strong> đến{' '}
-            <strong>{String(pendingData?.endHour).padStart(2, '0')}:00</strong> ngày{' '}
+            You are booking court <strong>{courtName}</strong> from{' '}
+            <strong>{String(pendingData?.startHour).padStart(2, '0')}:00</strong> to{' '}
+            <strong>{String(pendingData?.endHour).padStart(2, '0')}:00</strong> on{' '}
             <strong>{formatDate(selectedDate)}</strong>.
           </span>
         }

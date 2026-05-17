@@ -17,17 +17,15 @@ export function canCancelBooking(
   return hoursSinceCreated < cancelWithinHours && hoursUntilStart > noCancelBeforeHours;
 }
 
-/**
- * REQ-27.2 — getBookingTimeWarning
- * Returns 'within-12h' when startTime - now < 12h, null otherwise.
- */
 export function getBookingTimeWarning(
   startTime: string,
   now: Date = new Date(),
   noCancelBeforeHours = 12,
-): 'within-12h' | null {
+): string | null {
   const hours = differenceInHours(new Date(startTime), now);
-  return hours < noCancelBeforeHours ? 'within-12h' : null;
+  return hours < noCancelBeforeHours
+    ? `This booking starts in less than ${noCancelBeforeHours} hours. You will not be able to cancel this booking.`
+    : null;
 }
 
 /**

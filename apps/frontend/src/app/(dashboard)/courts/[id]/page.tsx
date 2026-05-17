@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -247,7 +247,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
                   <ReactMarkdown>{court.description}</ReactMarkdown>
                 </div>
               ) : (
-                <p className="text-slate-400">Chưa có mô tả cho sân này</p>
+                <p className="text-slate-400">No description available for this court</p>
               )}
             </div>
           </div>

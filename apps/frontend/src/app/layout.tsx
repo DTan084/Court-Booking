@@ -8,12 +8,12 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Court Booking',
-  description: 'Nền tảng đặt sân thể thao',
+  description: 'Sports facility and court booking platform',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi">
+    <html lang="en">
       <body className={inter.className}>
         <QueryProvider>
           {children}

@@ -55,18 +55,18 @@ describe('TimeSlotGrid', () => {
     expect(screen.getByText(/180\.000/)).toBeInTheDocument();
   });
 
-  it('should show "Còn trống" badge for available slots', () => {
+  it('should show "Available" badge for available slots', () => {
     render(<TimeSlotGrid timeSlots={mockTimeSlots} bookedRanges={[]} />);
 
-    const availableBadges = screen.getAllByText('Còn trống');
+    const availableBadges = screen.getAllByText('Available');
     expect(availableBadges).toHaveLength(3);
   });
 
-  it('should show "Đã đặt" badge for booked slots', () => {
+  it('should show "Booked" badge for booked slots', () => {
     render(<TimeSlotGrid timeSlots={mockTimeSlots} bookedRanges={mockBookedRanges} />);
 
-    expect(screen.getByText('Đã đặt')).toBeInTheDocument();
-    const availableBadges = screen.getAllByText('Còn trống');
+    expect(screen.getByText('Booked')).toBeInTheDocument();
+    const availableBadges = screen.getAllByText('Available');
     expect(availableBadges).toHaveLength(2);
   });
 

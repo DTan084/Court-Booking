@@ -60,7 +60,7 @@ export function useCreateSlotTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.slotTemplates.list() });
-      toast.success('Đã tạo mẫu slot');
+      toast.success('Slot template created');
     },
   });
 }
@@ -73,7 +73,7 @@ export function useDeleteSlotTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.slotTemplates.list() });
-      toast.success('Đã xóa mẫu slot');
+      toast.success('Slot template deleted');
     },
   });
 }

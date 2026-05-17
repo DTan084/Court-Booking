@@ -79,25 +79,25 @@ export function TimeSlotGrid({
                 {formatCurrency(slot.price)}
               </div>
             ) : (
-              <div className="mb-2 text-sm font-medium text-slate-500">Khong kha dung</div>
+              <div className="mb-2 text-sm font-medium text-slate-500">Unavailable</div>
             )}
 
             <div>
               {isPast ? (
                 <span className="inline-block rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">
-                  Da qua
+                  Ended
                 </span>
               ) : booked ? (
                 <span className="inline-block rounded-full bg-gray-200 px-2 py-1 text-xs font-medium text-gray-700">
-                  Da dat
+                  Booked
                 </span>
               ) : isSelected ? (
                 <span className="inline-block rounded-full bg-blue-200 px-2 py-1 text-xs font-medium text-blue-700">
-                  Dang chon
+                  Selected
                 </span>
               ) : (
                 <span className="inline-block rounded-full bg-green-200 px-2 py-1 text-xs font-medium text-green-700">
-                  Con trong
+                  Available
                 </span>
               )}
             </div>

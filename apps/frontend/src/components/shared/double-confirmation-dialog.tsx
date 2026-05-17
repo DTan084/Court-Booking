@@ -37,8 +37,8 @@ export function DoubleConfirmationDialog({
   onConfirm,
   title,
   description,
-  confirmText = 'Xác nhận',
-  cancelText = 'Quay lại',
+  confirmText = 'Confirm',
+  cancelText = 'Back',
   variant = 'default',
   isLoading = false,
   warning,
@@ -95,7 +95,7 @@ export function DoubleConfirmationDialog({
             {isLoading ? (
               <div className="flex items-center gap-2">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Đang xử lý...
+                Processing...
               </div>
             ) : (
               confirmText
