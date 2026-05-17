@@ -83,6 +83,7 @@ export class UsersController {
     }
 
     const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/avatars/${file.filename}`;
+    await this.usersService.updateMe(user.id, { avatarUrl });
     return { url: avatarUrl };
   }
 

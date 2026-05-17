@@ -11,6 +11,7 @@ const SETTING_DEFAULTS = {
   no_cancel_before_hours: '12',
   analytics_start_hour: '6',
   analytics_end_hour: '22',
+  profile_update_cooldown_days: '30',
 } as const;
 
 export type AdminSettingsDto = {
@@ -21,6 +22,7 @@ export type AdminSettingsDto = {
   noCancelBeforeHours: number;
   analyticsStartHour: number;
   analyticsEndHour: number;
+  profileUpdateCooldownDays: number;
 };
 
 export type RuntimeSettingsDto = {
@@ -31,6 +33,7 @@ export type RuntimeSettingsDto = {
   noCancelBeforeHours: number;
   analyticsStartHour: number;
   analyticsEndHour: number;
+  profileUpdateCooldownDays: number;
 };
 
 @Injectable()
@@ -59,7 +62,7 @@ export class SettingsService {
     return map;
   }
 
-  async getNumber(key: keyof typeof SETTING_DEFAULTS, fallback: number): Promise<number> {
+  async getNumber(key: keyof typeof SETTING_DEFAULTS | string, fallback: number): Promise<number> {
     const values = await this.getRawValues([key]);
     return this.parseIntSafe(values[key], fallback);
   }
@@ -74,6 +77,7 @@ export class SettingsService {
       noCancelBeforeHours: this.parseIntSafe(values.no_cancel_before_hours, 12),
       analyticsStartHour: this.parseIntSafe(values.analytics_start_hour, 6),
       analyticsEndHour: this.parseIntSafe(values.analytics_end_hour, 22),
+      profileUpdateCooldownDays: this.parseIntSafe(values.profile_update_cooldown_days, 30),
     };
   }
 
@@ -94,6 +98,7 @@ export class SettingsService {
       ['no_cancel_before_hours', payload.noCancelBeforeHours],
       ['analytics_start_hour', payload.analyticsStartHour],
       ['analytics_end_hour', payload.analyticsEndHour],
+      ['profile_update_cooldown_days', payload.profileUpdateCooldownDays],
     ];
 
     for (const [key, value] of entries) {

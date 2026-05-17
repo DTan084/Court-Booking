@@ -11,16 +11,16 @@ import { UserEntity } from '../../database/entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { BookingStatus } from '@court-booking/shared';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class UsersService {
-  private readonly PROFILE_UPDATE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
-
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(BookingEntity)
     private readonly bookingRepository: Repository<BookingEntity>,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async findMe(id: string): Promise<UserEntity> {
@@ -37,11 +37,10 @@ export class UsersService {
 
   async updateMe(id: string, updateUserDto: UpdateUserDto): Promise<UserEntity> {
     const user = await this.findMe(id);
-    this.assertProfileUpdateAllowed(user);
+    await this.assertProfileUpdateAllowed(user);
 
     Object.assign(user, updateUserDto);
     user.updatedAt = new Date();
-
     return this.userRepository.save(user);
   }
 
@@ -162,13 +161,16 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  private assertProfileUpdateAllowed(user: UserEntity) {
+  private async assertProfileUpdateAllowed(user: UserEntity) {
     if (!user.updatedAt) return;
 
-    const nextAllowedAt = new Date(user.updatedAt.getTime() + this.PROFILE_UPDATE_COOLDOWN_MS);
+    const cooldownDays = await this.settingsService.getNumber('profile_update_cooldown_days', 30);
+    const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
+    const nextAllowedAt = new Date(user.updatedAt.getTime() + cooldownMs);
+
     if (Date.now() < nextAllowedAt.getTime()) {
       throw new HttpException(
-        `Ban chi duoc cap nhat ho so 1 lan moi 30 ngay. Thu lai sau: ${nextAllowedAt.toISOString()}`,
+        `Ban chi duoc cap nhat ho so ${cooldownDays} ngay 1 lan. Thu lai sau: ${nextAllowedAt.toISOString()}`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
