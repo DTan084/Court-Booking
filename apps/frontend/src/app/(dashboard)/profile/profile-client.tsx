@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { useAuthStore } from '@/lib/auth';
 import { useUpdateProfile, useUploadAvatar } from '@/hooks/useUser';
 import { useMyBookingStats } from '@/hooks/useBookings';
+import { useRuntimeSettings } from '@/hooks/useRuntimeSettings';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -42,9 +43,13 @@ export function ProfileClient() {
   const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = React.useState<string>('');
   const { data: myBookingStats } = useMyBookingStats();
+
+  const { data: settings } = useRuntimeSettings();
+  const cooldownDays = settings?.profileUpdateCooldownDays ?? 30;
+
   const updatedAt = user?.updatedAt ? new Date(user.updatedAt) : null;
   const nextProfileUpdateAt = updatedAt
-    ? new Date(updatedAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+    ? new Date(updatedAt.getTime() + cooldownDays * 24 * 60 * 60 * 1000)
     : null;
   const isProfileLocked =
     !!nextProfileUpdateAt &&

@@ -12,6 +12,7 @@ export type RuntimeSettings = {
   noCancelBeforeHours: number;
   analyticsStartHour: number;
   analyticsEndHour: number;
+  profileUpdateCooldownDays: number;
 };
 
 const DEFAULTS: RuntimeSettings = {
@@ -22,6 +23,7 @@ const DEFAULTS: RuntimeSettings = {
   noCancelBeforeHours: 12,
   analyticsStartHour: 6,
   analyticsEndHour: 22,
+  profileUpdateCooldownDays: 30,
 };
 
 export function useRuntimeSettings() {
