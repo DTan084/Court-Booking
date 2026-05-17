@@ -15,6 +15,11 @@ import { UserEntity } from './entities/user.entity';
 const logger = new Logger('ResetDevDb');
 
 async function runResetDev() {
+  if (process.env.NODE_ENV === 'production') {
+    logger.error('CRITICAL: reset-dev script attempt in production! ABORTING.');
+    return;
+  }
+
   dataSource.setOptions({
     dropSchema: true,
     synchronize: true,

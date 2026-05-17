@@ -10,6 +10,11 @@ import { UserEntity } from './entities/user.entity';
 const logger = new Logger('DatabaseSeed');
 
 async function runSeed() {
+  if (process.env.NODE_ENV === 'production') {
+    logger.warn('Seed script skipped in production environment');
+    return;
+  }
+
   await dataSource.initialize();
   logger.log('Database connected');
 
