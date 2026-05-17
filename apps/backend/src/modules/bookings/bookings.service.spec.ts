@@ -15,6 +15,8 @@ import {
 import { BookingStatus } from '@court-booking/shared';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserEntity } from '../../database/entities/user.entity';
+import { SettingsService } from '../settings/settings.service';
 
 const mockBookingRepository = () => ({
   find: jest.fn(),
@@ -48,6 +50,14 @@ const mockConfigService = () => ({
     if (key === 'booking.minCancelHours') return 2;
     return defaultValue;
   }),
+});
+
+const mockUserRepository = () => ({
+  findOne: jest.fn(),
+});
+
+const mockSettingsService = () => ({
+  getNumber: jest.fn((key: string, defaultValue: number) => defaultValue),
 });
 
 const mockDataSource = () => ({
@@ -88,6 +98,14 @@ describe('BookingsService', () => {
           useValue: {
             create: jest.fn().mockResolvedValue({}),
           },
+        },
+        {
+          provide: getRepositoryToken(UserEntity),
+          useFactory: mockUserRepository,
+        },
+        {
+          provide: SettingsService,
+          useFactory: mockSettingsService,
         },
       ],
     }).compile();

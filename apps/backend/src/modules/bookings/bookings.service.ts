@@ -4,10 +4,16 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Brackets } from 'typeorm';
 import { differenceInHours } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+
+import bookingConfig from '../../config/booking.config';
+const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || 'Asia/Ho_Chi_Minh';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
@@ -32,11 +38,14 @@ export class BookingsService {
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
     private readonly settingsService: SettingsService,
+    @Inject(bookingConfig.KEY)
+    private readonly bookingCfg: ConfigType<typeof bookingConfig>,
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
-    const startDate = new Date(`${date}T00:00:00`);
-    const endDate = new Date(`${date}T23:59:59.999`);
+    const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || 'Asia/Ho_Chi_Minh';
+    const startDate = toZonedTime(`${date}T00:00:00`, BUSINESS_TIMEZONE);
+    const endDate = toZonedTime(`${date}T23:59:59.999`, BUSINESS_TIMEZONE);
     const now = new Date();
 
     const bookings = await this.bookingRepository
@@ -90,6 +99,12 @@ export class BookingsService {
       throw new BadRequestException('Invalid booking duration');
     }
 
+    if (durationHours > this.bookingCfg.maxBookingDurationHours) {
+      throw new BadRequestException(
+        `Booking duration cannot exceed ${this.bookingCfg.maxBookingDurationHours} hours`,
+      );
+    }
+
     if (start.getMinutes() !== 0 || end.getMinutes() !== 0) {
       throw new BadRequestException('Booking must start and end on the hour (e.g. 08:00, 10:00)');
     }
@@ -115,9 +130,11 @@ export class BookingsService {
       }
 
       // 2. Validate time slots
-      const dayOfWeek = start.getDay();
-      const startHour = start.getHours();
-      const endHour = end.getHours() || 24;
+      const zonedStart = toZonedTime(start, BUSINESS_TIMEZONE);
+      const zonedEnd = toZonedTime(end, BUSINESS_TIMEZONE);
+      const dayOfWeek = zonedStart.getDay();
+      const startHour = zonedStart.getHours();
+      const endHour = zonedEnd.getHours() || 24;
 
       const slots = await this.timeSlotRepository.find({
         where: { courtId, dayOfWeek },
@@ -495,7 +512,18 @@ export class BookingsService {
 
     const start = new Date(startTime);
     const end = new Date(endTime);
-    if (start >= end) throw new BadRequestException('Invalid booking duration');
+    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    if (durationHours <= 0) throw new BadRequestException('Invalid booking duration');
+
+    if (durationHours > this.bookingCfg.maxBookingDurationHours) {
+      throw new BadRequestException(
+        `Booking duration cannot exceed ${this.bookingCfg.maxBookingDurationHours} hours`,
+      );
+    }
+
+    if (start.getMinutes() !== 0 || end.getMinutes() !== 0) {
+      throw new BadRequestException('Booking must start and end on the hour (e.g. 08:00, 10:00)');
+    }
 
     return this.dataSource.transaction(async (manager) => {
       const court = await manager.findOne(CourtEntity, {
@@ -523,11 +551,18 @@ export class BookingsService {
         throw new ConflictException('Sân đã được đặt trong khung giờ này');
       }
 
+      const zonedStart = toZonedTime(start, BUSINESS_TIMEZONE);
+      const zonedEnd = toZonedTime(end, BUSINESS_TIMEZONE);
+
       const slots = await this.timeSlotRepository.find({
-        where: { courtId, dayOfWeek: start.getDay() },
+        where: { courtId, dayOfWeek: zonedStart.getDay() },
         order: { startHour: 'ASC' },
       });
-      const covered = this.findCoveringSlots(slots, start.getHours(), end.getHours() || 24);
+      const covered = this.findCoveringSlots(
+        slots,
+        zonedStart.getHours(),
+        zonedEnd.getHours() || 24,
+      );
       if (!covered)
         throw new BadRequestException(
           'Requested time range is not covered by available time slots',

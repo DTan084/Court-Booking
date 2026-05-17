@@ -36,21 +36,26 @@ export class BookingJobsProcessor {
 
     if (expiredBookings.length === 0) return;
 
+    let expiredCount = 0;
     for (const booking of expiredBookings) {
-      booking.status = BookingStatus.EXPIRED;
-      booking.expiredAt = now;
-      await this.bookingRepo.save(booking);
+      const result = await this.bookingRepo.update(
+        { id: booking.id, status: BookingStatus.PENDING_PAYMENT },
+        { status: BookingStatus.EXPIRED, expiredAt: now },
+      );
 
-      await this.notificationsService.create({
-        userId: booking.userId!,
-        type: NotificationType.BOOKING_EXPIRED,
-        title: 'Đặt sân đã hết hạn',
-        message: `Lịch đặt sân ${booking.court?.name || ''} của bạn đã bị hủy do quá hạn thanh toán 30 phút.`,
-        bookingId: booking.id,
-      });
+      if (result.affected && result.affected > 0) {
+        expiredCount++;
+        await this.notificationsService.create({
+          userId: booking.userId!,
+          type: NotificationType.BOOKING_EXPIRED,
+          title: 'Đặt sân đã hết hạn',
+          message: `Lịch đặt sân ${booking.court?.name || ''} của bạn đã bị hủy do quá hạn thanh toán.`,
+          bookingId: booking.id,
+        });
+      }
     }
 
-    this.logger.log(`Expired and notified ${expiredBookings.length} booking(s)`);
+    this.logger.log(`Expired and notified ${expiredCount} booking(s)`);
   }
 
   /**
