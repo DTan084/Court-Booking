@@ -56,8 +56,8 @@ services:
           .then(() => ds.runMigrations())
           .then(() => { console.log('✅ Migrations done'); process.exit(0); })
           .catch(e => { console.error('❌ Migration failed:', e.message); process.exit(1); });
-    profiles:
-      - migrate
+    # profiles:
+    #   - migrate
 
   # ── Backend (NestJS) ──────────────────────────
   backend:
@@ -73,14 +73,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     env_file:
       - ../.env.docker
+    volumes:
+      - uploads_data:/app/uploads
 
   # ── Frontend (Next.js) ────────────────────────
   frontend:
     build:
       context: ..
       dockerfile: apps/frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost}
     container_name: court-booking-frontend
     restart: unless-stopped
     ports:
@@ -107,3 +113,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:

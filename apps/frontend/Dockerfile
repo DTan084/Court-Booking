@@ -18,6 +18,9 @@ COPY apps/frontend ./apps/frontend
 COPY packages/shared ./packages/shared
 
 # Build shared package then frontend
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 RUN pnpm --filter @court-booking/shared build
 RUN pnpm --filter @court-booking/frontend build
 
