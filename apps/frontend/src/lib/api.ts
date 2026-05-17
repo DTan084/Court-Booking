@@ -1,8 +1,13 @@
 import axios, { type AxiosError } from 'axios';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+if (!apiUrl) {
+  console.warn('NEXT_PUBLIC_API_URL is missing. API calls will likely fail.');
+}
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL + '/api/v1',
+  baseURL: (apiUrl || '') + '/api/v1',
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // gửi httpOnly cookie tự động (nếu backend set cookie)
 });

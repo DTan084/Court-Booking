@@ -10,7 +10,7 @@ import { Pagination } from '@/components/shared/Pagination';
 import { useCourts, useDistricts } from '@/hooks/useCourts';
 import type { CourtType } from '@/types';
 
-const PER_PAGE = 2;
+const PER_PAGE = 6;
 
 export default function CourtsPage() {
   const [page, setPage] = useState(1);

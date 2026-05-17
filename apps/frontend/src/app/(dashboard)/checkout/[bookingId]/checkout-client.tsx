@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
@@ -158,8 +158,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
         <AlertTriangle className="h-12 w-12 text-destructive" />
-        <h2 className="text-xl font-semibold">KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin Ä‘áº·t sÃ¢n</h2>
-        <Button onClick={() => router.push('/courts')}>Quay láº¡i danh sÃ¡ch sÃ¢n</Button>
+        <h2 className="text-xl font-semibold">Booking information not found</h2>
+        <Button onClick={() => router.push('/courts')}>Back to courts list</Button>
       </div>
     );
   }
@@ -356,9 +356,14 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     ? 'Please verify your booking details before proceeding to payment.'
                     : 'Complete your booking details below.'}
                 </p>
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  <Lock className="h-3.5 w-3.5" />
-                  SSL secured checkout
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <Lock className="h-3.5 w-3.5" />
+                    SSL secured checkout
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-700">
+                    Simulation Mode
+                  </div>
                 </div>
               </div>
               <button
@@ -438,8 +443,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     <div className="mt-8 border-t border-slate-100 pt-8">
                       {isWithinNoCancelWindow && (
                         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                          Warning: Booking này bắt đầu trong vòng 12 giờ, bạn sẽ không thể hủy theo
-                          chính sách.
+                          Warning: This booking starts within 12 hours. You cannot cancel according
+                          to policy.
                         </div>
                       )}
                       <h4 className="text-lg font-semibold text-slate-900 mb-4">Selected Slots</h4>
