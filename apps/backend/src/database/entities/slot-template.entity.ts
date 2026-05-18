@@ -1,4 +1,5 @@
-﻿import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+﻿import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { SlotTemplateItemEntity } from './slot-template-item.entity';
 
 @Entity('slot_templates')
 export class SlotTemplateEntity {
@@ -16,4 +17,7 @@ export class SlotTemplateEntity {
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
+
+  @OneToMany(() => SlotTemplateItemEntity, (item) => item.template)
+  items: SlotTemplateItemEntity[];
 }

@@ -15,6 +15,7 @@ import { CourtTimeSlotEntity } from './court-time-slot.entity';
 import { CourtType } from '@court-booking/shared';
 import { CourtImageEntity } from './court-image.entity';
 import { SportTypeEntity } from './sport-type.entity';
+import { CourtFeatureEntity } from './court-feature.entity';
 
 export enum CourtStatus {
   ACTIVE = 'ACTIVE',
@@ -76,6 +77,9 @@ export class CourtEntity {
 
   @OneToMany(() => CourtTimeSlotEntity, (slot) => slot.court, { cascade: true })
   timeSlots: CourtTimeSlotEntity[];
+
+  @OneToMany(() => CourtFeatureEntity, (link) => link.court)
+  featureLinks: CourtFeatureEntity[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
