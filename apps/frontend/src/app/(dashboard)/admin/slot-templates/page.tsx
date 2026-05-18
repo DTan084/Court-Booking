@@ -717,7 +717,7 @@ export default function AdminSlotTemplatesPage() {
                           <p className="text-sm font-semibold text-slate-800">{day.label}</p>
                           <p className="text-xs text-slate-500">
                             {dayItems.length} slot{dayItems.length === 1 ? '' : 's'}
-                            {dayErrorCount > 0 ? ` â€¢ ${dayErrorCount} error(s)` : ''}
+                            {dayErrorCount > 0 ? ' - ' + dayErrorCount + ' error(s)' : ''}
                           </p>
                         </div>
                         <button

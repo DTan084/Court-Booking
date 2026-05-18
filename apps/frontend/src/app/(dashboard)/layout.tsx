@@ -33,7 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setUser(userData);
       })
       .catch(() => {
-        // Silently fail â€” user is not logged in, middleware will redirect if needed
+        // Silently fail: user is not logged in, middleware will redirect if needed.
         clearUser();
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-  # ── PostgreSQL ────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: court-booking-db
@@ -20,7 +17,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Redis ─────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: court-booking-redis
@@ -38,8 +34,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── DB Migration (one-shot, run before backend) ──
-  # Usage: docker compose run --rm migrate
   migrate:
     build:
       context: ..
@@ -57,12 +51,9 @@ services:
         const ds = require('./apps/backend/dist/database/data-source').default;
         ds.initialize()
           .then(() => ds.runMigrations())
-          .then(() => { console.log('✅ Migrations done'); process.exit(0); })
-          .catch(e => { console.error('❌ Migration failed:', e.message); process.exit(1); });
-    # profiles:
-    #   - migrate
+          .then(() => { console.log('[ok] Migrations done'); process.exit(0); })
+          .catch(e => { console.error('[error] Migration failed:', e.message); process.exit(1); });
 
-    # ── Backend (NestJS) ──────────────────────────
   backend:
     build:
       context: ..
@@ -83,7 +74,6 @@ services:
     volumes:
       - uploads_data:/app/uploads
 
-  # ── Frontend (Next.js) ────────────────────────
   frontend:
     build:
       context: ..
@@ -101,7 +91,6 @@ services:
     environment:
       - PORT=3000
 
-  # ── Nginx (Reverse Proxy) ────────────────────
   nginx:
     image: nginx:alpine
     container_name: court-booking-nginx

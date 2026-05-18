@@ -3,27 +3,27 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-# ── Build Stage ───────────────────────────────────────────────────────────────
+# Build stage
 FROM base AS builder
 WORKDIR /app
 
-# Copy manifests first (better layer caching)
+# Copy manifests first for better layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/backend/package.json ./apps/backend/
 COPY packages/shared/package.json ./packages/shared/
 
-# Install ALL dependencies (needed for build)
+# Install all dependencies required for the build
 RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY apps/backend ./apps/backend
 COPY packages/shared ./packages/shared
 
-# Build shared package first using tsc from root node_modules, then backend
+# Build shared package first, then the backend
 RUN ./node_modules/typescript/bin/tsc -p packages/shared/tsconfig.json
 RUN cd apps/backend && ../../node_modules/.bin/nest build
 
-# ── Runner Stage ──────────────────────────────────────────────────────────────
+# Runtime stage
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -41,14 +41,14 @@ COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY apps/backend/docker-entrypoint.sh ./apps/backend/docker-entrypoint.sh
 
-# HUSKY=0 prevents husky from running in CI/Docker (must be before pnpm install)
+# Prevent husky from running in Docker
 ENV HUSKY=0
 
-# Install production dependencies only (no devDeps)
-# Note: bcrypt needs install script to build native module
+# Install production dependencies only
+# bcrypt still needs its install script to build the native module
 RUN pnpm install --frozen-lockfile --prod
 
-# Non-root user for security
+# Create a non-root user for runtime
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001 \
     && chmod +x /app/apps/backend/docker-entrypoint.sh
 

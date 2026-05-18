@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+﻿import { Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { randomUUID, createHash } from 'crypto';
 import {
@@ -26,7 +26,7 @@ import { UserEntity } from './entities/user.entity';
 
 const logger = new Logger('SeedFull');
 
-/** Trả về Date tại `hour` giờ, offset `days` ngày từ hôm nay */
+/** Returns a Date at the given hour with a day offset from today. */
 function dateAt(days: number, hour: number): Date {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -39,13 +39,11 @@ async function runSeedFull() {
     logger.error('CRITICAL: seed attempt in production! ABORTING.');
     process.exit(1);
   }
-
-  // ── 1. Drop & recreate schema ──────────────────────────────────────────────
+  // 1. Reset schema
   dataSource.setOptions({ dropSchema: true, synchronize: true, logging: false });
   await dataSource.initialize();
-  logger.log('✓ Database reset (drop + synchronize)');
-
-  // ── Repositories ───────────────────────────────────────────────────────────
+  logger.log('[ok] Database reset (drop + synchronize)');
+  // Repositories
   const userRepo = dataSource.getRepository(UserEntity);
   const courtRepo = dataSource.getRepository(CourtEntity);
   const imageRepo = dataSource.getRepository(CourtImageEntity);
@@ -59,8 +57,7 @@ async function runSeedFull() {
   const notificationRepo = dataSource.getRepository(NotificationEntity);
   const refreshTokenRepo = dataSource.getRepository(RefreshTokenEntity);
   const settingRepo = dataSource.getRepository(SystemSettingEntity);
-
-  // ── 2. Users ───────────────────────────────────────────────────────────────
+  // 2. Seed users
   const adminPwd = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
   const userPwd = process.env.SEED_USER_PASSWORD || 'User@123';
   const adminHash = await bcrypt.hash(adminPwd, 10);
@@ -102,9 +99,8 @@ async function runSeedFull() {
       avatarUrl: 'https://picsum.photos/seed/user3/200/200',
     }),
   ]);
-  logger.log(`✓ Seeded 4 users`);
-
-  // Refresh token cho user1 (test "remember me" / auto-login)
+  logger.log(`[ok] Seeded 4 users`);
+  // Refresh token for user1 to exercise remember-me and auto-login flows.
   const rawToken = randomUUID();
   const hashedToken = createHash('sha256').update(rawToken).digest('hex');
   await refreshTokenRepo.save(
@@ -115,8 +111,7 @@ async function runSeedFull() {
       revoked: false,
     }),
   );
-
-  // ── 3. Sport Types ─────────────────────────────────────────────────────────
+  // 3. Seed sport types
   const sportTypeDefs = [
     { name: 'Football', icon: 'SOCCER', color: '#4CAF50', order: 1 },
     { name: 'Badminton', icon: 'BADMINTON', color: '#2196F3', order: 2 },
@@ -137,9 +132,8 @@ async function runSeedFull() {
     ),
   );
   const [football, badminton, tennis, , , pickleball] = sportTypes;
-  logger.log(`✓ Seeded ${sportTypes.length} sport types`);
-
-  // ── 4. Features ────────────────────────────────────────────────────────────
+  logger.log(`[ok] Seeded ${sportTypes.length} sport types`);
+  // 4. Seed features
   const featureDefs = [
     { name: 'Roof Cover', icon: 'ROOF', category: 'Facility' },
     { name: 'Night Lights', icon: 'LIGHT', category: 'Facility' },
@@ -151,30 +145,29 @@ async function runSeedFull() {
   const features = await featureRepo.save(
     featureDefs.map((f) => featureRepo.create({ ...f, isActive: true })),
   );
-  logger.log(`✓ Seeded ${features.length} features`);
-
-  // ── 5. Courts ──────────────────────────────────────────────────────────────
+  logger.log(`[ok] Seeded ${features.length} features`);
+  // 5. Seed courts
   const courtDefs = [
     {
       name: 'Badminton Court A1',
       sportTypeId: badminton.id,
-      address: '123 Cầu Giấy, Hà Nội',
-      district: 'Cầu Giấy',
+      address: '123 Cau Giay, Hanoi',
+      district: 'Cau Giay',
       courtType: CourtType.INDOOR,
-      description: 'Sân cầu lông tiêu chuẩn thi đấu, sàn gỗ cao cấp, có hệ thống đèn LED.',
+      description: 'Competition-grade badminton court with premium wood flooring and LED lighting.',
       pricePerHour: 150000,
       status: CourtStatus.ACTIVE,
       isFeatured: true,
       maxPlayers: 4,
-      features: [0, 1, 2, 4], // indices vào mảng features
+      features: [0, 1, 2, 4], // feature indexes
     },
     {
       name: 'Premium Tennis Court',
       sportTypeId: tennis.id,
-      address: '45 Lê Lợi, Quận 1, TP.HCM',
-      district: 'Quận 1',
+      address: '45 Le Loi, District 1, Ho Chi Minh City',
+      district: 'District 1',
       courtType: CourtType.OUTDOOR,
-      description: 'Sân tennis mặt cứng (hard court) cao cấp, có khán đài nhỏ cho người xem.',
+      description: 'Premium hard tennis court with a small spectator stand for match viewing.',
       pricePerHour: 250000,
       status: CourtStatus.ACTIVE,
       isFeatured: false,
@@ -184,10 +177,11 @@ async function runSeedFull() {
     {
       name: 'Mini Football 5v5',
       sportTypeId: football.id,
-      address: '89 Nguyễn Huệ, Đà Nẵng',
-      district: 'Hải Châu',
+      address: '89 Nguyen Hue, Da Nang',
+      district: 'Hai Chau',
       courtType: CourtType.OUTDOOR,
-      description: 'Sân bóng đá mini cỏ nhân tạo thế hệ 3, phù hợp thi đấu 5v5.',
+      description:
+        '5v5 mini football field with third-generation artificial turf for casual play and fixtures.',
       pricePerHour: 300000,
       status: CourtStatus.ACTIVE,
       isFeatured: true,
@@ -197,10 +191,10 @@ async function runSeedFull() {
     {
       name: 'Pickleball Court P1',
       sportTypeId: pickleball.id,
-      address: '22 Võ Văn Kiệt, Quận 1, TP.HCM',
-      district: 'Quận 1',
+      address: '22 Vo Van Kiet, District 1, Ho Chi Minh City',
+      district: 'District 1',
       courtType: CourtType.INDOOR,
-      description: 'Sân pickleball với sàn chuyên dụng, ánh sáng chuẩn thi đấu quốc tế.',
+      description: 'Indoor pickleball court with dedicated flooring and tournament-grade lighting.',
       pricePerHour: 180000,
       status: CourtStatus.ACTIVE,
       isFeatured: false,
@@ -208,12 +202,12 @@ async function runSeedFull() {
       features: [0, 1, 2, 3],
     },
     {
-      name: 'Badminton Court B2 (Bảo trì)',
+      name: 'Badminton Court B2 (Maintenance)',
       sportTypeId: badminton.id,
-      address: '10 Hoàng Hoa Thám, Hà Nội',
-      district: 'Ba Đình',
+      address: '10 Hoang Hoa Tham, Hanoi',
+      district: 'Ba Dinh',
       courtType: CourtType.INDOOR,
-      description: 'Sân đang trong thời gian bảo trì định kỳ.',
+      description: 'Court currently unavailable for scheduled maintenance.',
       pricePerHour: 120000,
       status: CourtStatus.INACTIVE,
       isFeatured: false,
@@ -233,18 +227,17 @@ async function runSeedFull() {
       imageRepo.create({
         courtId: court.id,
         url: `https://picsum.photos/seed/${court.id}a/1200/800`,
-        altText: `${court.name} – ảnh 1`,
+        altText: `${court.name} - image 1`,
         displayOrder: 1,
       }),
       imageRepo.create({
         courtId: court.id,
         url: `https://picsum.photos/seed/${court.id}b/1200/800`,
-        altText: `${court.name} – ảnh 2`,
+        altText: `${court.name} - image 2`,
         displayOrder: 2,
       }),
     ]);
-
-    // Time slots (6h-22h, chia 3 khung giá)
+    // Time slots from 06:00 to 22:00 with off-peak, standard, and peak pricing.
     const slots: CourtTimeSlotEntity[] = [];
     for (let day = 0; day <= 6; day++) {
       for (let hour = 6; hour < 22; hour += 2) {
@@ -268,13 +261,12 @@ async function runSeedFull() {
     );
     await courtFeatureRepo.save(courtFeatureRows);
   }
-  logger.log(`✓ Seeded ${courts.length} courts với images, time slots, features`);
-
-  // ── 6. Slot Templates ──────────────────────────────────────────────────────
+  logger.log(`[ok] Seeded ${features.length} features`);
+  // 6. Seed slot templates
   const template = await slotTemplateRepo.save(
     slotTemplateRepo.create({
       name: 'Default Weekly Template',
-      description: 'Template mặc định cho admin test quản lý khung giờ',
+      description: 'Default template for exercising admin slot management.',
       isActive: true,
     }),
   );
@@ -315,9 +307,8 @@ async function runSeedFull() {
       price: 200000,
     }),
   ]);
-  logger.log(`✓ Seeded slot template`);
-
-  // ── 7. Bookings (đủ mọi trạng thái) ───────────────────────────────────────
+  logger.log(`[ok] Seeded slot template`);
+  // 7. Seed bookings across key statuses
   const bookings = await bookingRepo.save([
     // CONFIRMED - live for user1 (test My Bookings "Live & Upcoming")
     bookingRepo.create({
@@ -352,7 +343,7 @@ async function runSeedFull() {
       paymentReminderSent: false,
       note: '[visual-seed] Live booking for user1',
     }),
-    // CONFIRMED – tương lai (user1, sân 0)
+    // CONFIRMED future booking for user1 on court 0
     bookingRepo.create({
       userId: user1.id,
       courtId: courts[0].id,
@@ -366,9 +357,9 @@ async function runSeedFull() {
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: false,
-      note: 'Booking CONFIRMED – test reminder flow',
+      note: 'Confirmed booking for reminder-flow testing',
     }),
-    // PENDING_PAYMENT – tương lai (user1, sân 1)
+    // PENDING_PAYMENT future booking for user1 on court 1
     bookingRepo.create({
       userId: user1.id,
       courtId: courts[1].id,
@@ -380,9 +371,9 @@ async function runSeedFull() {
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: false,
-      note: 'Booking PENDING_PAYMENT – test payment flow',
+      note: 'Pending-payment booking for payment-flow testing',
     }),
-    // COMPLETED – quá khứ (user1, sân 1)
+    // COMPLETED historical booking for user1 on court 1
     bookingRepo.create({
       userId: user1.id,
       courtId: courts[1].id,
@@ -397,7 +388,7 @@ async function runSeedFull() {
       bookingReminderSent: true,
       paymentReminderSent: true,
     }),
-    // CANCELLED bởi USER – tương lai (user1, sân 2)
+    // CANCELLED by USER for a future booking on court 2
     bookingRepo.create({
       userId: user1.id,
       courtId: courts[2].id,
@@ -407,15 +398,15 @@ async function runSeedFull() {
       totalPrice: 360000,
       cancelledAt: new Date(),
       cancelledBy: CancelledBy.USER,
-      cancelledReason: 'Bận việc đột xuất',
-      cancellationNote: 'Mong được hoàn tiền',
+      cancelledReason: 'Unexpected schedule conflict',
+      cancellationNote: 'Please process the refund',
       refundedAt: new Date(),
       refundAmount: 360000,
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: false,
     }),
-    // CANCELLED bởi ADMIN (user2, sân 0)
+    // CANCELLED by ADMIN for user2 on court 0
     bookingRepo.create({
       userId: user2.id,
       courtId: courts[0].id,
@@ -425,7 +416,7 @@ async function runSeedFull() {
       totalPrice: 240000,
       cancelledAt: new Date(),
       cancelledBy: CancelledBy.ADMIN,
-      cancelledReason: 'Sân bảo trì khẩn cấp',
+      cancelledReason: 'Emergency court maintenance',
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: false,
@@ -442,8 +433,8 @@ async function runSeedFull() {
       paymentMethod: 'CARD',
       cancelledAt: dateAt(-2, 10),
       cancelledBy: CancelledBy.ADMIN,
-      cancelledReason: 'Sân đóng đột xuất',
-      cancellationNote: 'Chờ xử lý hoàn tiền',
+      cancelledReason: 'Court closed unexpectedly',
+      cancellationNote: 'Waiting for refund processing',
       refundedAt: null,
       refundAmount: null,
       bookingSource: BookingSource.ONLINE,
@@ -451,7 +442,7 @@ async function runSeedFull() {
       paymentReminderSent: false,
       note: '[visual-seed] Refund pending case',
     }),
-    // EXPIRED – payment timeout (user2, sân 3)
+    // EXPIRED because payment was not completed in time
     bookingRepo.create({
       userId: user2.id,
       courtId: courts[3].id,
@@ -464,12 +455,12 @@ async function runSeedFull() {
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: true,
-      note: 'Booking EXPIRED – test auto-expire job',
+      note: 'Expired booking for auto-expire job testing',
     }),
-    // CONFIRMED – WALK_IN (guest, sân 1)
+    // CONFIRMED walk-in booking on court 1
     bookingRepo.create({
       userId: null,
-      guestName: 'Khách Walk-in',
+      guestName: 'Walk-in Guest',
       guestPhone: '0901234567',
       courtId: courts[1].id,
       startTime: dateAt(3, 10),
@@ -481,9 +472,9 @@ async function runSeedFull() {
       bookingSource: BookingSource.WALK_IN,
       bookingReminderSent: false,
       paymentReminderSent: false,
-      note: 'Walk-in qua quầy lễ tân',
+      note: 'Walk-in booking created at the front desk',
     }),
-    // CONFIRMED – ADMIN source + checkedIn (user3, sân 2)
+    // CONFIRMED admin-created booking with check-in
     bookingRepo.create({
       userId: user3.id,
       courtId: courts[2].id,
@@ -497,9 +488,9 @@ async function runSeedFull() {
       bookingSource: BookingSource.ADMIN,
       bookingReminderSent: true,
       paymentReminderSent: false,
-      note: 'Booking admin tạo + đã check-in',
+      note: 'Admin-created booking with completed check-in',
     }),
-    // COMPLETED – quá khứ (user2, sân 2)
+    // COMPLETED historical booking for user2 on court 2
     bookingRepo.create({
       userId: user2.id,
       courtId: courts[2].id,
@@ -514,7 +505,7 @@ async function runSeedFull() {
       bookingReminderSent: true,
       paymentReminderSent: true,
     }),
-    // CONFIRMED – tương lai xa (user3, sân 3) để test calendar
+    // CONFIRMED future booking far enough out to exercise calendar views
     bookingRepo.create({
       userId: user3.id,
       courtId: courts[3].id,
@@ -528,7 +519,7 @@ async function runSeedFull() {
       bookingReminderSent: false,
       paymentReminderSent: false,
     }),
-    // CONFIRMED – ĐANG DIỄN RA (live: startTime < now < endTime) cho "My Bookings > Live"
+    // CONFIRMED booking currently in progress for "My Bookings > Live"
     bookingRepo.create({
       userId: user2.id,
       courtId: courts[0].id,
@@ -558,9 +549,9 @@ async function runSeedFull() {
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: true,
       paymentReminderSent: false,
-      note: 'Live booking – đang diễn ra để test "Live & Upcoming" tab',
+      note: 'Live booking for the "Live & Upcoming" tab',
     }),
-    // CANCELLED bởi SYSTEM (auto-cancel: no-show / court maintenance)
+    // CANCELLED by SYSTEM due to policy enforcement
     bookingRepo.create({
       userId: user3.id,
       courtId: courts[1].id,
@@ -571,25 +562,24 @@ async function runSeedFull() {
       cancelledAt: dateAt(-1, 13),
       cancelledBy: CancelledBy.SYSTEM,
       cancelledReason: 'NO_SHOW',
-      cancellationNote: 'Tự động hủy do không check-in sau 15 phút',
+      cancellationNote: 'Automatically cancelled after failing to check in within 15 minutes',
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: true,
       paymentReminderSent: false,
-      note: 'CANCELLED by SYSTEM – test system cancellation policy',
+      note: 'System-cancelled booking for policy testing',
     }),
   ]);
-
-  // ── Revenue history: bookings trải dài 30 ngày để test analytics/chart ────
+  // Revenue history across the last 30 days for analytics views
   const revenueHistory = [];
   const revenueUsers = [user1, user2, user3];
   const revenueCourts = [courts[0], courts[1], courts[2], courts[3]];
-  // Tạo ~20 completed bookings rải đều trong 30 ngày qua
+  // Create completed bookings distributed across the last 30 days.
   const revenueDays = [-29, -26, -23, -20, -18, -15, -13, -10, -8, -6, -5, -4, -3, -2, -1];
   for (let i = 0; i < revenueDays.length; i++) {
     const day = revenueDays[i];
     const court = revenueCourts[i % revenueCourts.length];
     const user = revenueUsers[i % revenueUsers.length];
-    const price = Number(court.pricePerHour) * 2; // 2 giờ
+    const price = Number(court.pricePerHour) * 2; // 2 hours
     revenueHistory.push(
       bookingRepo.create({
         userId: user.id,
@@ -604,17 +594,16 @@ async function runSeedFull() {
         bookingSource: BookingSource.ONLINE,
         bookingReminderSent: true,
         paymentReminderSent: true,
-        note: `[revenue-seed] ngày ${day}`,
+        note: `[revenue-seed] day ${day}`,
       }),
     );
   }
   const revenueBookings = await bookingRepo.save(revenueHistory);
   const allBookings = [...bookings, ...revenueBookings];
   logger.log(
-    `✓ Seeded ${bookings.length + revenueBookings.length} bookings (đủ mọi status + source + 30d history)`,
+    `[ok] Seeded ${bookings.length + revenueBookings.length} bookings across key statuses, sources, and 30-day history`,
   );
-
-  // ── 8. Notifications ───────────────────────────────────────────────────────
+  // 8. Seed notifications
   const findBooking = (predicate: (booking: BookingEntity) => boolean) => {
     const found = allBookings.find(predicate);
     if (!found) {
@@ -730,9 +719,8 @@ async function runSeedFull() {
       isRead: false,
     }),
   ]);
-  logger.log(`✓ Seeded notifications`);
-
-  // ── 9. System Settings ─────────────────────────────────────────────────────
+  logger.log(`[ok] Seeded notifications`);
+  // 9. Seed system settings
   const settings = [
     { key: 'default_timezone', value: 'Asia/Ho_Chi_Minh' },
     { key: 'payment_deadline_minutes', value: '30' },
@@ -743,16 +731,15 @@ async function runSeedFull() {
     { key: 'max_booking_days_ahead', value: '30' },
   ];
   await settingRepo.save(settings.map((s) => settingRepo.create(s)));
-  logger.log(`✓ Seeded ${settings.length} system settings`);
-
-  // ── Summary ────────────────────────────────────────────────────────────────
+  logger.log(`[ok] Seeded ${settings.length} system settings`);
+  // Summary
   logger.log('');
-  logger.log('══════════════ SEED COMPLETED ══════════════');
+  logger.log('================ SEED COMPLETED ================');
   logger.log(`Admin : admin@courtbooking.com  /  ${adminPwd}`);
   logger.log(`User 1: user@courtbooking.com   /  ${userPwd}`);
   logger.log(`User 2: user2@courtbooking.com  /  ${userPwd}`);
   logger.log(`User 3: user3@courtbooking.com  /  ${userPwd}`);
-  logger.log('═════════════════════════════════════════════');
+  logger.log('================================================');
 
   await dataSource.destroy();
 }
