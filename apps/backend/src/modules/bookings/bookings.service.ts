@@ -54,10 +54,12 @@ export class BookingsService {
   }
 
   private async loadBookingWithCourt(id: string): Promise<BookingEntity> {
-    const booking = await this.bookingRepository.findOne({
-      where: { id },
-      relations: ['court'],
-    });
+    const booking = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .withDeleted()
+      .leftJoinAndSelect('booking.court', 'court')
+      .where('booking.id = :id', { id })
+      .getOne();
 
     if (!booking) throw new NotFoundException('Booking not found');
     return booking;
@@ -452,6 +454,7 @@ export class BookingsService {
 
     const queryBuilder = this.bookingRepository
       .createQueryBuilder('booking')
+      .withDeleted()
       .leftJoinAndSelect('booking.court', 'court')
       .leftJoinAndSelect('court.images', 'courtImages')
       .where('booking.userId = :userId', { userId })
@@ -541,10 +544,14 @@ export class BookingsService {
     const cancelWithinHours = await this.settingsService.getNumber('cancel_within_hours', 24);
     const noCancelBeforeHours = await this.settingsService.getNumber('no_cancel_before_hours', 12);
 
-    const booking = await this.bookingRepository.findOne({
-      where: { id, userId },
-      relations: ['court', 'court.images'],
-    });
+    const booking = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .withDeleted()
+      .leftJoinAndSelect('booking.court', 'court')
+      .leftJoinAndSelect('court.images', 'courtImages')
+      .where('booking.id = :id', { id })
+      .andWhere('booking.userId = :userId', { userId })
+      .getOne();
 
     if (!booking) throw new NotFoundException('Booking not found');
 
@@ -704,6 +711,7 @@ export class BookingsService {
     const limit = query.limit ?? 10;
     const qb = this.bookingRepository
       .createQueryBuilder('booking')
+      .withDeleted()
       .leftJoinAndSelect('booking.court', 'court')
       .leftJoinAndSelect('booking.user', 'user')
       .orderBy('booking.startTime', 'DESC')
@@ -998,6 +1006,7 @@ export class BookingsService {
     const statuses = [BookingStatus.CONFIRMED, BookingStatus.COMPLETED];
     const qb = this.bookingRepository
       .createQueryBuilder('booking')
+      .withDeleted()
       .leftJoinAndSelect('booking.court', 'court')
       .where('booking.status IN (:...statuses)', { statuses })
       .andWhere('booking.startTime < :to', { to })
