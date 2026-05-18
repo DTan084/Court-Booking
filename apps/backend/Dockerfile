@@ -39,6 +39,7 @@ COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 # Copy built artifacts
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY apps/backend/docker-entrypoint.sh ./apps/backend/docker-entrypoint.sh
 
 # HUSKY=0 prevents husky from running in CI/Docker (must be before pnpm install)
 ENV HUSKY=0
@@ -49,11 +50,8 @@ RUN pnpm install --frozen-lockfile --prod
 
 # Non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001 \
-    && mkdir -p /app/logs \
-    && chown -R nestjs:nodejs /app
-USER nestjs
+    && chmod +x /app/apps/backend/docker-entrypoint.sh
 
 EXPOSE 3001
 
-# WORKDIR is /app, dist is at /app/apps/backend/dist/main.js
-CMD ["node", "apps/backend/dist/main"]
+ENTRYPOINT ["/app/apps/backend/docker-entrypoint.sh"]

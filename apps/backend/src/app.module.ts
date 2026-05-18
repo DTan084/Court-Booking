@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
@@ -43,12 +44,24 @@ import { SettingsModule } from './modules/settings/settings.module';
       envFilePath: '../../.env',
       load: [appConfig, databaseConfig, jwtConfig, redisConfig, bookingConfig],
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60000, // 60000 ms = 1 minute (NestJS Throttler v6 uses ms, not seconds)
-        limit: 100, // 100 requests per minute
-      },
-    ]),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          {
+            ttl: 60000, // 60000 ms = 1 minute (NestJS Throttler v6 uses ms, not seconds)
+            limit: 100, // 100 requests per minute
+          },
+        ],
+        storage: new ThrottlerStorageRedisService({
+          host: configService.get<string>('redis.host', '127.0.0.1'),
+          port: configService.get<number>('redis.port', 6379),
+          password: configService.get<string>('redis.password') || undefined,
+          db: configService.get<number>('redis.db', 0),
+        }),
+      }),
+    }),
     WinstonModule.forRoot(winstonConfig),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],

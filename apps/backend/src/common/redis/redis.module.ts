@@ -14,6 +14,7 @@ import { Logger } from '@nestjs/common';
           host: configService.get<string>('redis.host'),
           port: configService.get<number>('redis.port'),
           password: configService.get<string>('redis.password'),
+          db: configService.get<number>('redis.db', 0),
           retryStrategy: (times) => {
             const delay = Math.min(times * 50, 2000);
             logger.warn(`Redis connection retry attempt ${times}, delay: ${delay}ms`);

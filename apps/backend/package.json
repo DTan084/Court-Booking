@@ -15,7 +15,7 @@
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
-    "db:reset:dev": "ts-node src/database/reset-dev.ts",
+    "db:seed": "ts-node src/database/seed.ts",
     "migration:generate": "pnpm run typeorm migration:generate",
     "migration:run": "pnpm run typeorm migration:run",
     "migration:revert": "pnpm run typeorm migration:revert"
@@ -33,6 +33,7 @@
     "@nestjs/swagger": "^7.0.0",
     "@nestjs/terminus": "^11.1.1",
     "@nestjs/throttler": "^6.5.0",
+    "@nest-lab/throttler-storage-redis": "^1.0.0",
     "@nestjs/typeorm": "^10.0.0",
     "bcrypt": "^5.0.0",
     "bull": "^4.16.5",
