@@ -138,6 +138,7 @@ export class CourtsService {
     const qb = this.courtRepository
       .createQueryBuilder('court')
       .leftJoinAndSelect('court.images', 'images')
+      .leftJoinAndSelect('court.sportTypeRef', 'sportTypeRef')
       .where('court.deletedAt IS NULL')
       .skip(skip)
       .take(limit)
@@ -256,6 +257,7 @@ export class CourtsService {
     const result = {
       data: data.map((court) => ({
         ...court,
+        sportTypeName: court.sportTypeRef?.name,
         images: [...(court.images ?? [])].sort((a, b) => a.displayOrder - b.displayOrder),
         featureItems: featureByCourt.get(court.id) ?? [],
       })),
@@ -283,7 +285,7 @@ export class CourtsService {
 
     const court = await this.courtRepository.findOne({
       where: { id, deletedAt: IsNull() },
-      relations: ['images'],
+      relations: ['images', 'sportTypeRef'],
       order: { images: { displayOrder: 'ASC' } },
     });
 
@@ -301,6 +303,7 @@ export class CourtsService {
 
     const result = {
       ...court,
+      sportTypeName: court.sportTypeRef?.name,
       featureItems,
     };
 
