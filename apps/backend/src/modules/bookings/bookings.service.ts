@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, Brackets } from 'typeorm';
+import { Repository, DataSource, Brackets, QueryFailedError } from 'typeorm';
 import { differenceInHours } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
@@ -26,6 +26,13 @@ import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
 
 @Injectable()
 export class BookingsService {
+  private isBookingConflictError(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) return false;
+    const driverError = (error as QueryFailedError & { driverError?: { code?: string } })
+      .driverError;
+    return driverError?.code === '23P01' || driverError?.code === '23505';
+  }
+
   constructor(
     @InjectRepository(BookingEntity)
     private readonly bookingRepository: Repository<BookingEntity>,
@@ -197,7 +204,14 @@ export class BookingsService {
         note: createBookingDto.note ?? null,
       });
 
-      return manager.save(booking);
+      try {
+        return await manager.save(booking);
+      } catch (error) {
+        if (this.isBookingConflictError(error)) {
+          throw new ConflictException('Court is already booked for the selected time slot');
+        }
+        throw error;
+      }
     });
   }
 
@@ -584,7 +598,15 @@ export class BookingsService {
         guestPhone: guestPhone ?? null,
         note: note ?? null,
       });
-      const saved = await manager.save(booking);
+      let saved: BookingEntity;
+      try {
+        saved = await manager.save(booking);
+      } catch (error) {
+        if (this.isBookingConflictError(error)) {
+          throw new ConflictException('The requested court is already booked for this time slot');
+        }
+        throw error;
+      }
 
       if (saved.userId) {
         this.notificationsService

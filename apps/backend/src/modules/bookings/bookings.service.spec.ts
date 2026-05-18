@@ -6,6 +6,7 @@ import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import bookingConfig from '../../config/booking.config';
 import {
   BadRequestException,
   ConflictException,
@@ -64,6 +65,11 @@ const mockDataSource = () => ({
   transaction: jest.fn(),
 });
 
+const mockBookingConfig = () => ({
+  minCancelHours: 2,
+  maxBookingDurationHours: 8,
+});
+
 describe('BookingsService', () => {
   let service: BookingsService;
   let timeSlotRepository: ReturnType<typeof mockTimeSlotRepository>;
@@ -92,6 +98,10 @@ describe('BookingsService', () => {
         {
           provide: DataSource,
           useFactory: mockDataSource,
+        },
+        {
+          provide: bookingConfig.KEY,
+          useFactory: mockBookingConfig,
         },
         {
           provide: NotificationsService,

@@ -24,6 +24,7 @@ export class CourtsService {
   private readonly CACHE_TTL = 300; // 5 minutes
   private readonly COURT_CACHE_PREFIX = 'court:';
   private readonly COURTS_LIST_PREFIX = 'courts:list:';
+  private readonly COURTS_LIST_VERSION_KEY = 'courts:list:version';
 
   constructor(
     @InjectRepository(CourtEntity)
@@ -75,6 +76,19 @@ export class CourtsService {
     }
   }
 
+  private async getCourtsListVersion(): Promise<string> {
+    try {
+      const existing = await this.redis.get(this.COURTS_LIST_VERSION_KEY);
+      if (existing) return existing;
+      const initialized = await this.redis.set(this.COURTS_LIST_VERSION_KEY, '1', 'NX');
+      if (initialized) return '1';
+      const after = await this.redis.get(this.COURTS_LIST_VERSION_KEY);
+      return after || '1';
+    } catch {
+      return '1';
+    }
+  }
+
   async create(createCourtDto: CreateCourtDto): Promise<CourtEntity> {
     const sportTypeId = await this.resolveSportTypeId(createCourtDto.sportTypeId);
     const court = this.courtRepository.create({
@@ -105,10 +119,11 @@ export class CourtsService {
       minPlayers,
       maxPlayers,
       availableToday,
+      includeInactive,
     } = query;
 
-    // Generate cache key based on query params
-    const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
+    const listVersion = await this.getCourtsListVersion();
+    const cacheKey = `${this.COURTS_LIST_PREFIX}v${listVersion}:${JSON.stringify(query)}`;
 
     // Try to get from cache
     const cached = await this.safeCacheGet(cacheKey);
@@ -126,6 +141,10 @@ export class CourtsService {
       .take(limit)
       .orderBy('court.isFeatured', 'DESC')
       .addOrderBy('court.createdAt', 'DESC');
+
+    if (!includeInactive) {
+      qb.andWhere('court.status = :activeStatus', { activeStatus: CourtStatus.ACTIVE });
+    }
 
     if (name) {
       qb.andWhere('court.name ILIKE :name', { name: `%${name}%` });
@@ -235,6 +254,7 @@ export class CourtsService {
     const result = {
       data: data.map((court) => ({
         ...court,
+        images: [...(court.images ?? [])].sort((a, b) => a.displayOrder - b.displayOrder),
         featureItems: featureByCourt.get(court.id) ?? [],
       })),
       meta: {
@@ -601,16 +621,8 @@ export class CourtsService {
   }
 
   private async invalidateCourtsListCache(): Promise<void> {
-    const pattern = `${this.COURTS_LIST_PREFIX}*`;
     try {
-      let cursor = '0';
-      do {
-        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-        cursor = nextCursor;
-        if (keys.length > 0) {
-          await this.safeCacheDel(...keys);
-        }
-      } while (cursor !== '0');
+      await this.redis.incr(this.COURTS_LIST_VERSION_KEY);
     } catch {
       // no-op
     }

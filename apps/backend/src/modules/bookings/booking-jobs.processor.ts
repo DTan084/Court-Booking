@@ -2,7 +2,7 @@ import { Processor, Process } from '@nestjs/bull';
 import { Job } from 'bull';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, Between, LessThan } from 'typeorm';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { BookingStatus, NotificationType } from '@court-booking/shared';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -93,7 +93,7 @@ export class BookingJobsProcessor {
     const pendingReminders = await this.bookingRepo.find({
       where: {
         status: BookingStatus.PENDING_PAYMENT,
-        paymentDeadline: LessThan(tenMinsFromNow),
+        paymentDeadline: Between(now, tenMinsFromNow),
         paymentReminderSent: false,
       },
       relations: ['court'],
@@ -118,7 +118,7 @@ export class BookingJobsProcessor {
     const upcomingBookings = await this.bookingRepo.find({
       where: {
         status: BookingStatus.CONFIRMED,
-        startTime: LessThan(oneHourFromNow),
+        startTime: Between(now, oneHourFromNow),
         bookingReminderSent: false,
       },
       relations: ['court'],

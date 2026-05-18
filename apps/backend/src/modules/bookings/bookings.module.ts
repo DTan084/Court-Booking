@@ -25,6 +25,8 @@ import { UserEntity } from '../../database/entities/user.entity';
           host: configService.get<string>('redis.host', '127.0.0.1'),
           port: configService.get<number>('redis.port', 6379),
           password: configService.get<string>('redis.password') || undefined,
+          db: configService.get<number>('redis.queueDb', 1),
+          keyPrefix: configService.get<string>('redis.queueKeyPrefix', 'bull'),
         },
       }),
     }),

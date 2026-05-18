@@ -23,6 +23,7 @@ export const getCourtsSchema = z.object({
   minPlayers: z.coerce.number().int().min(1).optional(),
   maxPlayers: z.coerce.number().int().min(1).optional(),
   availableToday: z.coerce.boolean().optional(),
+  includeInactive: z.coerce.boolean().optional(),
 });
 
 export type GetCourtsDto = z.infer<typeof getCourtsSchema>;
