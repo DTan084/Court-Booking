@@ -72,7 +72,6 @@ const mockBookingConfig = () => ({
 
 describe('BookingsService', () => {
   let service: BookingsService;
-  let timeSlotRepository: ReturnType<typeof mockTimeSlotRepository>;
   let dataSource: ReturnType<typeof mockDataSource>;
 
   beforeEach(async () => {
@@ -121,7 +120,6 @@ describe('BookingsService', () => {
     }).compile();
 
     service = module.get<BookingsService>(BookingsService);
-    timeSlotRepository = module.get(getRepositoryToken(CourtTimeSlotEntity));
     dataSource = module.get(DataSource);
   });
 
@@ -296,11 +294,22 @@ describe('BookingsService', () => {
     it('should process booking in a transaction', async () => {
       dataSource.transaction.mockImplementation(async (cb) => {
         const mockManager = {
+          query: jest.fn().mockResolvedValue(undefined),
           findOne: jest.fn().mockResolvedValue({
             id: 'court-1',
             status: CourtStatus.ACTIVE,
             pricePerHour: 100,
           }),
+          find: jest.fn().mockResolvedValue([
+            {
+              id: 'slot-1',
+              courtId: 'court-1',
+              dayOfWeek: new Date(mockDto.startTime).getDay(),
+              startHour: new Date(mockDto.startTime).getHours(),
+              endHour: new Date(mockDto.endTime).getHours(),
+              price: 100,
+            },
+          ]),
           createQueryBuilder: jest.fn(() => ({
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
@@ -311,18 +320,6 @@ describe('BookingsService', () => {
         };
         return cb(mockManager);
       });
-
-      // Mock time slot repository to return valid slots
-      timeSlotRepository.find.mockResolvedValue([
-        {
-          id: 'slot-1',
-          courtId: 'court-1',
-          dayOfWeek: new Date(mockDto.startTime).getDay(),
-          startHour: new Date(mockDto.startTime).getHours(),
-          endHour: new Date(mockDto.endTime).getHours(),
-          price: 100,
-        },
-      ]);
 
       const result = await service.createBooking(mockDto, mockUserId);
       expect(result.id).toBe('new-booking');

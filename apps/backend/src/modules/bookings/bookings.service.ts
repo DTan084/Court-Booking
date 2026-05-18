@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, Brackets, QueryFailedError } from 'typeorm';
+import { Repository, DataSource, Brackets, QueryFailedError, EntityManager } from 'typeorm';
 import { differenceInHours } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
@@ -26,6 +26,18 @@ import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
 
 @Injectable()
 export class BookingsService {
+  private getCourtAdvisoryLockKeys(courtId: string): [number, number] {
+    const normalized = courtId.replace(/-/g, '');
+    const high = parseInt(normalized.slice(0, 8), 16) | 0;
+    const low = parseInt(normalized.slice(8, 16), 16) | 0;
+    return [high, low];
+  }
+
+  private async lockCourtBookingWindow(manager: EntityManager, courtId: string): Promise<void> {
+    const [high, low] = this.getCourtAdvisoryLockKeys(courtId);
+    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [high, low]);
+  }
+
   private isBookingConflictError(error: unknown): boolean {
     if (!(error instanceof QueryFailedError)) return false;
     const driverError = (error as QueryFailedError & { driverError?: { code?: string } })
@@ -225,6 +237,9 @@ export class BookingsService {
         throw new BadRequestException('Court is not active');
       }
 
+      // Serialize booking writes per court inside the current Postgres transaction.
+      await this.lockCourtBookingWindow(manager, courtId);
+
       // 2. Validate time slots
       const zonedStart = toZonedTime(start, BUSINESS_TIMEZONE);
       const zonedEnd = toZonedTime(end, BUSINESS_TIMEZONE);
@@ -232,7 +247,7 @@ export class BookingsService {
       const startHour = zonedStart.getHours();
       const endHour = zonedEnd.getHours() || 24;
 
-      const slots = await this.timeSlotRepository.find({
+      const slots = await manager.find(CourtTimeSlotEntity, {
         where: { courtId, dayOfWeek },
         order: { startHour: 'ASC' },
       });
@@ -615,6 +630,11 @@ export class BookingsService {
         lock: { mode: 'pessimistic_write' },
       });
       if (!court) throw new NotFoundException('Court not found');
+      if (court.status !== CourtStatus.ACTIVE) {
+        throw new BadRequestException('Court is not active');
+      }
+
+      await this.lockCourtBookingWindow(manager, courtId);
 
       const overlapping = await manager
         .createQueryBuilder(BookingEntity, 'booking')
@@ -638,7 +658,7 @@ export class BookingsService {
       const zonedStart = toZonedTime(start, BUSINESS_TIMEZONE);
       const zonedEnd = toZonedTime(end, BUSINESS_TIMEZONE);
 
-      const slots = await this.timeSlotRepository.find({
+      const slots = await manager.find(CourtTimeSlotEntity, {
         where: { courtId, dayOfWeek: zonedStart.getDay() },
         order: { startHour: 'ASC' },
       });
