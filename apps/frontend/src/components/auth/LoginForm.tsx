@@ -72,7 +72,7 @@ export function LoginForm() {
     <div className="w-full max-w-md">
       <div className="mb-8">
         <h1 className="text-4xl font-extrabold tracking-tight text-[#0b1c30]">Welcome back</h1>
-        <p className="mt-2 text-sm text-slate-600">Sign in to your CourtCommand account.</p>
+        <p className="mt-2 text-sm text-slate-600">Sign in to your Tana account.</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -89,7 +89,7 @@ export function LoginForm() {
           <Input
             id="email"
             type="email"
-            placeholder="coach@courtcommand.com"
+            placeholder="coach@tana.app"
             {...register('email')}
             disabled={isLoading}
             className="h-12 border-slate-300 bg-white focus-visible:ring-[#fd933d]"

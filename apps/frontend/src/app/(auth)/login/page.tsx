@@ -1,7 +1,17 @@
-import Image from 'next/image';
+﻿import Image from 'next/image';
+import type { Metadata } from 'next';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { Navbar } from '@/components/shared/Navbar';
 import { SiteFooter } from '@/components/shared/SiteFooter';
+
+export const metadata: Metadata = {
+  title: 'Login',
+  description: 'Access your Tana account to manage bookings and venue activity.',
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function LoginPage() {
   return (

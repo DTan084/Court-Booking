@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { LogOut, Shield, User as UserIcon } from 'lucide-react';
 import { Role } from '@/types';
+import { BrandLogo } from './BrandLogo';
 import { NotificationBell } from './notification-bell';
 
 export function Navbar() {
@@ -58,10 +59,7 @@ export function Navbar() {
     return (
       <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2 font-bold text-xl">
-            <span className="text-primary">CB</span>
-            <span>Court Booking</span>
-          </Link>
+          <BrandLogo priority />
           <div className="h-10 w-10" />
         </div>
       </nav>
@@ -71,10 +69,7 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center space-x-2 font-bold text-xl">
-          <span className="text-primary">CB</span>
-          <span>Court Booking</span>
-        </Link>
+        <BrandLogo priority />
 
         <div className="flex items-center space-x-6">
           <Link
@@ -159,7 +154,7 @@ export function Navbar() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="relative h-10 w-10 rounded-full border-2 border-primary/20 transition-all hover:border-primary/50 overflow-hidden"
+                  className="relative h-10 w-10 overflow-hidden rounded-full border-2 border-primary/20 transition-all hover:border-primary/50"
                 >
                   <Avatar>
                     <AvatarImage src={user.avatarUrl || ''} alt={user.name} />

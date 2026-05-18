@@ -90,7 +90,7 @@ export function RegisterForm() {
     <div className="w-full max-w-md">
       <div className="mb-8">
         <h1 className="text-4xl font-extrabold tracking-tight text-[#0b1c30]">Create account</h1>
-        <p className="mt-2 text-sm text-slate-600">Get started with CourtCommand today.</p>
+        <p className="mt-2 text-sm text-slate-600">Get started with Tana today.</p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">

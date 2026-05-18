@@ -4,6 +4,10 @@ import { CheckoutClient } from './checkout-client';
 export const metadata: Metadata = {
   title: 'Checkout | Court Booking',
   description: 'Complete your sport facility booking payment',
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 interface CheckoutPageProps {

@@ -1,12 +1,14 @@
 ﻿import Link from 'next/link';
 import { Globe, Mail, Share2 } from 'lucide-react';
+import { SITE_NAME } from '@/lib/site';
+import { BrandLogo } from './BrandLogo';
 
 export function SiteFooter() {
   return (
     <footer className="border-t border-slate-300 bg-[#eff4ff] py-12">
       <div className="mx-auto grid w-full max-w-[1440px] gap-8 px-5 md:grid-cols-2 md:px-8">
         <div>
-          <h3 className="text-3xl font-extrabold text-black">CourtCommand</h3>
+          <BrandLogo className="w-fit" />
           <p className="mt-4 max-w-md text-slate-600">
             Empowering facility managers and athletes with high-performance digital tools. The
             future of sports management is here.
@@ -37,7 +39,7 @@ export function SiteFooter() {
             </div>
           </div>
           <p className="text-sm text-slate-500">
-            © {new Date().getFullYear()} CourtCommand. All rights reserved.
+            © {new Date().getFullYear()} {SITE_NAME}. All rights reserved.
           </p>
         </div>
       </div>

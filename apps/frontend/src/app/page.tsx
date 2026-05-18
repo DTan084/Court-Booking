@@ -1,10 +1,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { ArrowRight, PlayCircle } from 'lucide-react';
 import { Navbar } from '@/components/shared/Navbar';
 import { SiteFooter } from '@/components/shared/SiteFooter';
 import { Button } from '@/components/ui/button';
 import { normalizeImageUrl, shouldBypassImageOptimizer } from '@/lib/image';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, getAbsoluteUrl } from '@/lib/site';
 import { CourtStatus } from '@court-booking/shared';
 import { type Court, type PaginatedResult } from '@/types';
 
@@ -29,6 +31,26 @@ const sportImageByName: Record<string, string> = {
     'https://images.unsplash.com/photo-1556056504-5c7696c4c28d?auto=format&fit=crop&w=1400&q=80',
   volleyball:
     'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?auto=format&fit=crop&w=1400&q=80',
+};
+
+export const metadata: Metadata = {
+  title: 'Book Tennis, Badminton, and Basketball Courts Online',
+  description:
+    'Book tennis, badminton, basketball, and multi-sport courts online with clear pricing, real-time availability, and fast checkout.',
+  alternates: {
+    canonical: getAbsoluteUrl('/'),
+  },
+  openGraph: {
+    title: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    description:
+      'Discover premium sports venues, compare pricing, and reserve your next court session online in minutes.',
+    url: getAbsoluteUrl('/'),
+  },
+  twitter: {
+    title: `${SITE_NAME} | ${SITE_TAGLINE}`,
+    description:
+      'Find and reserve sports courts online with real-time availability and straightforward booking.',
+  },
 };
 
 async function getFeaturedCourts() {
@@ -72,8 +94,24 @@ export default async function HomePage() {
   const featuredCourts = courts.filter((court) => court.isFeatured);
   const nonFeaturedCourts = courts.filter((court) => !court.isFeatured);
   const priorityCourts = [...featuredCourts, ...nonFeaturedCourts].slice(0, 3);
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: SITE_NAME,
+    url: getAbsoluteUrl('/'),
+    description: SITE_DESCRIPTION,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${getAbsoluteUrl('/courts')}?name={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  };
   return (
     <div className="min-h-screen bg-[#f8f9ff] text-[#0b1c30]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Navbar />
       <main>
         <section className="relative h-[80vh] min-h-[680px] overflow-hidden bg-[#0e2034]">
@@ -88,14 +126,16 @@ export default async function HomePage() {
           <div className="relative z-10 mx-auto flex h-full w-full max-w-[1440px] items-center px-5 md:px-8">
             <div className="max-w-2xl">
               <span className="mb-6 inline-block rounded-full border border-[#fd933d] bg-[#fd933d] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#301400]">
-                Digital Command Center
+                Online Court Booking
               </span>
               <h1 className="mb-6 text-5xl font-black leading-tight tracking-tight text-white md:text-7xl">
-                Command the Court.<span className="block text-[#fd933d]">Elevate Your Game.</span>
+                Book Better Courts.
+                <span className="block text-[#fd933d]">Play Without the Back-and-Forth.</span>
               </h1>
               <p className="mb-10 max-w-xl text-lg leading-relaxed text-slate-200">
-                Elite management for professional facilities. Schedule matches, manage memberships,
-                and track performance with the industry&apos;s fastest interface.
+                Browse tennis, badminton, basketball, and multi-sport venues with live availability,
+                transparent hourly pricing, and a checkout flow that takes minutes instead of
+                messages.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button
@@ -121,9 +161,9 @@ export default async function HomePage() {
           <div className="mx-auto grid w-full max-w-[1440px] grid-cols-2 gap-8 px-5 text-center md:grid-cols-4 md:px-8">
             {[
               ['50k+', 'Monthly Bookings'],
-              ['15+', 'Premier Locations'],
-              ['99.9%', 'Uptime Reliability'],
-              ['4.9/5', 'Member Rating'],
+              ['15+', 'Bookable Venues'],
+              ['99.9%', 'Platform Availability'],
+              ['4.9/5', 'Player Rating'],
             ].map(([value, label]) => (
               <div key={label}>
                 <p className="text-5xl font-black tracking-tight text-black">{value}</p>
@@ -139,14 +179,15 @@ export default async function HomePage() {
             <div>
               <h2 className="text-4xl font-extrabold text-black">World-Class Facilities</h2>
               <p className="mt-3 max-w-2xl text-slate-600">
-                Our premier courts and sports facilities available for immediate booking.
+                Compare featured sports courts, check what fits your group size and budget, and move
+                straight into booking.
               </p>
             </div>
             <Link
               href="/courts"
               className="inline-flex items-center gap-2 font-medium text-[#944a00] hover:underline"
             >
-              View All Facilities <ArrowRight className="h-4 w-4" />
+              Browse All Courts <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           {priorityCourts.length === 0 ? (
