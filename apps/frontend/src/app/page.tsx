@@ -4,6 +4,7 @@ import { ArrowRight, PlayCircle } from 'lucide-react';
 import { Navbar } from '@/components/shared/Navbar';
 import { SiteFooter } from '@/components/shared/SiteFooter';
 import { Button } from '@/components/ui/button';
+import { normalizeImageUrl, shouldBypassImageOptimizer } from '@/lib/image';
 import { CourtStatus } from '@court-booking/shared';
 import { type Court, type PaginatedResult } from '@/types';
 
@@ -166,19 +167,21 @@ export default async function HomePage() {
                   >
                     {(() => {
                       const dbImageSrc = court.images?.[0]?.url;
+                      const normalizedDbImageSrc = normalizeImageUrl(dbImageSrc);
                       const sport = sportTypeMap.get(court.sportTypeId);
                       const sportName = sport?.name?.toLowerCase() ?? '';
                       const sportFallback = sportName ? sportImageByName[sportName] : undefined;
                       return (
                         <Image
                           src={
-                            dbImageSrc ??
+                            normalizedDbImageSrc ??
                             sportFallback ??
                             'https://images.unsplash.com/photo-1521412644187-c49fa049e84d?auto=format&fit=crop&w=1400&q=80'
                           }
                           alt={court.name}
                           fill
                           sizes="(max-width: 768px) 100vw, 33vw"
+                          unoptimized={shouldBypassImageOptimizer(dbImageSrc)}
                           className="object-cover transition duration-500 group-hover:scale-110"
                         />
                       );

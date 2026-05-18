@@ -20,6 +20,7 @@ import { BookingStatus } from '@/types';
 import { CountdownTimer } from '@/components/bookings/countdown-timer';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/auth';
+import { normalizeImageUrl, shouldBypassImageOptimizer } from '@/lib/image';
 import { calculateBookingPrice, formatCurrency } from '@/lib/utils';
 import { formatDateByTimezone, formatTimeByTimezone } from '@/lib/datetime';
 
@@ -168,6 +169,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const hoursUntilStart = (new Date(booking.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
   const isWithinNoCancelWindow = hoursUntilStart <= 12;
   const primaryCourtImage = booking.court?.images?.[0]?.url ?? null;
+  const normalizedPrimaryCourtImage = normalizeImageUrl(primaryCourtImage);
+  const bypassPrimaryCourtImageOptimizer = shouldBypassImageOptimizer(primaryCourtImage);
 
   const handleCompletePayment = async () => {
     try {
@@ -211,9 +214,10 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                   <div className="h-48 w-full relative">
                     {primaryCourtImage && (
                       <Image
-                        src={primaryCourtImage}
+                        src={normalizedPrimaryCourtImage}
                         alt={booking.court?.name ?? 'Court image'}
                         fill
+                        unoptimized={bypassPrimaryCourtImageOptimizer}
                         className="object-cover"
                         sizes="(max-width: 768px) 100vw, 60vw"
                       />
@@ -383,9 +387,10 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                         {primaryCourtImage && (
                           <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200">
                             <Image
-                              src={primaryCourtImage}
+                              src={normalizedPrimaryCourtImage}
                               alt={booking.court?.name ?? 'Court image'}
                               fill
+                              unoptimized={bypassPrimaryCourtImageOptimizer}
                               className="object-cover"
                               sizes="96px"
                             />

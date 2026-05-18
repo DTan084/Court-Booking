@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { normalizeImageUrl, shouldBypassImageOptimizer } from '@/lib/image';
 import type { CourtImage } from '@/types';
 
 interface CourtGalleryProps {
@@ -55,10 +56,11 @@ export function CourtGallery({ images, courtName }: CourtGalleryProps) {
           onClick={() => setOpen(true)}
         >
           <Image
-            src={galleryImages[0].url}
+            src={normalizeImageUrl(galleryImages[0].url)}
             alt={galleryImages[0].altText ?? courtName}
             fill
             sizes="100vw"
+            unoptimized={shouldBypassImageOptimizer(galleryImages[0].url)}
             className="object-cover transition duration-500 hover:scale-[1.02]"
           />
         </button>
@@ -77,10 +79,11 @@ export function CourtGallery({ images, courtName }: CourtGalleryProps) {
               }}
             >
               <Image
-                src={img.url}
+                src={normalizeImageUrl(img.url)}
                 alt={img.altText ?? courtName}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
+                unoptimized={shouldBypassImageOptimizer(img.url)}
                 className="object-cover transition duration-500 hover:scale-[1.03]"
               />
             </button>
@@ -99,10 +102,11 @@ export function CourtGallery({ images, courtName }: CourtGalleryProps) {
             }}
           >
             <Image
-              src={galleryImages[0].url}
+              src={normalizeImageUrl(galleryImages[0].url)}
               alt={galleryImages[0].altText ?? courtName}
               fill
               sizes="(max-width: 768px) 100vw, 66vw"
+              unoptimized={shouldBypassImageOptimizer(galleryImages[0].url)}
               className="object-cover transition duration-500 hover:scale-[1.02]"
             />
           </button>
@@ -118,10 +122,11 @@ export function CourtGallery({ images, courtName }: CourtGalleryProps) {
                 }}
               >
                 <Image
-                  src={img.url}
+                  src={normalizeImageUrl(img.url)}
                   alt={img.altText ?? courtName}
                   fill
                   sizes="33vw"
+                  unoptimized={shouldBypassImageOptimizer(img.url)}
                   className="object-cover transition duration-500 hover:scale-[1.03]"
                 />
                 {idx === 1 && extraCount > 0 && (
@@ -139,10 +144,11 @@ export function CourtGallery({ images, courtName }: CourtGalleryProps) {
           <DialogTitle>{courtName}</DialogTitle>
           <div className="relative">
             <Image
-              src={active.url}
+              src={normalizeImageUrl(active.url)}
               alt={active.altText ?? courtName}
               width={1400}
               height={900}
+              unoptimized={shouldBypassImageOptimizer(active.url)}
               className="max-h-[70vh] w-full rounded-lg object-contain"
             />
             {galleryImages.length > 1 && (
@@ -175,10 +181,11 @@ export function CourtGallery({ images, courtName }: CourtGalleryProps) {
                 onClick={() => setActiveIndex(idx)}
               >
                 <Image
-                  src={img.url}
+                  src={normalizeImageUrl(img.url)}
                   alt={img.altText ?? courtName}
                   width={160}
                   height={96}
+                  unoptimized={shouldBypassImageOptimizer(img.url)}
                   className="h-full w-full object-cover"
                 />
               </button>

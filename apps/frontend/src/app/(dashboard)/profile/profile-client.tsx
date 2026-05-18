@@ -95,10 +95,9 @@ export function ProfileClient() {
           toast.success('Profile updated successfully');
         },
         onError: (error: unknown) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const apiError = error as { response?: { data?: { message?: string } } };
           toast.error(
-            (error as any).response?.data?.message ||
-              'An error occurred while updating your profile',
+            apiError.response?.data?.message || 'An error occurred while updating your profile',
           );
         },
       },

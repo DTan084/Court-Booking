@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { CancelledBy } from '@court-booking/shared';
 import Image from 'next/image';
 import { formatDateByTimezone } from '@/lib/datetime';
+import { normalizeImageUrl, shouldBypassImageOptimizer } from '@/lib/image';
 import { useRuntimeSettings, runtimeSettingDefaults } from '@/hooks/useRuntimeSettings';
 
 type BookingWithCourt = Booking & { court: Court };
@@ -376,9 +377,10 @@ function BookingsPageContent() {
                 <div className="relative h-40">
                   {venue.imageUrl ? (
                     <Image
-                      src={venue.imageUrl}
+                      src={normalizeImageUrl(venue.imageUrl)}
                       alt={venue.courtName}
                       fill
+                      unoptimized={shouldBypassImageOptimizer(venue.imageUrl)}
                       className="object-cover"
                       sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
                     />
@@ -502,9 +504,6 @@ function BookingsPageContent() {
                 <section className="space-y-4 pt-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-slate-900">Past Bookings</h2>
-                    <button className="text-xs font-bold text-orange-700 hover:underline">
-                      Export CSV
-                    </button>
                   </div>
                   {pastBookings.length > 0 ? (
                     <>

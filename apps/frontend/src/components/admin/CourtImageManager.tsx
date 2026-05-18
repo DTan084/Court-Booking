@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useAdminCourts';
 import { Button } from '@/components/ui/button';
 import { DoubleConfirmationDialog } from '@/components/shared/double-confirmation-dialog';
+import { normalizeImageUrl, shouldBypassImageOptimizer } from '@/lib/image';
 
 export function CourtImageManager({ courtId }: { courtId: string }) {
   const { data: court } = useCourt(courtId);
@@ -82,71 +83,76 @@ export function CourtImageManager({ courtId }: { courtId: string }) {
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {images.map((img, idx) => (
-          <div
-            key={img.id}
-            className="rounded-lg border bg-white p-3"
-            draggable
-            onDragStart={() => setDragIndex(idx)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => onDropImage(idx)}
-          >
-            <Image
-              src={img.url}
-              alt={img.altText ?? `Court image ${idx + 1}`}
-              width={400}
-              height={220}
-              className="mb-3 h-36 w-full rounded object-cover"
-            />
-            <p className="mb-2 truncate text-xs text-slate-500">{img.url}</p>
-            <div className="mb-3 flex gap-2">
-              <input
-                value={altDrafts[img.id] ?? img.altText ?? ''}
-                onChange={(e) =>
-                  setAltDrafts((prev) => ({
-                    ...prev,
-                    [img.id]: e.target.value,
-                  }))
-                }
-                placeholder="Alt text"
-                className="w-full rounded-md border px-2 py-1.5 text-xs"
+        {images.map((img, idx) => {
+          const imageUrl = normalizeImageUrl(img.url);
+          const unoptimized = shouldBypassImageOptimizer(img.url);
+          return (
+            <div
+              key={img.id}
+              className="rounded-lg border bg-white p-3"
+              draggable
+              onDragStart={() => setDragIndex(idx)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => onDropImage(idx)}
+            >
+              <Image
+                src={imageUrl}
+                alt={img.altText ?? `Court image ${idx + 1}`}
+                width={400}
+                height={220}
+                unoptimized={unoptimized}
+                className="mb-3 h-36 w-full rounded object-cover"
               />
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isUpdatingAlt}
-                onClick={() => {
-                  const nextAlt = (altDrafts[img.id] ?? img.altText ?? '').trim();
-                  updateAlt({ imageId: img.id, altText: nextAlt || undefined });
-                }}
-              >
-                Save
-              </Button>
+              <p className="mb-2 truncate text-xs text-slate-500">{img.url}</p>
+              <div className="mb-3 flex gap-2">
+                <input
+                  value={altDrafts[img.id] ?? img.altText ?? ''}
+                  onChange={(e) =>
+                    setAltDrafts((prev) => ({
+                      ...prev,
+                      [img.id]: e.target.value,
+                    }))
+                  }
+                  placeholder="Alt text"
+                  className="w-full rounded-md border px-2 py-1.5 text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isUpdatingAlt}
+                  onClick={() => {
+                    const nextAlt = (altDrafts[img.id] ?? img.altText ?? '').trim();
+                    updateAlt({ imageId: img.id, altText: nextAlt || undefined });
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+              <p className="mb-3 text-xs text-slate-400">Drag and drop to reorder</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => onMove(idx, -1)}
+                  disabled={idx === 0}
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => onMove(idx, 1)}
+                  disabled={idx === images.length - 1}
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </Button>
+                <Button variant="destructive" size="icon" onClick={() => setDeleteId(img.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <p className="mb-3 text-xs text-slate-400">Drag and drop to reorder</p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => onMove(idx, -1)}
-                disabled={idx === 0}
-              >
-                <ArrowUp className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => onMove(idx, 1)}
-                disabled={idx === images.length - 1}
-              >
-                <ArrowDown className="h-4 w-4" />
-              </Button>
-              <Button variant="destructive" size="icon" onClick={() => setDeleteId(img.id)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <DoubleConfirmationDialog
         isOpen={!!deleteId}

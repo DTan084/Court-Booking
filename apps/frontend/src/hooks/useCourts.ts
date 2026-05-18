@@ -16,6 +16,7 @@ export interface GetCourtsParams {
   minPlayers?: number;
   maxPlayers?: number;
   availableToday?: boolean;
+  includeInactive?: boolean;
   [key: string]: unknown;
 }
 

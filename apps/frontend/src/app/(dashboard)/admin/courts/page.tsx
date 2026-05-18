@@ -46,6 +46,7 @@ export default function AdminCourtsPage() {
       limit,
       name: search.trim() || undefined,
       sportTypeId: sportFilter === 'ALL' ? undefined : [sportFilter],
+      includeInactive: true,
     }),
     [page, search, sportFilter],
   );
