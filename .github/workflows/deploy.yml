@@ -30,6 +30,7 @@ jobs:
         run: pnpm build
 
       - name: Deploy to VPS via SSH
+        run: echo "Deploying to VPS..."
         # uses: appleboy/ssh-action@v1.0.3
         # with:
         #   host: ${{ secrets.VPS_HOST }}

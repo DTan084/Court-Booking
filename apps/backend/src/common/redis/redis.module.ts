@@ -12,7 +12,7 @@ class RedisLifecycleService implements OnApplicationShutdown {
     try {
       await this.redis.quit();
       this.logger.log(`Redis connection closed${signal ? ` on ${signal}` : ''}`);
-    } catch (error) {
+    } catch {
       this.logger.warn('Redis quit failed, forcing disconnect');
       this.redis.disconnect(false);
     }

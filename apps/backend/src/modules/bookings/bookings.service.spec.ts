@@ -18,6 +18,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserEntity } from '../../database/entities/user.entity';
 import { SettingsService } from '../settings/settings.service';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 const mockBookingRepository = () => ({
   find: jest.fn(),
@@ -268,19 +269,20 @@ describe('BookingsService', () => {
 
   describe('createBooking', () => {
     const mockUserId = 'user-1';
+    const businessTimezone = 'Asia/Ho_Chi_Minh';
 
-    // Create dates with minutes = 0
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(10, 0, 0, 0); // 10:00 AM
-
-    const tomorrowEnd = new Date(tomorrow);
-    tomorrowEnd.setHours(11, 0, 0, 0); // 11:00 AM
+    const bookingDate = formatInTimeZone(
+      new Date(Date.now() + 24 * 60 * 60 * 1000),
+      businessTimezone,
+      'yyyy-MM-dd',
+    );
+    const bookingStart = new Date(`${bookingDate}T10:00:00+07:00`);
+    const bookingEnd = new Date(`${bookingDate}T11:00:00+07:00`);
 
     const mockDto: CreateBookingDto = {
       courtId: 'court-1',
-      startTime: tomorrow.toISOString(),
-      endTime: tomorrowEnd.toISOString(),
+      startTime: bookingStart.toISOString(),
+      endTime: bookingEnd.toISOString(),
     };
 
     it('should throw BadRequestException if start time is in the past', async () => {
@@ -292,6 +294,9 @@ describe('BookingsService', () => {
     });
 
     it('should process booking in a transaction', async () => {
+      const zonedStart = toZonedTime(new Date(mockDto.startTime), businessTimezone);
+      const zonedEnd = toZonedTime(new Date(mockDto.endTime), businessTimezone);
+
       dataSource.transaction.mockImplementation(async (cb) => {
         const mockManager = {
           query: jest.fn().mockResolvedValue(undefined),
@@ -304,9 +309,9 @@ describe('BookingsService', () => {
             {
               id: 'slot-1',
               courtId: 'court-1',
-              dayOfWeek: new Date(mockDto.startTime).getDay(),
-              startHour: new Date(mockDto.startTime).getHours(),
-              endHour: new Date(mockDto.endTime).getHours(),
+              dayOfWeek: zonedStart.getDay(),
+              startHour: zonedStart.getHours(),
+              endHour: zonedEnd.getHours(),
               price: 100,
             },
           ]),

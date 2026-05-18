@@ -45,7 +45,7 @@ export class BookingJobsScheduler implements OnApplicationBootstrap {
         'NX',
       );
       return acquired === 'OK';
-    } catch (error) {
+    } catch {
       this.logger.warn(
         'Unable to acquire booking scheduler bootstrap lock; skipping scheduler init',
       );

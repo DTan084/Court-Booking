@@ -11,6 +11,7 @@ describe('CourtsController (e2e)', () => {
   let adminToken: string;
   let createdCourtId: string;
   let sportTypeId: string;
+  let createdSportTypeId: string | undefined;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -18,14 +19,31 @@ describe('CourtsController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
+    app.setGlobalPrefix('api/v1');
     await app.init();
 
     dataSource = app.get(DataSource);
+    const [firstSportType] = await dataSource.query(
+      'SELECT id FROM sport_types WHERE is_active = true ORDER BY display_order ASC, created_at ASC LIMIT 1',
+    );
+    if (firstSportType?.id) {
+      sportTypeId = firstSportType.id;
+    } else {
+      const [insertedSportType] = await dataSource.query(
+        `
+          INSERT INTO sport_types (name, icon, color, is_active, display_order)
+          VALUES ($1, $2, $3, true, 0)
+          RETURNING id
+        `,
+        [`E2E Sport ${Date.now()}`, 'TENNIS', '#2563EB'],
+      );
+      sportTypeId = insertedSportType.id;
+      createdSportTypeId = insertedSportType.id;
+    }
 
     // Register and login as admin for testing
     const adminEmail = `admin_e2e_${Date.now()}@example.com`;
-    await request(app.getHttpServer()).post('/api/auth/register').send({
+    await request(app.getHttpServer()).post('/api/v1/auth/register').send({
       name: 'Admin Test',
       email: adminEmail,
       password: 'Password123!',
@@ -36,16 +54,12 @@ describe('CourtsController (e2e)', () => {
       adminEmail,
     ]);
 
-    const loginRes = await request(app.getHttpServer()).post('/api/auth/login').send({
+    const loginRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: adminEmail,
       password: 'Password123!',
     });
 
     adminToken = loginRes.body.access_token;
-    const [firstSportType] = await dataSource.query(
-      'SELECT id FROM sport_types WHERE is_active = true ORDER BY display_order ASC, created_at ASC LIMIT 1',
-    );
-    sportTypeId = firstSportType?.id;
   });
 
   afterAll(async () => {
@@ -58,13 +72,18 @@ describe('CourtsController (e2e)', () => {
     if (createdCourtId && createdCourtId.length === 36) {
       await dataSource.query('DELETE FROM courts WHERE id = $1', [createdCourtId]);
     }
+    if (createdSportTypeId) {
+      await dataSource.query('DELETE FROM sport_types WHERE id = $1', [createdSportTypeId]);
+    }
+    const redis = app.get('REDIS_CLIENT');
+    if (redis) await redis.quit();
     await app.close();
   });
 
   describe('POST /courts', () => {
     it('should create a new court when admin', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/courts')
+        .post('/api/v1/courts')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           name: 'E2E Test Court',
@@ -82,7 +101,7 @@ describe('CourtsController (e2e)', () => {
     it('should return 403 when not admin', async () => {
       // Create a normal user token or just call without token (401)
       // Let's assume we call without token
-      const res = await request(app.getHttpServer()).post('/api/courts').send({ name: 'Fail' });
+      const res = await request(app.getHttpServer()).post('/api/v1/courts').send({ name: 'Fail' });
       expect(res.status).toBe(401);
     });
   });
@@ -90,25 +109,25 @@ describe('CourtsController (e2e)', () => {
   describe('GET /courts', () => {
     it('should return list of courts', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/courts')
+        .get('/api/v1/courts')
         .query({ page: 1, limit: 10 });
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.data)).toBe(true);
-      expect(res.body.total).toBeGreaterThanOrEqual(1);
+      expect(res.body.meta.total).toBeGreaterThanOrEqual(1);
     });
   });
 
   describe('GET /courts/:id', () => {
     it('should return court details', async () => {
-      const res = await request(app.getHttpServer()).get(`/api/courts/${createdCourtId}`);
+      const res = await request(app.getHttpServer()).get(`/api/v1/courts/${createdCourtId}`);
 
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(createdCourtId);
     });
 
     it('should return 400 for invalid UUID', async () => {
-      const res = await request(app.getHttpServer()).get('/api/courts/invalid-uuid');
+      const res = await request(app.getHttpServer()).get('/api/v1/courts/invalid-uuid');
       expect(res.status).toBe(400);
     });
   });
@@ -116,7 +135,7 @@ describe('CourtsController (e2e)', () => {
   describe('PATCH /courts/:id', () => {
     it('should update court info', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/api/courts/${createdCourtId}`)
+        .patch(`/api/v1/courts/${createdCourtId}`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ name: 'E2E Updated Court' });
 
@@ -128,13 +147,13 @@ describe('CourtsController (e2e)', () => {
   describe('DELETE /courts/:id', () => {
     it('should soft delete court', async () => {
       const res = await request(app.getHttpServer())
-        .delete(`/api/courts/${createdCourtId}`)
+        .delete(`/api/v1/courts/${createdCourtId}`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
 
       // Verify it's not in the list anymore
-      const checkRes = await request(app.getHttpServer()).get(`/api/courts/${createdCourtId}`);
+      const checkRes = await request(app.getHttpServer()).get(`/api/v1/courts/${createdCourtId}`);
       expect(checkRes.status).toBe(404);
     });
   });

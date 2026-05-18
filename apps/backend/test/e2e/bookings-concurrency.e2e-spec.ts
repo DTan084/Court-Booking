@@ -13,6 +13,22 @@ describe('Bookings Concurrency (e2e)', () => {
   let user2Token: string;
   let courtId: string;
   let sportTypeId: string;
+  let createdSportTypeId: string | undefined;
+  const BUSINESS_TIMEZONE_OFFSET = '+07:00';
+
+  const formatBusinessTime = (date: Date, hour: number) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+
+    const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((part) => part.type === type)?.value;
+
+    return `${getPart('year')}-${getPart('month')}-${getPart('day')}T${String(hour).padStart(2, '0')}:00:00${BUSINESS_TIMEZONE_OFFSET}`;
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -20,14 +36,31 @@ describe('Bookings Concurrency (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
+    app.setGlobalPrefix('api/v1');
     await app.init();
 
     dataSource = app.get(DataSource);
+    const [firstSportType] = await dataSource.query(
+      'SELECT id FROM sport_types WHERE is_active = true ORDER BY display_order ASC, created_at ASC LIMIT 1',
+    );
+    if (firstSportType?.id) {
+      sportTypeId = firstSportType.id;
+    } else {
+      const [insertedSportType] = await dataSource.query(
+        `
+          INSERT INTO sport_types (name, icon, color, is_active, display_order)
+          VALUES ($1, $2, $3, true, 0)
+          RETURNING id
+        `,
+        [`E2E Concurrency Sport ${Date.now()}`, 'TENNIS', '#2563EB'],
+      );
+      sportTypeId = insertedSportType.id;
+      createdSportTypeId = insertedSportType.id;
+    }
 
     // 1. Create Admin
     const adminEmail = `admin_conc_${Date.now()}@example.com`;
-    await request(app.getHttpServer()).post('/api/auth/register').send({
+    await request(app.getHttpServer()).post('/api/v1/auth/register').send({
       name: 'Admin Conc',
       email: adminEmail,
       password: 'Password123!',
@@ -35,24 +68,20 @@ describe('Bookings Concurrency (e2e)', () => {
     await dataSource.query(`UPDATE users SET role = '${Role.ADMIN}' WHERE email = $1`, [
       adminEmail,
     ]);
-    const adminLogin = await request(app.getHttpServer()).post('/api/auth/login').send({
+    const adminLogin = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: adminEmail,
       password: 'Password123!',
     });
     adminToken = adminLogin.body.access_token;
-    const [firstSportType] = await dataSource.query(
-      'SELECT id FROM sport_types WHERE is_active = true ORDER BY display_order ASC, created_at ASC LIMIT 1',
-    );
-    sportTypeId = firstSportType?.id;
 
     // 2. Create User 1
     const user1Email = `user1_conc_${Date.now()}@example.com`;
-    await request(app.getHttpServer()).post('/api/auth/register').send({
+    await request(app.getHttpServer()).post('/api/v1/auth/register').send({
       name: 'User1 Conc',
       email: user1Email,
       password: 'Password123!',
     });
-    const user1Login = await request(app.getHttpServer()).post('/api/auth/login').send({
+    const user1Login = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: user1Email,
       password: 'Password123!',
     });
@@ -60,12 +89,12 @@ describe('Bookings Concurrency (e2e)', () => {
 
     // 3. Create User 2
     const user2Email = `user2_conc_${Date.now()}@example.com`;
-    await request(app.getHttpServer()).post('/api/auth/register').send({
+    await request(app.getHttpServer()).post('/api/v1/auth/register').send({
       name: 'User2 Conc',
       email: user2Email,
       password: 'Password123!',
     });
-    const user2Login = await request(app.getHttpServer()).post('/api/auth/login').send({
+    const user2Login = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: user2Email,
       password: 'Password123!',
     });
@@ -73,7 +102,7 @@ describe('Bookings Concurrency (e2e)', () => {
 
     // 4. Create a Court
     const courtRes = await request(app.getHttpServer())
-      .post('/api/courts')
+      .post('/api/v1/courts')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         name: 'Concurrency Test Court',
@@ -85,7 +114,7 @@ describe('Bookings Concurrency (e2e)', () => {
     courtId = courtRes.body.id;
 
     await request(app.getHttpServer())
-      .put(`/api/courts/${courtId}/time-slots`)
+      .put(`/api/v1/courts/${courtId}/time-slots`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         slots: Array.from({ length: 7 }, (_, dayOfWeek) => ({
@@ -105,6 +134,9 @@ describe('Bookings Concurrency (e2e)', () => {
         await dataSource.query('DELETE FROM court_time_slots WHERE court_id = $1', [courtId]);
         await dataSource.query('DELETE FROM courts WHERE id = $1', [courtId]);
       }
+      if (createdSportTypeId) {
+        await dataSource.query('DELETE FROM sport_types WHERE id = $1', [createdSportTypeId]);
+      }
       await dataSource.query(
         "DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%_conc_%')",
       );
@@ -121,22 +153,19 @@ describe('Bookings Concurrency (e2e)', () => {
     // Setup time: Tomorrow 08:00 - 10:00
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(8, 0, 0, 0);
-    const startTime = tomorrow.toISOString();
-
-    tomorrow.setHours(10, 0, 0, 0);
-    const endTime = tomorrow.toISOString();
+    const startTime = formatBusinessTime(tomorrow, 8);
+    const endTime = formatBusinessTime(tomorrow, 10);
 
     const bookingPayload = { courtId, startTime, endTime };
 
     // Fire 2 booking requests concurrently
     const [res1, res2] = await Promise.all([
       request(app.getHttpServer())
-        .post('/api/bookings')
+        .post('/api/v1/bookings')
         .set('Authorization', `Bearer ${user1Token}`)
         .send(bookingPayload),
       request(app.getHttpServer())
-        .post('/api/bookings')
+        .post('/api/v1/bookings')
         .set('Authorization', `Bearer ${user2Token}`)
         .send(bookingPayload),
     ]);

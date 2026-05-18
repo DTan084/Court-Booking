@@ -63,7 +63,7 @@ async function runSeedFull() {
   const adminHash = await bcrypt.hash(adminPwd, 10);
   const userHash = await bcrypt.hash(userPwd, 10);
 
-  const [adminUser, user1, user2, user3] = await userRepo.save([
+  const [, user1, user2, user3] = await userRepo.save([
     userRepo.create({
       name: 'Super Admin',
       email: 'admin@courtbooking.com',

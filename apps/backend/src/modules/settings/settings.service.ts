@@ -52,7 +52,7 @@ export class SettingsService {
   private async safeCacheGet(key: string): Promise<string | null> {
     try {
       return await this.redis.get(key);
-    } catch (error) {
+    } catch {
       this.logger.warn(`Redis get failed for settings cache key "${key}"`);
       return null;
     }
@@ -61,7 +61,7 @@ export class SettingsService {
   private async safeCacheSet(key: string, value: unknown): Promise<void> {
     try {
       await this.redis.setex(key, this.CACHE_TTL_SECONDS, JSON.stringify(value));
-    } catch (error) {
+    } catch {
       this.logger.warn(`Redis set failed for settings cache key "${key}"`);
     }
   }
@@ -69,7 +69,7 @@ export class SettingsService {
   private async safeCacheDel(key: string): Promise<void> {
     try {
       await this.redis.del(key);
-    } catch (error) {
+    } catch {
       this.logger.warn(`Redis delete failed for settings cache key "${key}"`);
     }
   }
