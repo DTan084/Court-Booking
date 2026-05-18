@@ -321,8 +321,9 @@ export default function AdminSportTypesPage() {
               )}
               {Number(pendingDelete.courtCount ?? 0) > 0 ? (
                 <p className="mt-2 text-xs text-amber-700">
-                  Khong the xoa - co {pendingDelete.courtCount} san dang dung sport type nay. Hay
-                  chuyen san sang sport type khac truoc, hoac chon &quot;An&quot; thay vi xoa.
+                  Cannot delete this sport type because {pendingDelete.courtCount} court(s) are
+                  still using it. Reassign those courts to another sport type first, or choose
+                  &quot;Hide&quot; instead of deleting.
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-slate-500">

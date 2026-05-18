@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 import { BookingStatus } from '@/types';
 import type { BookingStatus as BookingStatusType } from '@/types';
 
+import { fromZonedTime } from 'date-fns-tz';
+
 interface BookingFiltersProps {
   onFilterChange: (filters: {
     tab: FilterTab;
@@ -18,12 +20,17 @@ interface BookingFiltersProps {
 
 export type FilterTab = 'all' | 'pending' | 'cancelled' | 'completed';
 
+const BUSINESS_TIMEZONE = process.env.NEXT_PUBLIC_BUSINESS_TIMEZONE || 'Asia/Ho_Chi_Minh';
+
 export function BookingFilters({ onFilterChange }: BookingFiltersProps) {
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
-  const toStartOfDayIso = (date: string) => new Date(`${date}T00:00:00.000Z`).toISOString();
-  const toEndOfDayIso = (date: string) => new Date(`${date}T23:59:59.999Z`).toISOString();
+
+  const toStartOfDayIso = (date: string) =>
+    fromZonedTime(`${date} 00:00:00`, BUSINESS_TIMEZONE).toISOString();
+  const toEndOfDayIso = (date: string) =>
+    fromZonedTime(`${date} 23:59:59.999`, BUSINESS_TIMEZONE).toISOString();
 
   useEffect(() => {
     const filters: {

@@ -21,6 +21,7 @@ describe('AuthService', () => {
   let userRepository: any;
   let refreshTokenRepository: any;
   let jwtService: any;
+  let redisClient: any;
 
   const mockUser = {
     id: 'user-id',
@@ -56,6 +57,7 @@ describe('AuthService', () => {
       expire: jest.fn().mockResolvedValue(1),
       del: jest.fn().mockResolvedValue(1),
     };
+    redisClient = mockRedis;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -131,8 +133,31 @@ describe('AuthService', () => {
       expect(result).not.toHaveProperty('passwordHash');
     });
 
+    it('should still allow login when redis lockout check fails', async () => {
+      const loginDto = { email: 'test@example.com', password: 'Password1' };
+      redisClient.get.mockRejectedValueOnce(new Error('redis down'));
+      userRepository.findOne.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      jwtService.sign.mockReturnValue('mock-jwt-token');
+      refreshTokenRepository.create.mockReturnValue({ token: 'mock-uuid' });
+      refreshTokenRepository.save.mockResolvedValue({});
+
+      const result = await service.login(loginDto);
+
+      expect(result.access_token).toBe('mock-jwt-token');
+    });
+
     it('should throw UnauthorizedException if user is not found', async () => {
       userRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.login({ email: 'notfound@example.com', password: 'Password1' }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should still return UnauthorizedException when redis tracking fails on invalid user', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+      redisClient.incr.mockRejectedValueOnce(new Error('redis down'));
 
       await expect(
         service.login({ email: 'notfound@example.com', password: 'Password1' }),

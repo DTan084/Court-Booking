@@ -1,10 +1,15 @@
 import axios, { type AxiosError } from 'axios';
 
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+if (!apiUrl) {
+  console.warn('NEXT_PUBLIC_API_URL is missing. API calls will likely fail.');
+}
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL + '/api/v1',
+  baseURL: (apiUrl || '') + '/api/v1',
   headers: { 'Content-Type': 'application/json' },
-  withCredentials: true, // gửi httpOnly cookie tự động (nếu backend set cookie)
+  withCredentials: true, // automatically send httpOnly cookies
 });
 
 // Track if a refresh is already in progress to prevent concurrent refresh calls
@@ -81,23 +86,23 @@ api.interceptors.response.use(
     // 403 Forbidden - show toast
     if (error.response?.status === 403) {
       import('sonner').then(({ toast }) => {
-        toast.error('Bạn không có quyền thực hiện hành động này');
+        toast.error('You do not have permission to perform this action');
       });
     }
 
     // 500 Internal Server Error - show toast
     if (error.response?.status === 500) {
       import('sonner').then(({ toast }) => {
-        toast.error('Lỗi hệ thống, vui lòng thử lại sau');
+        toast.error('Internal server error, please try again later');
       });
     }
 
     // Network error handling
     if (!error.response) {
       import('sonner').then(({ toast }) => {
-        toast.error('Không thể kết nối đến máy chủ, vui lòng thử lại');
+        toast.error('Cannot connect to server, please try again');
       });
-      return Promise.reject(new Error('Không thể kết nối đến máy chủ, vui lòng thử lại'));
+      return Promise.reject(new Error('Cannot connect to server, please try again'));
     }
 
     return Promise.reject(error);

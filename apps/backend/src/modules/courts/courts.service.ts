@@ -16,14 +16,17 @@ import { UpsertTimeSlotsDto } from './dto/upsert-time-slots.dto';
 import { AddCourtImageDto } from './dto/add-court-image.dto';
 import { ReorderCourtImagesDto } from './dto/reorder-court-images.dto';
 import { BookingEntity } from '../../database/entities/booking.entity';
-import { BookingStatus, CancelledBy } from '@court-booking/shared';
+import { BookingStatus, CancelledBy, NotificationType } from '@court-booking/shared';
 import { CourtStatus } from '../../database/entities/court.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CourtsService {
   private readonly CACHE_TTL = 300; // 5 minutes
   private readonly COURT_CACHE_PREFIX = 'court:';
   private readonly COURTS_LIST_PREFIX = 'courts:list:';
+  private readonly COURTS_LIST_VERSION_KEY = 'courts:list:version';
+  private readonly COURTS_DISTRICTS_CACHE_KEY = 'courts:districts';
 
   constructor(
     @InjectRepository(CourtEntity)
@@ -39,6 +42,7 @@ export class CourtsService {
     @InjectRepository(SportTypeEntity)
     private readonly sportTypeRepository: Repository<SportTypeEntity>,
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
@@ -75,6 +79,19 @@ export class CourtsService {
     }
   }
 
+  private async getCourtsListVersion(): Promise<string> {
+    try {
+      const existing = await this.redis.get(this.COURTS_LIST_VERSION_KEY);
+      if (existing) return existing;
+      const initialized = await this.redis.set(this.COURTS_LIST_VERSION_KEY, '1', 'NX');
+      if (initialized) return '1';
+      const after = await this.redis.get(this.COURTS_LIST_VERSION_KEY);
+      return after || '1';
+    } catch {
+      return '1';
+    }
+  }
+
   async create(createCourtDto: CreateCourtDto): Promise<CourtEntity> {
     const sportTypeId = await this.resolveSportTypeId(createCourtDto.sportTypeId);
     const court = this.courtRepository.create({
@@ -105,10 +122,11 @@ export class CourtsService {
       minPlayers,
       maxPlayers,
       availableToday,
+      includeInactive,
     } = query;
 
-    // Generate cache key based on query params
-    const cacheKey = `${this.COURTS_LIST_PREFIX}${JSON.stringify(query)}`;
+    const listVersion = await this.getCourtsListVersion();
+    const cacheKey = `${this.COURTS_LIST_PREFIX}v${listVersion}:${JSON.stringify(query)}`;
 
     // Try to get from cache
     const cached = await this.safeCacheGet(cacheKey);
@@ -121,11 +139,16 @@ export class CourtsService {
     const qb = this.courtRepository
       .createQueryBuilder('court')
       .leftJoinAndSelect('court.images', 'images')
+      .leftJoinAndSelect('court.sportTypeRef', 'sportTypeRef')
       .where('court.deletedAt IS NULL')
       .skip(skip)
       .take(limit)
       .orderBy('court.isFeatured', 'DESC')
       .addOrderBy('court.createdAt', 'DESC');
+
+    if (!includeInactive) {
+      qb.andWhere('court.status = :activeStatus', { activeStatus: CourtStatus.ACTIVE });
+    }
 
     if (name) {
       qb.andWhere('court.name ILIKE :name', { name: `%${name}%` });
@@ -235,6 +258,8 @@ export class CourtsService {
     const result = {
       data: data.map((court) => ({
         ...court,
+        sportTypeName: court.sportTypeRef?.name,
+        images: [...(court.images ?? [])].sort((a, b) => a.displayOrder - b.displayOrder),
         featureItems: featureByCourt.get(court.id) ?? [],
       })),
       meta: {
@@ -261,7 +286,7 @@ export class CourtsService {
 
     const court = await this.courtRepository.findOne({
       where: { id, deletedAt: IsNull() },
-      relations: ['images'],
+      relations: ['images', 'sportTypeRef'],
       order: { images: { displayOrder: 'ASC' } },
     });
 
@@ -279,6 +304,7 @@ export class CourtsService {
 
     const result = {
       ...court,
+      sportTypeName: court.sportTypeRef?.name,
       featureItems,
     };
 
@@ -348,6 +374,7 @@ export class CourtsService {
     cancellationNote: string,
   ): Promise<number> {
     const now = new Date();
+    const court = await this.courtRepository.findOne({ where: { id: courtId } });
     const targets = await this.dataSource.getRepository(BookingEntity).find({
       where: [
         { courtId, status: BookingStatus.PENDING_PAYMENT },
@@ -374,6 +401,18 @@ export class CourtsService {
       }
     }
     await this.dataSource.getRepository(BookingEntity).save(futureTargets);
+
+    for (const booking of futureTargets) {
+      if (!booking.userId) continue;
+      await this.notificationsService.create({
+        userId: booking.userId,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: 'Booking cancelled by system',
+        message: `Your booking at ${court?.name || 'this court'} was cancelled because the venue is unavailable. ${cancellationNote}`,
+        bookingId: booking.id,
+      });
+    }
+
     return futureTargets.length;
   }
 
@@ -414,6 +453,11 @@ export class CourtsService {
    * REQ-21.4: GET /courts/districts — distinct districts of ACTIVE courts
    */
   async getDistricts(): Promise<string[]> {
+    const cached = await this.safeCacheGet(this.COURTS_DISTRICTS_CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached) as string[];
+    }
+
     const rows = await this.courtRepository
       .createQueryBuilder('c')
       .select('DISTINCT c.district', 'district')
@@ -423,7 +467,13 @@ export class CourtsService {
       .orderBy('district', 'ASC')
       .getRawMany();
 
-    return rows.map((r) => r.district as string);
+    const districts = rows.map((r) => r.district as string);
+    await this.safeCacheSet(
+      this.COURTS_DISTRICTS_CACHE_KEY,
+      this.CACHE_TTL,
+      JSON.stringify(districts),
+    );
+    return districts;
   }
 
   async getStats(id: string, query: GetCourtStatsDto) {
@@ -601,10 +651,12 @@ export class CourtsService {
   }
 
   private async invalidateCourtsListCache(): Promise<void> {
-    const pattern = `${this.COURTS_LIST_PREFIX}*`;
     try {
-      const keys = await this.redis.keys(pattern);
-      await this.safeCacheDel(...keys);
+      await this.redis
+        .multi()
+        .incr(this.COURTS_LIST_VERSION_KEY)
+        .del(this.COURTS_DISTRICTS_CACHE_KEY)
+        .exec();
     } catch {
       // no-op
     }

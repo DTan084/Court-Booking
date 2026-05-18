@@ -4,10 +4,16 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, Brackets } from 'typeorm';
+import { Repository, DataSource, Brackets, QueryFailedError, EntityManager } from 'typeorm';
 import { differenceInHours } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+
+import bookingConfig from '../../config/booking.config';
+const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || 'Asia/Ho_Chi_Minh';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
@@ -20,6 +26,114 @@ import { GetMyBookingsDto } from './dto/get-my-bookings.dto';
 
 @Injectable()
 export class BookingsService {
+  private getCourtAdvisoryLockKeys(courtId: string): [number, number] {
+    const normalized = courtId.replace(/-/g, '');
+    const high = parseInt(normalized.slice(0, 8), 16) | 0;
+    const low = parseInt(normalized.slice(8, 16), 16) | 0;
+    return [high, low];
+  }
+
+  private async lockCourtBookingWindow(manager: EntityManager, courtId: string): Promise<void> {
+    const [high, low] = this.getCourtAdvisoryLockKeys(courtId);
+    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [high, low]);
+  }
+
+  private isBookingConflictError(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) return false;
+    const driverError = (error as QueryFailedError & { driverError?: { code?: string } })
+      .driverError;
+    return driverError?.code === '23P01' || driverError?.code === '23505';
+  }
+
+  private getCourtLabel(
+    booking: Pick<BookingEntity, 'court'> & { court?: { name?: string } | null },
+  ) {
+    return booking.court?.name || 'your court';
+  }
+
+  private getBookingScheduleLabels(
+    booking: Pick<BookingEntity, 'startTime' | 'court'> & { court?: { name?: string } | null },
+  ) {
+    const start = new Date(booking.startTime);
+    return {
+      courtName: this.getCourtLabel(booking),
+      startTimeStr: start.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      startDateStr: start.toLocaleDateString('vi-VN'),
+    };
+  }
+
+  private async loadBookingWithCourt(id: string): Promise<BookingEntity> {
+    const booking = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .withDeleted()
+      .leftJoinAndSelect('booking.court', 'court')
+      .where('booking.id = :id', { id })
+      .getOne();
+
+    if (!booking) throw new NotFoundException('Booking not found');
+    return booking;
+  }
+
+  private createConfirmedNotification(booking: BookingEntity, message?: string): Promise<unknown> {
+    const { courtName, startTimeStr, startDateStr } = this.getBookingScheduleLabels(booking);
+    return this.notificationsService.create({
+      userId: booking.userId!,
+      type: NotificationType.BOOKING_CONFIRMED,
+      title: 'Booking Confirmed',
+      message:
+        message ||
+        `You have successfully booked ${courtName} at ${startTimeStr} on ${startDateStr}.`,
+      bookingId: booking.id,
+    });
+  }
+
+  private createCancellationNotification(booking: BookingEntity): Promise<unknown> {
+    const { courtName, startTimeStr, startDateStr } = this.getBookingScheduleLabels(booking);
+    const cancelledBy = booking.cancelledBy ?? CancelledBy.USER;
+
+    if (cancelledBy === CancelledBy.ADMIN) {
+      return this.notificationsService.create({
+        userId: booking.userId!,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: 'Booking cancelled by admin',
+        message: `Your booking for ${courtName} at ${startTimeStr} on ${startDateStr} was cancelled by our staff.${booking.cancelledReason ? ` Reason: ${booking.cancelledReason}.` : ''}`,
+        bookingId: booking.id,
+      });
+    }
+
+    if (cancelledBy === CancelledBy.SYSTEM) {
+      return this.notificationsService.create({
+        userId: booking.userId!,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: 'Booking cancelled by system',
+        message: `Your booking for ${courtName} at ${startTimeStr} on ${startDateStr} was cancelled automatically.${booking.cancellationNote ? ` ${booking.cancellationNote}` : ''}`,
+        bookingId: booking.id,
+      });
+    }
+
+    return this.notificationsService.create({
+      userId: booking.userId!,
+      type: NotificationType.BOOKING_CANCELLED,
+      title: 'Booking Cancelled',
+      message: `Your booking for ${courtName} at ${startTimeStr} on ${startDateStr} has been successfully cancelled.`,
+      bookingId: booking.id,
+    });
+  }
+
+  private createRefundNotification(booking: BookingEntity): Promise<unknown> {
+    const { courtName } = this.getBookingScheduleLabels(booking);
+    return this.notificationsService.create({
+      userId: booking.userId!,
+      type: NotificationType.REFUND_PROCESSED,
+      title: 'Refund processed',
+      message: `A refund of ${Number(booking.refundAmount || 0).toLocaleString('vi-VN')} VND for your booking at ${courtName} has been processed.`,
+      bookingId: booking.id,
+    });
+  }
+
   constructor(
     @InjectRepository(BookingEntity)
     private readonly bookingRepository: Repository<BookingEntity>,
@@ -32,11 +146,14 @@ export class BookingsService {
     private readonly dataSource: DataSource,
     private readonly notificationsService: NotificationsService,
     private readonly settingsService: SettingsService,
+    @Inject(bookingConfig.KEY)
+    private readonly bookingCfg: ConfigType<typeof bookingConfig>,
   ) {}
 
   async getCourtSchedule(courtId: string, date: string): Promise<BookingEntity[]> {
-    const startDate = new Date(`${date}T00:00:00`);
-    const endDate = new Date(`${date}T23:59:59.999`);
+    const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || 'Asia/Ho_Chi_Minh';
+    const startDate = toZonedTime(`${date}T00:00:00`, BUSINESS_TIMEZONE);
+    const endDate = toZonedTime(`${date}T23:59:59.999`, BUSINESS_TIMEZONE);
     const now = new Date();
 
     const bookings = await this.bookingRepository
@@ -90,6 +207,12 @@ export class BookingsService {
       throw new BadRequestException('Invalid booking duration');
     }
 
+    if (durationHours > this.bookingCfg.maxBookingDurationHours) {
+      throw new BadRequestException(
+        `Booking duration cannot exceed ${this.bookingCfg.maxBookingDurationHours} hours`,
+      );
+    }
+
     if (start.getMinutes() !== 0 || end.getMinutes() !== 0) {
       throw new BadRequestException('Booking must start and end on the hour (e.g. 08:00, 10:00)');
     }
@@ -114,12 +237,17 @@ export class BookingsService {
         throw new BadRequestException('Court is not active');
       }
 
-      // 2. Validate time slots
-      const dayOfWeek = start.getDay();
-      const startHour = start.getHours();
-      const endHour = end.getHours() || 24;
+      // Serialize booking writes per court inside the current Postgres transaction.
+      await this.lockCourtBookingWindow(manager, courtId);
 
-      const slots = await this.timeSlotRepository.find({
+      // 2. Validate time slots
+      const zonedStart = toZonedTime(start, BUSINESS_TIMEZONE);
+      const zonedEnd = toZonedTime(end, BUSINESS_TIMEZONE);
+      const dayOfWeek = zonedStart.getDay();
+      const startHour = zonedStart.getHours();
+      const endHour = zonedEnd.getHours() || 24;
+
+      const slots = await manager.find(CourtTimeSlotEntity, {
         where: { courtId, dayOfWeek },
         order: { startHour: 'ASC' },
       });
@@ -180,13 +308,20 @@ export class BookingsService {
         note: createBookingDto.note ?? null,
       });
 
-      return manager.save(booking);
+      try {
+        return await manager.save(booking);
+      } catch (error) {
+        if (this.isBookingConflictError(error)) {
+          throw new ConflictException('Court is already booked for the selected time slot');
+        }
+        throw error;
+      }
     });
   }
 
   /**
    * REQ-17: POST /bookings/:id/confirm-payment
-   * Chuyển PENDING_PAYMENT → CONFIRMED khi deadline chưa qua.
+   * Transition PENDING_PAYMENT -> CONFIRMED when the deadline has not expired.
    */
   async confirmPayment(bookingId: string, userId: string): Promise<BookingEntity> {
     const savedBooking = await this.dataSource.transaction(async (manager) => {
@@ -200,12 +335,12 @@ export class BookingsService {
 
       // REQ-17.5: already confirmed
       if (booking.status === BookingStatus.CONFIRMED) {
-        throw new ConflictException('Booking đã được thanh toán');
+        throw new ConflictException('Booking is already paid');
       }
 
       // REQ-17.4: expired
       if (booking.status === BookingStatus.EXPIRED) {
-        throw new BadRequestException('Booking đã hết hạn thanh toán');
+        throw new BadRequestException('Booking payment window has expired');
       }
 
       // REQ-16.6: terminal states
@@ -213,7 +348,7 @@ export class BookingsService {
         booking.status === BookingStatus.COMPLETED ||
         booking.status === BookingStatus.CANCELLED
       ) {
-        throw new BadRequestException(`Không thể xác nhận booking ở trạng thái ${booking.status}`);
+        throw new BadRequestException(`Cannot confirm booking in state ${booking.status}`);
       }
 
       // Double check deadline hasn't passed (job may not have run yet)
@@ -221,7 +356,7 @@ export class BookingsService {
         booking.status = BookingStatus.EXPIRED;
         booking.expiredAt = new Date();
         await manager.save(booking);
-        throw new BadRequestException('Booking đã hết hạn thanh toán');
+        throw new BadRequestException('Booking payment window has expired');
       }
 
       // REQ-17.3: PENDING_PAYMENT → CONFIRMED
@@ -231,22 +366,10 @@ export class BookingsService {
       return manager.save(booking);
     });
 
-    // REQ-23.2: Notification on CONFIRMED
-    const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
-
-    this.notificationsService
-      .create({
-        userId: savedBooking.userId!,
-        type: NotificationType.BOOKING_CONFIRMED,
-        title: 'Đặt sân thành công',
-        message: `Bạn đã đặt thành công sân ${savedBooking.court?.name || 'thể thao'} lúc ${startTimeStr} ngày ${startDateStr}.`,
-        bookingId: savedBooking.id,
-      })
-      .catch(console.error);
+    const bookingWithCourt = await this.loadBookingWithCourt(savedBooking.id).catch(
+      () => savedBooking,
+    );
+    this.createConfirmedNotification(bookingWithCourt).catch(console.error);
 
     return savedBooking;
   }
@@ -311,7 +434,7 @@ export class BookingsService {
       const hoursSinceCreated = differenceInHours(now, booking.createdAt);
       if (hoursSinceCreated >= cancelWithinHours) {
         throw new BadRequestException(
-          `Chi co the huy trong vong ${cancelWithinHours} gio ke tu khi dat`,
+          `Only cancellations within ${cancelWithinHours} hours of booking are allowed`,
         );
       }
 
@@ -319,7 +442,7 @@ export class BookingsService {
       const hoursUntilStart = differenceInHours(booking.startTime, now);
       if (hoursUntilStart <= noCancelBeforeHours) {
         throw new BadRequestException(
-          `Khong the huy dat san trong vong ${noCancelBeforeHours} gio truoc gio choi`,
+          `Cannot cancel booking within ${noCancelBeforeHours} hours of the scheduled playtime`,
         );
       }
 
@@ -329,22 +452,10 @@ export class BookingsService {
       return manager.save(booking);
     });
 
-    // REQ-23.2: Notification on CANCELLED
-    const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
-
-    this.notificationsService
-      .create({
-        userId: savedBooking.userId!,
-        type: NotificationType.BOOKING_CANCELLED,
-        title: 'Đặt sân đã bị hủy',
-        message: `Lịch đặt sân ${savedBooking.court?.name || ''} lúc ${startTimeStr} ngày ${startDateStr} của bạn đã được hủy thành công.`,
-        bookingId: savedBooking.id,
-      })
-      .catch(console.error);
+    const bookingWithCourt = await this.loadBookingWithCourt(savedBooking.id).catch(
+      () => savedBooking,
+    );
+    this.createCancellationNotification(bookingWithCourt).catch(console.error);
 
     return savedBooking;
   }
@@ -358,6 +469,7 @@ export class BookingsService {
 
     const queryBuilder = this.bookingRepository
       .createQueryBuilder('booking')
+      .withDeleted()
       .leftJoinAndSelect('booking.court', 'court')
       .leftJoinAndSelect('court.images', 'courtImages')
       .where('booking.userId = :userId', { userId })
@@ -447,10 +559,14 @@ export class BookingsService {
     const cancelWithinHours = await this.settingsService.getNumber('cancel_within_hours', 24);
     const noCancelBeforeHours = await this.settingsService.getNumber('no_cancel_before_hours', 12);
 
-    const booking = await this.bookingRepository.findOne({
-      where: { id, userId },
-      relations: ['court', 'court.images'],
-    });
+    const booking = await this.bookingRepository
+      .createQueryBuilder('booking')
+      .withDeleted()
+      .leftJoinAndSelect('booking.court', 'court')
+      .leftJoinAndSelect('court.images', 'courtImages')
+      .where('booking.id = :id', { id })
+      .andWhere('booking.userId = :userId', { userId })
+      .getOne();
 
     if (!booking) throw new NotFoundException('Booking not found');
 
@@ -490,19 +606,35 @@ export class BookingsService {
       bookingSource,
     } = payload;
     if (!userId && !guestName?.trim()) {
-      throw new BadRequestException('Phải cung cấp user_id hoặc guest_name');
+      throw new BadRequestException('Must provide user_id or guest_name');
     }
 
     const start = new Date(startTime);
     const end = new Date(endTime);
-    if (start >= end) throw new BadRequestException('Invalid booking duration');
+    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    if (durationHours <= 0) throw new BadRequestException('Invalid booking duration');
 
-    return this.dataSource.transaction(async (manager) => {
+    if (durationHours > this.bookingCfg.maxBookingDurationHours) {
+      throw new BadRequestException(
+        `Booking duration cannot exceed ${this.bookingCfg.maxBookingDurationHours} hours`,
+      );
+    }
+
+    if (start.getMinutes() !== 0 || end.getMinutes() !== 0) {
+      throw new BadRequestException('Booking must start and end on the hour (e.g. 08:00, 10:00)');
+    }
+
+    const savedBooking = await this.dataSource.transaction(async (manager) => {
       const court = await manager.findOne(CourtEntity, {
         where: { id: courtId },
         lock: { mode: 'pessimistic_write' },
       });
       if (!court) throw new NotFoundException('Court not found');
+      if (court.status !== CourtStatus.ACTIVE) {
+        throw new BadRequestException('Court is not active');
+      }
+
+      await this.lockCourtBookingWindow(manager, courtId);
 
       const overlapping = await manager
         .createQueryBuilder(BookingEntity, 'booking')
@@ -520,14 +652,21 @@ export class BookingsService {
         .getCount();
 
       if (overlapping > 0) {
-        throw new ConflictException('Sân đã được đặt trong khung giờ này');
+        throw new ConflictException('The requested court is already booked for this time slot');
       }
 
-      const slots = await this.timeSlotRepository.find({
-        where: { courtId, dayOfWeek: start.getDay() },
+      const zonedStart = toZonedTime(start, BUSINESS_TIMEZONE);
+      const zonedEnd = toZonedTime(end, BUSINESS_TIMEZONE);
+
+      const slots = await manager.find(CourtTimeSlotEntity, {
+        where: { courtId, dayOfWeek: zonedStart.getDay() },
         order: { startHour: 'ASC' },
       });
-      const covered = this.findCoveringSlots(slots, start.getHours(), end.getHours() || 24);
+      const covered = this.findCoveringSlots(
+        slots,
+        zonedStart.getHours(),
+        zonedEnd.getHours() || 24,
+      );
       if (!covered)
         throw new BadRequestException(
           'Requested time range is not covered by available time slots',
@@ -549,22 +688,30 @@ export class BookingsService {
         guestPhone: guestPhone ?? null,
         note: note ?? null,
       });
-      const saved = await manager.save(booking);
-
-      if (saved.userId) {
-        this.notificationsService
-          .create({
-            userId: saved.userId,
-            type: NotificationType.BOOKING_CONFIRMED,
-            title: 'Đặt sân thành công',
-            message: 'Lịch đặt sân của bạn đã được nhân viên xác nhận.',
-            bookingId: saved.id,
-          })
-          .catch(console.error);
+      let saved: BookingEntity;
+      try {
+        saved = await manager.save(booking);
+      } catch (error) {
+        if (this.isBookingConflictError(error)) {
+          throw new ConflictException('The requested court is already booked for this time slot');
+        }
+        throw error;
       }
 
       return saved;
     });
+
+    if (savedBooking.userId) {
+      const bookingWithCourt = await this.loadBookingWithCourt(savedBooking.id).catch(
+        () => savedBooking,
+      );
+      this.createConfirmedNotification(
+        bookingWithCourt,
+        'Your booking has been confirmed by our staff.',
+      ).catch(console.error);
+    }
+
+    return savedBooking;
   }
 
   async getAdminBookings(query: {
@@ -584,6 +731,7 @@ export class BookingsService {
     const limit = query.limit ?? 10;
     const qb = this.bookingRepository
       .createQueryBuilder('booking')
+      .withDeleted()
       .leftJoinAndSelect('booking.court', 'court')
       .leftJoinAndSelect('booking.user', 'user')
       .orderBy('booking.startTime', 'DESC')
@@ -784,7 +932,7 @@ export class BookingsService {
     const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.status !== BookingStatus.CONFIRMED) {
-      throw new BadRequestException('Chỉ có thể check-in booking đã xác nhận');
+      throw new BadRequestException('Only confirmed bookings can be checked in');
     }
     booking.checkedInAt = new Date();
     return this.bookingRepository.save(booking);
@@ -794,36 +942,52 @@ export class BookingsService {
     bookingId: string,
     payload: { cancelledReason?: string; cancellationNote?: string; cancelledBy?: CancelledBy },
   ) {
-    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId },
+      relations: ['court'],
+    });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.status === BookingStatus.COMPLETED) {
-      throw new BadRequestException('Không thể hủy booking đã hoàn thành');
+      throw new BadRequestException('Cannot cancel a completed booking');
     }
     booking.status = BookingStatus.CANCELLED;
     booking.cancelledAt = new Date();
     booking.cancelledBy = payload.cancelledBy ?? CancelledBy.ADMIN;
     booking.cancelledReason = payload.cancelledReason ?? null;
     booking.cancellationNote = payload.cancellationNote ?? null;
-    return this.bookingRepository.save(booking);
+    const saved = await this.bookingRepository.save(booking);
+    if (saved.userId) {
+      this.createCancellationNotification(saved).catch(console.error);
+    }
+    return saved;
   }
 
   async refundBooking(bookingId: string, refundAmount: number): Promise<BookingEntity> {
-    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId },
+      relations: ['court'],
+    });
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.refundedAt) throw new ConflictException('Booking da duoc hoan tien');
+    if (booking.refundedAt) throw new ConflictException('Booking has already been refunded');
 
     if (![BookingStatus.CANCELLED, BookingStatus.EXPIRED].includes(booking.status)) {
-      throw new BadRequestException('Chi hoan tien cho booking da huy hoac het han');
+      throw new BadRequestException(
+        'Refunds can only be processed for cancelled or expired bookings',
+      );
     }
     if (!booking.paidAt) {
-      throw new BadRequestException('Booking chua thanh toan, khong the hoan tien');
+      throw new BadRequestException('Cannot refund an unpaid booking');
     }
     if (refundAmount > Number(booking.totalPrice)) {
-      throw new BadRequestException('Số tiền hoàn trả không được vượt quá tổng giá trị booking');
+      throw new BadRequestException('Refund amount cannot exceed the total booking price');
     }
     booking.refundedAt = new Date();
     booking.refundAmount = refundAmount;
-    return this.bookingRepository.save(booking);
+    const saved = await this.bookingRepository.save(booking);
+    if (saved.userId) {
+      this.createRefundNotification(saved).catch(console.error);
+    }
+    return saved;
   }
 
   async updateAdminBooking(
@@ -862,6 +1026,7 @@ export class BookingsService {
     const statuses = [BookingStatus.CONFIRMED, BookingStatus.COMPLETED];
     const qb = this.bookingRepository
       .createQueryBuilder('booking')
+      .withDeleted()
       .leftJoinAndSelect('booking.court', 'court')
       .where('booking.status IN (:...statuses)', { statuses })
       .andWhere('booking.startTime < :to', { to })

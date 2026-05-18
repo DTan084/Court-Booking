@@ -1,8 +1,16 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { CalendarCheck2, ChevronLeft, ChevronRight, Clock3, Plus, Search } from 'lucide-react';
+import {
+  Archive,
+  CalendarCheck2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Plus,
+  Search,
+} from 'lucide-react';
 import { BookingSource, BookingStatus, CancelledBy } from '@court-booking/shared';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { MetricCard } from '@/components/admin/MetricCard';
@@ -12,6 +20,7 @@ import { useSportTypes } from '@/hooks/useSportTypes';
 import { api } from '@/lib/api';
 import { formatDateByTimezone, formatTimeByTimezone } from '@/lib/datetime';
 import { formatCurrency } from '@/lib/utils';
+import { CourtStatus } from '@/types';
 
 export default function AdminBookingsPage() {
   const timezone = 'Asia/Ho_Chi_Minh';
@@ -109,21 +118,25 @@ export default function AdminBookingsPage() {
           title="Total"
           value={String(data?.summary?.total ?? total)}
           icon={<CalendarCheck2 className="h-5 w-5" />}
+          hint="Bookings in selected filter"
         />
         <MetricCard
           title="Confirmed"
           value={`${data?.summary?.confirmed ?? 0}/${data?.summary?.confirmedOrCompleted ?? 0}`}
           icon={<Clock3 className="h-5 w-5" />}
+          hint="Active / total valid bookings"
         />
         <MetricCard
           title="Admin/Walk-in"
           value={String(data?.summary?.adminWalkIn ?? 0)}
           icon={<CalendarCheck2 className="h-5 w-5" />}
+          hint="Offline administrative entries"
         />
         <MetricCard
           title="Cancelled"
           value={String(data?.summary?.cancelled ?? 0)}
           icon={<Clock3 className="h-5 w-5" />}
+          hint="Cancelled or expired bookings"
         />
       </div>
       <div className="mt-2 grid gap-4 md:grid-cols-2">
@@ -131,11 +144,13 @@ export default function AdminBookingsPage() {
           title="Live Sessions"
           value={String(data?.summary?.liveSessions ?? 0)}
           icon={<Clock3 className="h-5 w-5" />}
+          hint="Currently active court usages"
         />
         <MetricCard
           title="Daily Revenue"
           value={formatCurrency(data?.summary?.dailyRevenue ?? 0)}
           icon={<CalendarCheck2 className="h-5 w-5" />}
+          hint="Revenue generated today"
         />
       </div>
 
@@ -237,6 +252,18 @@ export default function AdminBookingsPage() {
               const end = new Date(row.endTime);
               const now = new Date();
               const sourceLabel = row.bookingSource === 'WALK_IN' ? 'WALK-IN' : row.bookingSource;
+              const isVenueDeleted = row.court?.deletedAt != null;
+              const isVenueUnavailable = row.court?.status === CourtStatus.INACTIVE;
+              const venueAvailabilityLabel = isVenueDeleted
+                ? 'No Longer Available'
+                : isVenueUnavailable
+                  ? 'Unavailable'
+                  : null;
+              const venueAvailabilityHint = isVenueDeleted
+                ? 'This venue has been removed from the active court list.'
+                : isVenueUnavailable
+                  ? 'This venue is temporarily unavailable for new bookings.'
+                  : null;
               const isLive =
                 row.status === BookingStatus.CONFIRMED &&
                 start.getTime() <= now.getTime() &&
@@ -245,7 +272,28 @@ export default function AdminBookingsPage() {
               return (
                 <tr key={row.id} className="border-t border-slate-100">
                   <td className="px-6 py-4 font-semibold">{row.id.slice(0, 8)}</td>
-                  <td className="px-6 py-4">{row.court?.name ?? '-'}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span>{row.court?.name ?? '-'}</span>
+                      {venueAvailabilityLabel && (
+                        <span
+                          title={venueAvailabilityHint ?? undefined}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            isVenueDeleted
+                              ? 'border-slate-300 bg-slate-100 text-slate-700'
+                              : 'border-amber-200 bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          {isVenueDeleted ? (
+                            <Archive className="h-3 w-3" />
+                          ) : (
+                            <Clock3 className="h-3 w-3" />
+                          )}
+                          {venueAvailabilityLabel}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="font-semibold text-slate-900">
                       {formatDateByTimezone(start, timezone, locale)}

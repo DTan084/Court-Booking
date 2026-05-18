@@ -35,4 +35,6 @@ logs/
 *.tsbuildinfo
 
 # Documentation files (local only)
-*.html
+docs/
+/apps/backend/uploads/
+

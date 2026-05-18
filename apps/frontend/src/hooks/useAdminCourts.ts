@@ -73,17 +73,17 @@ export function useCreateCourt() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
-      toast.success('Tạo sân thành công');
+      toast.success('Court created successfully');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const status = error.response?.status;
       const message = error.response?.data?.error?.message || error.response?.data?.message || '';
       if (status === 409) {
-        toast.error('Tên sân đã tồn tại');
+        toast.error('Court name already exists');
       } else if (status === 400) {
-        toast.error(message || 'Dữ liệu không hợp lệ');
+        toast.error(message || 'Invalid input data');
       } else {
-        toast.error('Không thể tạo sân, vui lòng thử lại');
+        toast.error('Failed to create court, please try again');
       }
     },
   });
@@ -106,11 +106,11 @@ export function useUpdateCourt() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(variables.id) });
-      toast.success('Cập nhật sân thành công');
+      toast.success('Court updated successfully');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const message = error.response?.data?.error?.message || error.response?.data?.message || '';
-      toast.error(message || 'Không thể cập nhật sân, vui lòng thử lại');
+      toast.error(message || 'Failed to update court, please try again');
     },
   });
 }
@@ -132,17 +132,17 @@ export function useDeleteCourt() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
-      toast.success('Xóa sân thành công');
+      toast.success('Court deleted successfully');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const status = error.response?.status;
       const message = error.response?.data?.error?.message || error.response?.data?.message || '';
       if (status === 400 && message.toLowerCase().includes('booking')) {
-        toast.error('Không thể xóa sân có booking');
+        toast.error('Cannot delete court with active bookings');
       } else if (status === 404) {
-        toast.error('Sân không tồn tại hoặc đã bị xóa');
+        toast.error('Court does not exist or has already been deleted');
       } else {
-        toast.error('Không thể xóa sân, vui lòng thử lại');
+        toast.error('Failed to delete court, please try again');
       }
     },
   });
@@ -156,7 +156,7 @@ export function useRestoreCourt() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
-      toast.success('Khôi phục sân thành công');
+      toast.success('Court restored successfully');
     },
   });
 }
@@ -169,7 +169,7 @@ export function useHardDeleteCourt() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
-      toast.success('Đã xóa vĩnh viễn');
+      toast.success('Permanently deleted court');
     },
   });
 }
@@ -192,11 +192,11 @@ export function useUpsertTimeSlots() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.courts.timeSlots(variables.courtId),
       });
-      toast.success('Cập nhật khung giờ thành công');
+      toast.success('Time slots updated successfully');
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const message = error.response?.data?.error?.message || error.response?.data?.message || '';
-      toast.error(message || 'Không thể cập nhật khung giờ, vui lòng thử lại');
+      toast.error(message || 'Failed to update time slots, please try again');
     },
   });
 }
@@ -224,7 +224,7 @@ export function useAddCourtImage(courtId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
-      toast.success('Thêm ảnh thành công');
+      toast.success('Image added successfully');
     },
   });
 }
@@ -237,7 +237,7 @@ export function useDeleteCourtImage(courtId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
-      toast.success('Xóa ảnh thành công');
+      toast.success('Image deleted successfully');
     },
   });
 }
@@ -257,7 +257,7 @@ export function useReorderCourtImages(courtId: string) {
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       const message = error.response?.data?.error?.message || error.response?.data?.message || '';
-      toast.error(message || 'Không thể sắp xếp ảnh, vui lòng thử lại');
+      toast.error(message || 'Failed to reorder images, please try again');
       // Debug quickly in browser console when BE returns validation details.
       // eslint-disable-next-line no-console
       console.error('reorder court images failed:', error.response?.data);
@@ -277,7 +277,7 @@ export function useUpdateCourtImageAlt(courtId: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.courts.detail(courtId) });
-      toast.success('Đã cập nhật alt text');
+      toast.success('Alt text updated successfully');
     },
   });
 }

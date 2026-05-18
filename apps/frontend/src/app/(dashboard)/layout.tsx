@@ -18,10 +18,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isCheckoutRoute = pathname.startsWith('/checkout/');
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
   const isAccountRoute = pathname === '/profile' || pathname.startsWith('/bookings');
+  const shouldHydrateAuth = isCheckoutRoute || isAdminRoute || isAccountRoute || Boolean(user);
 
   useEffect(() => {
-    // Skip if already have user or already attempted
-    if (user || hasFetched.current) return;
+    // Public routes do not need a session probe for anonymous visitors.
+    if (!shouldHydrateAuth || hasFetched.current) return;
 
     hasFetched.current = true;
 
@@ -32,7 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setUser(userData);
       })
       .catch(() => {
-        // Silently fail â€” user is not logged in, middleware will redirect if needed
+        // Silently fail: user is not logged in, middleware will redirect if needed.
         clearUser();
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps

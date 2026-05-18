@@ -10,8 +10,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Format số tiền theo định dạng VND
- * Ví dụ: 150000 → "150.000 ₫"
+ * Format currency amount based on international ISO standards
+ * Example: 150000 -> "150,000 ₫"
  */
 export function formatCurrency(amount: number, currency?: string): string {
   const resolvedCurrency =
@@ -26,9 +26,9 @@ export function formatCurrency(amount: number, currency?: string): string {
 }
 
 /**
- * Tính totalPrice bằng cách tìm các CourtTimeSlot liên tiếp
- * bao phủ đúng khoảng [startHour, endHour].
- * Trả về null nếu khoảng thời gian không hợp lệ.
+ * Calculate totalPrice by finding continuous CourtTimeSlots
+ * covering the exact [startHour, endHour] range.
+ * Returns null if the range is invalid or not fully covered.
  */
 export function calculateBookingPrice(
   slots: CourtTimeSlot[],
@@ -56,11 +56,11 @@ export function calculateBookingPrice(
     }
   }
 
-  return null; // gap hoặc không bao phủ đủ
+  return null; // Gap or not fully covered
 }
 
 /**
- * Kiểm tra time slot có bị trùng với booking đã có không
+ * Check if the time slot overlaps with an existing booking
  */
 export function isSlotBooked(
   slotStartHour: number,
@@ -73,7 +73,7 @@ export function isSlotBooked(
 }
 
 /**
- * Format Date → "YYYY-MM-DD" dùng local timezone
+ * Format Date to "YYYY-MM-DD" using local timezone
  */
 export function formatDate(date: Date): string {
   const y = date.getFullYear();
@@ -83,8 +83,8 @@ export function formatDate(date: Date): string {
 }
 
 /**
- * Build ISO string từ date + hour theo local timezone
- * Ví dụ: date=2026-05-07, hour=8 → "2026-05-07T08:00:00+07:00"
+ * Build ISO string from date + hour using local timezone offset
+ * Example: date=2026-05-07, hour=8 -> "2026-05-07T08:00:00+07:00"
  */
 export function buildLocalISO(date: Date, hour: number): string {
   const d = new Date(date);

@@ -1,9 +1,33 @@
-// TODO: E2E test for application
-// - Test full request lifecycle
-// - Use supertest
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { AppModule } from '../../src/app.module';
 
-describe('App (e2e)', () => {
-  it('should initialize', () => {
-    expect(true).toBe(true);
+describe('AppController (e2e)', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
+  });
+
+  it('/api/v1/health (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/api/v1/health')
+      .expect(200)
+      .expect((res: any) => {
+        expect(res.body.status).toBe('ok');
+        expect(res.body.info).toBeDefined();
+      });
   });
 });

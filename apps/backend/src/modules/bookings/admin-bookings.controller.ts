@@ -57,6 +57,16 @@ const adminAnalyticsQuerySchema = z.object({
   courtId: z.string().uuid().optional(),
 });
 
+const adminRefundSchema = z.object({
+  refundAmount: z.number().positive(),
+});
+
+const adminCancelSchema = z.object({
+  cancelledReason: z.string().max(100).optional(),
+  cancellationNote: z.string().max(500).optional(),
+  cancelledBy: z.nativeEnum(CancelledBy).optional(),
+});
+
 @Controller('admin/bookings')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -119,14 +129,17 @@ export class AdminBookingsController {
   @Patch(':id/cancel')
   cancel(
     @Param('id') id: string,
-    @Body()
-    body: { cancelledReason?: string; cancellationNote?: string; cancelledBy?: CancelledBy },
+    @Body(new ZodValidationPipe(adminCancelSchema))
+    body: z.infer<typeof adminCancelSchema>,
   ) {
     return this.bookingsService.adminCancelBooking(id, body);
   }
 
   @Patch(':id/refund')
-  refund(@Param('id') id: string, @Body() body: { refundAmount: number }) {
+  refund(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(adminRefundSchema)) body: z.infer<typeof adminRefundSchema>,
+  ) {
     return this.bookingsService.refundBooking(id, body.refundAmount);
   }
 

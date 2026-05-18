@@ -9,7 +9,7 @@ import type { CourtTimeSlot } from '@/types';
 
 // ==================== CONSTANTS ====================
 
-const DAY_NAMES = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 // Display order: Mon-Sun (1-6, 0)
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
@@ -46,7 +46,7 @@ function formatHour(h: number): string {
 function validateSlots(slots: SlotDraft[]): SlotDraft[] {
   return slots.map((slot) => {
     if (slot.startHour >= slot.endHour) {
-      return { ...slot, error: 'Giờ kết thúc phải sau giờ bắt đầu' };
+      return { ...slot, error: 'End hour must be after start hour' };
     }
     // Check overlap with other slots in same day
     const daySlots = slots.filter((s) => s !== slot && s.dayOfWeek === slot.dayOfWeek);
@@ -54,7 +54,7 @@ function validateSlots(slots: SlotDraft[]): SlotDraft[] {
       (s) => slot.startHour < s.endHour && slot.endHour > s.startHour,
     );
     if (hasOverlap) {
-      return { ...slot, error: 'Khung giờ bị trùng với slot khác trong ngày' };
+      return { ...slot, error: 'Timeslot overlaps with another slot on this day' };
     }
     return { ...slot, error: undefined };
   });
@@ -105,21 +105,21 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
     if (isNaN(startHour) || isNaN(endHour) || isNaN(price)) {
       setAddForms((prev) => ({
         ...prev,
-        [dayOfWeek]: { ...form, error: 'Vui lòng nhập đầy đủ thông tin hợp lệ' },
+        [dayOfWeek]: { ...form, error: 'Please enter all valid information' },
       }));
       return;
     }
     if (startHour >= endHour) {
       setAddForms((prev) => ({
         ...prev,
-        [dayOfWeek]: { ...form, error: 'Giờ kết thúc phải sau giờ bắt đầu' },
+        [dayOfWeek]: { ...form, error: 'End hour must be after start hour' },
       }));
       return;
     }
     if (price < 0) {
       setAddForms((prev) => ({
         ...prev,
-        [dayOfWeek]: { ...form, error: 'Giá không được âm' },
+        [dayOfWeek]: { ...form, error: 'Price cannot be negative' },
       }));
       return;
     }
@@ -130,7 +130,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
     if (hasOverlap) {
       setAddForms((prev) => ({
         ...prev,
-        [dayOfWeek]: { ...form, error: 'Khung giờ bị trùng với slot đã có' },
+        [dayOfWeek]: { ...form, error: 'Timeslot overlaps with an existing slot' },
       }));
       return;
     }
@@ -149,7 +149,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
 
     if (slots.length === 0) {
       // Backend requires at least 1 slot — show warning
-      alert('Cần có ít nhất 1 khung giờ trước khi lưu.');
+      alert('At least 1 timeslot is required before saving.');
       return;
     }
 
@@ -176,8 +176,8 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
       <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
         <AlertCircle className="h-5 w-5 shrink-0 text-yellow-600 mt-0.5" />
         <p className="text-sm text-yellow-800">
-          Thao tác lưu sẽ <strong>thay thế toàn bộ</strong> lịch hoạt động hiện tại của sân. Hãy
-          kiểm tra kỹ trước khi lưu.
+          Saving will <strong>replace the entire</strong> active schedule for this court. Please
+          double check before saving.
         </p>
       </div>
 
@@ -195,12 +195,12 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
               {/* Day Header */}
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-semibold text-foreground">{DAY_NAMES[dayOfWeek]}</h3>
-                <span className="text-xs text-muted-foreground">{daySlots.length} khung giờ</span>
+                <span className="text-xs text-muted-foreground">{daySlots.length} slot(s)</span>
               </div>
 
               {/* Slots */}
               {daySlots.length === 0 && !addForm && (
-                <p className="mb-3 text-sm text-muted-foreground italic">Chưa có khung giờ nào</p>
+                <p className="mb-3 text-sm text-muted-foreground italic">No timeslots available</p>
               )}
 
               <div className="space-y-2">
@@ -226,7 +226,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
                       <button
                         onClick={() => handleRemoveSlot(slot.index)}
                         disabled={isPending}
-                        aria-label={`Xóa khung giờ ${formatHour(slot.startHour)} - ${formatHour(slot.endHour)}`}
+                        aria-label={`Delete timeslot ${formatHour(slot.startHour)} - ${formatHour(slot.endHour)}`}
                         className="rounded p-1 text-gray-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-50"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -241,7 +241,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
                     <div className="grid grid-cols-3 gap-2 mb-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Giờ bắt đầu
+                          Start Hour
                         </label>
                         <select
                           value={addForm.startHour}
@@ -266,7 +266,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Giờ kết thúc
+                          End Hour
                         </label>
                         <select
                           value={addForm.endHour}
@@ -291,7 +291,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Giá (VND)
+                          Price (VND)
                         </label>
                         <input
                           type="number"
@@ -319,7 +319,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
                         onClick={() => handleAddSlot(dayOfWeek)}
                         className="text-xs"
                       >
-                        Thêm
+                        Add
                       </Button>
                       <Button
                         size="sm"
@@ -327,7 +327,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
                         onClick={() => handleCloseAddForm(dayOfWeek)}
                         className="text-xs"
                       >
-                        Hủy
+                        Cancel
                       </Button>
                     </div>
                   </div>
@@ -342,7 +342,7 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
                   className="mt-2 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
                 >
                   <Plus className="h-4 w-4" />
-                  Thêm khung giờ
+                  Add Timeslot
                 </button>
               )}
             </div>
@@ -353,15 +353,15 @@ export function TimeSlotEditor({ courtId, timeSlots }: TimeSlotEditorProps) {
       {/* Save Button */}
       <div className="flex items-center justify-between rounded-lg border bg-card p-4">
         <p className="text-sm text-muted-foreground">
-          Tổng: <span className="font-medium text-foreground">{totalSlots} khung giờ</span>
-          {hasErrors && <span className="ml-2 text-red-600">— Có lỗi cần sửa trước khi lưu</span>}
+          Total: <span className="font-medium text-foreground">{totalSlots} slot(s)</span>
+          {hasErrors && <span className="ml-2 text-red-600">— Resolve errors before saving</span>}
           {totalSlots === 0 && (
-            <span className="ml-2 text-yellow-600">— Cần ít nhất 1 khung giờ</span>
+            <span className="ml-2 text-yellow-600">— At least 1 slot is required</span>
           )}
         </p>
         <Button onClick={handleSave} disabled={isPending || !canSave} className="gap-2">
           <Save className="h-4 w-4" />
-          {isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
+          {isPending ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
     </div>

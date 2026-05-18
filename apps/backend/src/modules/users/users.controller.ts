@@ -69,7 +69,7 @@ export class UsersController {
       }),
       fileFilter: (_req: any, file: any, cb: any) => {
         if (!file.mimetype.startsWith('image/')) {
-          cb(new BadRequestException('File upload phai la hinh anh'), false);
+          cb(new BadRequestException('Uploaded file must be an image'), false);
           return;
         }
         cb(null, true);
@@ -79,10 +79,11 @@ export class UsersController {
   )
   async uploadAvatar(@CurrentUser() user: any, @UploadedFile() file: any, @Req() req: Request) {
     if (!file) {
-      throw new BadRequestException('Vui long chon file anh de upload');
+      throw new BadRequestException('Please select an image file to upload');
     }
 
     const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/avatars/${file.filename}`;
+    await this.usersService.updateMe(user.id, { avatarUrl });
     return { url: avatarUrl };
   }
 
@@ -104,7 +105,7 @@ export class UsersController {
   @UsePipes(
     new ZodValidationPipe(
       updateUserSchema.extend({
-        email: z.string().email('Email khong hop le').optional(),
+        email: z.string().email('Invalid email address').optional(),
         role: z.nativeEnum(Role).optional(),
       }),
     ),

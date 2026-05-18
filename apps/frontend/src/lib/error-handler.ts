@@ -14,21 +14,21 @@ export function handleApiError(error: AxiosError): string {
   // Map status codes to user-friendly messages
   switch (status) {
     case 400:
-      return 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại';
+      return 'Invalid input data, please check again';
     case 401:
-      return 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại';
+      return 'Session expired, please sign in again';
     case 403:
-      return 'Bạn không có quyền thực hiện hành động này';
+      return 'You do not have permission to perform this action';
     case 404:
-      return 'Không tìm thấy dữ liệu';
+      return 'Data not found';
     case 409:
-      return 'Xung đột dữ liệu, vui lòng thử lại';
+      return 'Data conflict occurred, please try again';
     case 422:
-      return 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại';
+      return 'Invalid input data, please check again';
     case 500:
-      return 'Lỗi hệ thống, vui lòng thử lại sau';
+      return 'Internal server error, please try again later';
     case 503:
-      return 'Dịch vụ tạm thời không khả dụng, vui lòng thử lại sau';
+      return 'Service temporarily unavailable, please try again later';
     default:
       // If there's a specific message from the server, use it
       if (message) {
@@ -36,9 +36,9 @@ export function handleApiError(error: AxiosError): string {
       }
       // Network error
       if (!error.response) {
-        return 'Không thể kết nối đến máy chủ, vui lòng thử lại';
+        return 'Cannot connect to server, please try again';
       }
-      return 'Đã xảy ra lỗi, vui lòng thử lại';
+      return 'An error occurred, please try again';
   }
 }
 
@@ -52,5 +52,5 @@ export function getErrorMessage(error: unknown): string {
   if (typeof error === 'string') {
     return error;
   }
-  return 'Đã xảy ra lỗi không xác định';
+  return 'An unknown error occurred';
 }

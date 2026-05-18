@@ -24,7 +24,7 @@ export default function TimeSlotManagerPage({ params }: { params: { id: string }
         >
           <Link href="/admin/courts">
             <ArrowLeft className="h-4 w-4" />
-            Quay lai quan ly san
+            Back to Court Management
           </Link>
         </Button>
       </div>
@@ -34,7 +34,7 @@ export default function TimeSlotManagerPage({ params }: { params: { id: string }
           <Clock className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Quan ly khung gio</h1>
+          <h1 className="text-2xl font-bold text-foreground">Manage Timeslots</h1>
           {court && <p className="text-sm text-muted-foreground">{court.name}</p>}
         </div>
       </div>
@@ -45,9 +45,9 @@ export default function TimeSlotManagerPage({ params }: { params: { id: string }
         <TimeSlotEditor courtId={params.id} timeSlots={timeSlots} />
       ) : (
         <div className="rounded-lg border bg-card p-12 text-center">
-          <p className="text-muted-foreground">Khong tim thay san.</p>
+          <p className="text-muted-foreground">Court not found.</p>
           <Button asChild variant="outline" className="mt-4">
-            <Link href="/admin/courts">Quay lai</Link>
+            <Link href="/admin/courts">Go Back</Link>
           </Button>
         </div>
       )}

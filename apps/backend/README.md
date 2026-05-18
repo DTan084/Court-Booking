@@ -1,374 +1,375 @@
-# Court Booking Backend API
+# Backend Service
 
-Enterprise-grade court booking system backend built with NestJS, PostgreSQL, and Redis.
+This package contains the NestJS API for the Court Booking platform.
 
-## 🚀 Features
+## Responsibilities
 
-- **Authentication & Authorization**: JWT-based auth with role-based access control
-- **Court Management**: CRUD operations with time slot management
-- **Booking System**: Real-time booking with conflict detection and pessimistic locking
-- **Performance**: Redis caching, database indexing, connection pooling
-- **Security**: Helmet, CORS, rate limiting, input validation
-- **Logging**: Winston logger with request tracking
-- **API Documentation**: Swagger/OpenAPI at `/api/docs`
-- **Health Checks**: Database and Redis health monitoring
+The backend is responsible for:
 
-## 📋 Prerequisites
+- authentication, refresh, logout, and role checks
+- court, feature, sport type, and slot template management
+- booking lifecycle rules and admin booking operations
+- notifications, runtime settings, and health checks
+- background jobs for expiry, completion, and reminders
+- Redis-backed caching, throttling, and queue infrastructure
 
-- Node.js >= 18.x
-- pnpm >= 8.x
-- PostgreSQL >= 14.x
-- Redis >= 6.x
+## Tech Stack
 
-## 🛠️ Installation
+| Area          | Stack           |
+| ------------- | --------------- |
+| Framework     | NestJS 10       |
+| ORM           | TypeORM 0.3     |
+| Database      | PostgreSQL 16   |
+| Queue         | Bull            |
+| Cache / Infra | Redis, ioredis  |
+| Auth          | JWT, Passport   |
+| Docs          | Swagger         |
+| Testing       | Jest, Supertest |
 
-### 1. Clone Repository
+## Directory Structure
 
-```bash
-git clone <repository-url>
-cd Court-Booking/apps/backend
+```text
+apps/backend/
+├── src/
+│   ├── common/               Shared filters, interceptors, decorators, Redis wiring
+│   ├── config/               App, database, JWT, Redis, booking configuration
+│   ├── database/
+│   │   ├── entities/
+│   │   ├── migrations/
+│   │   └── seed.ts
+│   └── modules/
+│       ├── auth/
+│       ├── bookings/
+│       ├── courts/
+│       ├── features/
+│       ├── health/
+│       ├── notifications/
+│       ├── settings/
+│       ├── slot-templates/
+│       ├── sport-types/
+│       └── users/
+├── test/
+│   └── e2e/
+├── Dockerfile
+└── package.json
 ```
 
-### 2. Install Dependencies
+## Installation and Run
+
+From the repository root:
 
 ```bash
 pnpm install
+pnpm --filter @court-booking/backend build
 ```
 
-### 3. Environment Setup
+### Development
 
 ```bash
-# Copy example env file
-cp ../../.env.example ../../.env
-
-# Edit .env with your configuration
+pnpm --filter @court-booking/backend dev
 ```
 
-### 4. Database Setup
+### Production Build
 
 ```bash
-# Create database
-createdb court_booking
-
-# Run migrations
-pnpm migration:run
-
-# (Optional) Seed data
-pnpm seed
+pnpm --filter @court-booking/backend build
+pnpm --filter @court-booking/backend start:prod
 ```
 
-## 🏃 Running the Application
+### Docker
 
-### Development Mode
+The backend image is built through:
 
-```bash
-pnpm dev
-```
+- [`Dockerfile`](Dockerfile)
 
-Server runs at: `http://localhost:3001/api/v1`
+The local runtime stack is defined in:
 
-### Production Mode
+- [`../../infra/docker-compose.yml`](../../infra/docker-compose.yml)
 
-```bash
-# Build
-pnpm build
+## Environment Variables
 
-# Start
-pnpm start:prod
-```
+The backend reads values from the repository root environment files.
 
-### Watch Mode
+| Variable                            | Required | Purpose                                  |
+| ----------------------------------- | -------- | ---------------------------------------- |
+| `NODE_ENV`                          | Yes      | Runtime environment                      |
+| `PORT`                              | Yes      | Backend listen port                      |
+| `FE_URL`                            | Yes      | Frontend origin used for CORS            |
+| `DB_HOST`                           | Yes      | PostgreSQL host                          |
+| `DB_PORT`                           | Yes      | PostgreSQL port                          |
+| `DB_NAME`                           | Yes      | PostgreSQL database                      |
+| `DB_USER`                           | Yes      | PostgreSQL user                          |
+| `DB_PASSWORD`                       | Yes      | PostgreSQL password                      |
+| `JWT_SECRET`                        | Yes      | JWT signing secret                       |
+| `JWT_EXPIRES_IN`                    | Yes      | Access token TTL                         |
+| `JWT_REFRESH_EXPIRES_IN`            | Yes      | Refresh token TTL                        |
+| `REDIS_HOST`                        | Yes      | Redis host                               |
+| `REDIS_PORT`                        | Yes      | Redis port                               |
+| `REDIS_USERNAME`                    | No       | Redis ACL username                       |
+| `REDIS_PASSWORD`                    | No       | Redis password                           |
+| `REDIS_DB`                          | No       | App Redis DB index                       |
+| `REDIS_QUEUE_DB`                    | No       | Bull queue Redis DB index                |
+| `REDIS_APP_PREFIX`                  | No       | App Redis key prefix                     |
+| `REDIS_TLS_ENABLED`                 | No       | Toggle Redis TLS                         |
+| `REDIS_CONNECT_TIMEOUT_MS`          | No       | Redis connect timeout                    |
+| `REDIS_COMMAND_TIMEOUT_MS`          | No       | Redis command timeout                    |
+| `REDIS_ENABLE_OFFLINE_QUEUE`        | No       | App Redis offline queue behavior         |
+| `REDIS_QUEUE_ENABLE_OFFLINE_QUEUE`  | No       | Bull Redis offline queue behavior        |
+| `BOOKING_MIN_CANCEL_HOURS`          | Yes      | Cancellation policy threshold            |
+| `BOOKING_MAX_DURATION_HOURS`        | Yes      | Maximum booking duration                 |
+| `BOOKING_JOB_SCHEDULER_ENABLED`     | No       | Enables repeatable job registration      |
+| `BOOKING_JOB_SCHEDULER_LOCK_TTL_MS` | No       | Startup lock TTL for scheduler bootstrap |
 
-```bash
-pnpm start:dev
-```
+Reference template:
 
-## 🧪 Testing
+- [`../../.env.example`](../../.env.example)
 
-```bash
-# Unit tests
-pnpm test
+## API Endpoints
 
-# Test coverage
-pnpm test:cov
+Base URL:
 
-# E2E tests
-pnpm test:e2e
+- `http://localhost:3001/api/v1`
 
-# Watch mode
-pnpm test:watch
-```
+Swagger:
 
-## 📚 API Documentation
+- `http://localhost:3001/api/docs`
 
-Access Swagger documentation at: `http://localhost:3001/api/docs`
+### Authentication
 
-### API Endpoints
+| Method | Path             | Description                    |
+| ------ | ---------------- | ------------------------------ |
+| `POST` | `/auth/register` | Register a new user            |
+| `POST` | `/auth/login`    | Login and issue cookies/tokens |
+| `POST` | `/auth/refresh`  | Refresh access session         |
+| `POST` | `/auth/logout`   | Revoke refresh session         |
+| `GET`  | `/auth/me`       | Get current authenticated user |
+| `GET`  | `/auth/admin`    | Admin identity check           |
 
-#### Authentication
+### Users
 
-- `POST /api/v1/auth/register` - Register new user
-- `POST /api/v1/auth/login` - Login user
+| Method  | Path                | Description                 |
+| ------- | ------------------- | --------------------------- |
+| `GET`   | `/users/me`         | Get current user profile    |
+| `PATCH` | `/users/me`         | Update current user profile |
+| `POST`  | `/users/me/avatar`  | Upload avatar               |
+| `GET`   | `/users/admin/list` | Admin user listing          |
+| `PATCH` | `/users/admin/:id`  | Admin user update           |
 
-#### Courts
+### Courts
 
-- `GET /api/v1/courts` - List all courts (paginated)
-- `GET /api/v1/courts/:id` - Get court details
-- `POST /api/v1/courts` - Create court (Admin only)
-- `PATCH /api/v1/courts/:id` - Update court (Admin only)
-- `DELETE /api/v1/courts/:id` - Delete court (Admin only)
-- `GET /api/v1/courts/:id/stats` - Get court statistics
-- `GET /api/v1/courts/:id/time-slots` - Get time slots
-- `PUT /api/v1/courts/:id/time-slots` - Update time slots (Admin only)
-- `GET /api/v1/courts/:id/schedule` - Get court schedule
+| Method   | Path                          | Description                |
+| -------- | ----------------------------- | -------------------------- |
+| `GET`    | `/courts`                     | Public court list          |
+| `POST`   | `/courts`                     | Create court               |
+| `GET`    | `/courts/districts`           | Public district list       |
+| `GET`    | `/courts/admin/deleted`       | Deleted courts for admin   |
+| `GET`    | `/courts/:id`                 | Court detail               |
+| `PATCH`  | `/courts/:id`                 | Update court               |
+| `PATCH`  | `/courts/:id/featured`        | Toggle featured status     |
+| `DELETE` | `/courts/:id`                 | Soft delete court          |
+| `PATCH`  | `/courts/:id/restore`         | Restore soft-deleted court |
+| `DELETE` | `/courts/:id/hard`            | Hard delete court          |
+| `GET`    | `/courts/:id/schedule`        | Availability/schedule view |
+| `GET`    | `/courts/:id/stats`           | Court statistics           |
+| `GET`    | `/courts/:id/time-slots`      | Weekly time slots          |
+| `PUT`    | `/courts/:id/time-slots`      | Replace weekly time slots  |
+| `POST`   | `/courts/:id/images`          | Upload court image         |
+| `DELETE` | `/courts/:id/images/:imageId` | Delete court image         |
+| `PATCH`  | `/courts/:id/images/reorder`  | Reorder court images       |
+| `PATCH`  | `/courts/:id/images/:imageId` | Update image metadata      |
 
-#### Bookings
+### Bookings
 
-- `POST /api/v1/bookings` - Create booking
-- `PATCH /api/v1/bookings/:id/cancel` - Cancel booking
-- `GET /api/v1/bookings/me` - Get my bookings
+| Method  | Path                            | Description                  |
+| ------- | ------------------------------- | ---------------------------- |
+| `POST`  | `/bookings`                     | Create a user booking        |
+| `PATCH` | `/bookings/:id/cancel`          | Cancel a user booking        |
+| `POST`  | `/bookings/:id/confirm-payment` | Confirm payment              |
+| `GET`   | `/bookings/me`                  | Current user's bookings      |
+| `GET`   | `/bookings/me/stats`            | Current user's booking stats |
+| `GET`   | `/bookings/:id`                 | Booking detail               |
 
-#### Health
+### Admin Bookings
 
-- `GET /api/v1/health` - Overall health
-- `GET /api/v1/health/db` - Database health
-- `GET /api/v1/health/redis` - Redis health
+| Method  | Path                           | Description                     |
+| ------- | ------------------------------ | ------------------------------- |
+| `POST`  | `/admin/bookings`              | Create admin booking            |
+| `GET`   | `/admin/bookings`              | Admin booking list              |
+| `GET`   | `/admin/bookings/overview`     | Admin booking dashboard summary |
+| `GET`   | `/admin/bookings/analytics`    | Admin analytics                 |
+| `PATCH` | `/admin/bookings/:id/check-in` | Check in a booking              |
+| `PATCH` | `/admin/bookings/:id/cancel`   | Admin cancel                    |
+| `PATCH` | `/admin/bookings/:id/refund`   | Process refund                  |
+| `PATCH` | `/admin/bookings/:id`          | Update booking fields           |
 
-## 🗄️ Database
+### Reference Data and Settings
+
+| Method   | Path                                           | Description                   |
+| -------- | ---------------------------------------------- | ----------------------------- |
+| `GET`    | `/features`                                    | Public feature list           |
+| `GET`    | `/admin/features`                              | Admin feature list            |
+| `POST`   | `/admin/features`                              | Create feature                |
+| `PATCH`  | `/admin/features/:id`                          | Update feature                |
+| `DELETE` | `/admin/features/:id`                          | Soft delete feature           |
+| `DELETE` | `/admin/features/:id/hard`                     | Hard delete feature           |
+| `PUT`    | `/courts/:id/features`                         | Sync court features           |
+| `GET`    | `/sport-types`                                 | Public sport type list        |
+| `GET`    | `/admin/sport-types`                           | Admin sport type list         |
+| `POST`   | `/admin/sport-types`                           | Create sport type             |
+| `PATCH`  | `/admin/sport-types/:id`                       | Update sport type             |
+| `DELETE` | `/admin/sport-types/:id`                       | Soft delete sport type        |
+| `DELETE` | `/admin/sport-types/:id/hard`                  | Hard delete sport type        |
+| `GET`    | `/admin/slot-templates`                        | List slot templates           |
+| `GET`    | `/admin/slot-templates/:id`                    | Slot template detail          |
+| `POST`   | `/admin/slot-templates`                        | Create slot template          |
+| `PATCH`  | `/admin/slot-templates/:id`                    | Update slot template          |
+| `PUT`    | `/admin/slot-templates/:id/items`              | Replace template items        |
+| `DELETE` | `/admin/slot-templates/:id`                    | Delete slot template          |
+| `POST`   | `/admin/courts/:id/apply-template/:templateId` | Apply template to court       |
+| `GET`    | `/settings/runtime`                            | Runtime settings for frontend |
+| `GET`    | `/admin/settings`                              | Admin settings read           |
+| `PATCH`  | `/admin/settings`                              | Admin settings update         |
+
+### Notifications and Health
+
+| Method  | Path                          | Description                    |
+| ------- | ----------------------------- | ------------------------------ |
+| `GET`   | `/notifications`              | Notification list              |
+| `GET`   | `/notifications/unread-count` | Unread count                   |
+| `PATCH` | `/notifications/:id/read`     | Mark one notification as read  |
+| `PATCH` | `/notifications/read-all`     | Mark all notifications as read |
+| `GET`   | `/health`                     | Health summary                 |
+
+## Database Schema
+
+The backend uses a consolidated migration:
+
+- [`src/database/migrations/1800000000000-InitialFullSchema.ts`](src/database/migrations/1800000000000-InitialFullSchema.ts)
+
+### Core Tables
+
+| Table                 | Purpose                                  |
+| --------------------- | ---------------------------------------- |
+| `users`               | User and admin accounts                  |
+| `refresh_tokens`      | Refresh token persistence and revocation |
+| `courts`              | Court master data and lifecycle state    |
+| `court_images`        | Court images and display order           |
+| `court_time_slots`    | Weekly slot-based pricing                |
+| `features`            | Reusable feature catalog                 |
+| `court_features`      | Court-to-feature join table              |
+| `sport_types`         | Sport catalog                            |
+| `bookings`            | Reservation records and lifecycle fields |
+| `notifications`       | Notification feed                        |
+| `slot_templates`      | Weekly slot template headers             |
+| `slot_template_items` | Weekly slot template rows                |
+| `system_settings`     | Runtime configuration                    |
+
+### Important Relationships
+
+- `courts.sport_type_id -> sport_types.id`
+- `court_images.court_id -> courts.id`
+- `court_time_slots.court_id -> courts.id`
+- `court_features.court_id -> courts.id`
+- `court_features.feature_id -> features.id`
+- `bookings.user_id -> users.id`
+- `bookings.court_id -> courts.id`
+- `notifications.user_id -> users.id`
+- `notifications.booking_id -> bookings.id`
+- `slot_template_items.template_id -> slot_templates.id`
+
+## Notable Technical Design
+
+### Booking Concurrency Control
+
+- The backend uses PostgreSQL transaction-level advisory locks per court.
+- Availability correctness is enforced at the database transaction layer.
+- Redis is deliberately not used for booking overlap correctness.
+
+### Court Lifecycle and Historical Integrity
+
+- Courts support `ACTIVE`, `INACTIVE`, and soft-deleted states.
+- Future bookings can be cancelled when a court becomes unavailable.
+- Historical bookings still retain meaningful court context for user history and admin views.
+
+### Redis Usage
+
+Redis is used for:
+
+- throttling
+- auth failed-attempt tracking and temporary lockout
+- public/reference-data caching
+- Bull queue storage
+
+The service is designed to degrade gracefully when Redis is unavailable for non-critical auth tracking.
+
+### Job Processing
+
+Repeatable Bull jobs cover:
+
+- pending-payment expiration
+- confirmed booking completion
+- reminder dispatch
+
+Scheduler boot uses a short Redis initialization lock to reduce duplicate repeatable job registration when multiple instances start together.
+
+## Database Operations
 
 ### Migrations
 
 ```bash
-# Generate migration
-pnpm migration:generate src/database/migrations/MigrationName
-
-# Run migrations
-pnpm migration:run
-
-# Revert migration
-pnpm migration:revert
-
-# Show migrations
-pnpm migration:show
+pnpm --filter @court-booking/backend migration:run
+pnpm --filter @court-booking/backend migration:revert
 ```
 
-### Entities
-
-- **User**: User accounts with roles
-- **Court**: Court information
-- **CourtTimeSlot**: Time slots with pricing
-- **Booking**: Booking records
-- **RefreshToken**: JWT refresh tokens
-
-## 🔧 Configuration
-
-### Environment Variables
-
-```env
-# Application
-NODE_ENV=development
-PORT=3001
-APP_NAME=Court Booking API
-
-# Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=court_booking
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_POOL_SIZE=10
-DB_MAX_QUERY_TIME=5000
-
-# JWT
-JWT_SECRET=your-secret-key-min-32-characters
-JWT_EXPIRES_IN=15m
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-
-# Booking
-BOOKING_MIN_CANCEL_HOURS=2
-
-# Frontend URL (for CORS)
-FE_URL=http://localhost:3000
-```
-
-## 📁 Project Structure
-
-```
-apps/backend/
-├── src/
-│   ├── common/              # Shared utilities
-│   │   ├── decorators/      # Custom decorators
-│   │   ├── filters/         # Exception filters
-│   │   ├── interceptors/    # Interceptors
-│   │   ├── pipes/           # Validation pipes
-│   │   └── redis/           # Redis module
-│   ├── config/              # Configuration files
-│   ├── database/            # Database related
-│   │   ├── entities/        # TypeORM entities
-│   │   └── migrations/      # Database migrations
-│   ├── modules/             # Feature modules
-│   │   ├── auth/            # Authentication
-│   │   ├── bookings/        # Booking management
-│   │   ├── courts/          # Court management
-│   │   └── health/          # Health checks
-│   ├── app.module.ts        # Root module
-│   └── main.ts              # Application entry
-├── test/                    # E2E tests
-├── docs/                    # Documentation
-│   ├── API_REVIEW.md        # API review checklist
-│   ├── DEPLOYMENT.md        # Deployment guide
-│   └── PERFORMANCE.md       # Performance guide
-└── README.md                # This file
-```
-
-## 🔒 Security
-
-- **Helmet**: Security headers
-- **CORS**: Cross-origin resource sharing
-- **Rate Limiting**: Redis-based rate limiting (5 attempts)
-- **Input Validation**: Zod schema validation
-- **Password Hashing**: bcrypt with salt rounds
-- **JWT**: Secure token-based authentication
-- **SQL Injection**: TypeORM parameterized queries
-
-## ⚡ Performance
-
-- **Caching**: Redis caching for frequently accessed data
-- **Database**: Connection pooling, indexes, query optimization
-- **Compression**: Response compression with gzip
-- **Pagination**: All list endpoints support pagination
-- **N+1 Prevention**: Eager loading with relations
-
-## 📊 Monitoring
-
-### Logs
-
-Logs are stored in `logs/` directory:
-
-- `error.log` - Error logs
-- `combined.log` - All logs
-
-### Health Checks
-
-Monitor application health:
+### Seed
 
 ```bash
-curl http://localhost:3001/api/v1/health
-curl http://localhost:3001/api/v1/health/db
-curl http://localhost:3001/api/v1/health/redis
+pnpm --filter @court-booking/backend db:seed
 ```
 
-## 🐳 Docker
+Important:
 
-### Build Image
+- local use only
+- resets schema
+- not suitable for persistent environments
+
+## Testing
+
+### Unit Tests
 
 ```bash
-docker build -f Dockerfile -t court-booking-backend .
+pnpm --filter @court-booking/backend test
 ```
 
-### Run with Docker Compose
+### E2E Tests
 
 ```bash
-docker-compose up -d
+docker compose -f infra/docker-compose.yml --env-file .env.docker up -d postgres redis
+pnpm --filter @court-booking/backend test:e2e
+pnpm --filter @court-booking/backend test:e2e:concurrency
 ```
 
-## 🚀 Deployment
+## Troubleshooting
 
-See [DEPLOYMENT.md](./docs/DEPLOYMENT.md) for detailed deployment instructions.
+### `502 Bad Gateway`
 
-### Quick Deploy
-
-1. Set environment variables
-2. Run migrations: `pnpm migration:run`
-3. Build: `pnpm build`
-4. Start: `pnpm start:prod`
-
-## 🤝 Contributing
-
-1. Create feature branch
-2. Make changes
-3. Write tests
-4. Run linter: `pnpm lint`
-5. Run tests: `pnpm test`
-6. Create pull request
-
-## 📝 Code Style
-
-- **Linting**: ESLint with Prettier
-- **Formatting**: Prettier
-- **Commit**: Conventional commits
+Check the API and reverse proxy logs:
 
 ```bash
-# Lint
-pnpm lint
-
-# Format
-pnpm format
-
-# Lint and fix
-pnpm lint:fix
+docker logs court-booking-backend
+docker logs court-booking-nginx
 ```
 
-## 🐛 Troubleshooting
+### Seeded Data Does Not Appear
 
-### Database Connection Error
+Make sure you seeded the same database that the running backend is using.
 
-```bash
-# Check PostgreSQL is running
-pg_isready
+Host-side scripts read `.env`, while Docker services read `.env.docker`.
 
-# Check connection
-psql -h localhost -U postgres -d court_booking
-```
+### Redis Startup Issues
 
-### Redis Connection Error
+Queue startup behavior depends on the queue Redis settings in `.env` / `.env.docker`, especially:
 
-```bash
-# Check Redis is running
-redis-cli ping
-
-# Should return: PONG
-```
-
-### Migration Error
-
-```bash
-# Check migration status
-pnpm migration:show
-
-# Revert last migration
-pnpm migration:revert
-```
-
-### Port Already in Use
-
-```bash
-# Change PORT in .env file
-PORT=3002
-```
-
-## 📞 Support
-
-For issues or questions:
-
-- Check documentation in `docs/` folder
-- Review API documentation at `/api/docs`
-- Check logs in `logs/` directory
-
-## 📄 License
-
-Private - All rights reserved
-
-## 👥 Team
-
-- Backend Developer: [Your Name]
-- Project Manager: [PM Name]
-
----
-
-**Version**: 1.0.0  
-**Last Updated**: 2026-05-04
+- `REDIS_QUEUE_ENABLE_OFFLINE_QUEUE`
+- `REDIS_QUEUE_DB`
+- `REDIS_QUEUE_PREFIX`

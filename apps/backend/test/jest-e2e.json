@@ -2,9 +2,11 @@
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": "..",
   "testEnvironment": "node",
+  "testTimeout": 30000,
+  "setupFiles": ["<rootDir>/test/setup-env.ts"],
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.ts$": "ts-jest"
   },
   "transformIgnorePatterns": ["node_modules/(?!(uuid|@court-booking/shared)/)"],
   "moduleNameMapper": {

@@ -1,4 +1,5 @@
-﻿import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
+﻿import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { CourtFeatureEntity } from './court-feature.entity';
 
 @Entity('features')
 export class FeatureEntity {
@@ -19,4 +20,7 @@ export class FeatureEntity {
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
+
+  @OneToMany(() => CourtFeatureEntity, (link) => link.feature)
+  courtLinks: CourtFeatureEntity[];
 }

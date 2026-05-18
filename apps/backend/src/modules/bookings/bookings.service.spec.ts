@@ -6,6 +6,7 @@ import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import bookingConfig from '../../config/booking.config';
 import {
   BadRequestException,
   ConflictException,
@@ -15,6 +16,8 @@ import {
 import { BookingStatus } from '@court-booking/shared';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserEntity } from '../../database/entities/user.entity';
+import { SettingsService } from '../settings/settings.service';
 
 const mockBookingRepository = () => ({
   find: jest.fn(),
@@ -50,13 +53,25 @@ const mockConfigService = () => ({
   }),
 });
 
+const mockUserRepository = () => ({
+  findOne: jest.fn(),
+});
+
+const mockSettingsService = () => ({
+  getNumber: jest.fn((key: string, defaultValue: number) => defaultValue),
+});
+
 const mockDataSource = () => ({
   transaction: jest.fn(),
 });
 
+const mockBookingConfig = () => ({
+  minCancelHours: 2,
+  maxBookingDurationHours: 8,
+});
+
 describe('BookingsService', () => {
   let service: BookingsService;
-  let timeSlotRepository: ReturnType<typeof mockTimeSlotRepository>;
   let dataSource: ReturnType<typeof mockDataSource>;
 
   beforeEach(async () => {
@@ -84,16 +99,27 @@ describe('BookingsService', () => {
           useFactory: mockDataSource,
         },
         {
+          provide: bookingConfig.KEY,
+          useFactory: mockBookingConfig,
+        },
+        {
           provide: NotificationsService,
           useValue: {
             create: jest.fn().mockResolvedValue({}),
           },
         },
+        {
+          provide: getRepositoryToken(UserEntity),
+          useFactory: mockUserRepository,
+        },
+        {
+          provide: SettingsService,
+          useFactory: mockSettingsService,
+        },
       ],
     }).compile();
 
     service = module.get<BookingsService>(BookingsService);
-    timeSlotRepository = module.get(getRepositoryToken(CourtTimeSlotEntity));
     dataSource = module.get(DataSource);
   });
 
@@ -268,11 +294,22 @@ describe('BookingsService', () => {
     it('should process booking in a transaction', async () => {
       dataSource.transaction.mockImplementation(async (cb) => {
         const mockManager = {
+          query: jest.fn().mockResolvedValue(undefined),
           findOne: jest.fn().mockResolvedValue({
             id: 'court-1',
             status: CourtStatus.ACTIVE,
             pricePerHour: 100,
           }),
+          find: jest.fn().mockResolvedValue([
+            {
+              id: 'slot-1',
+              courtId: 'court-1',
+              dayOfWeek: new Date(mockDto.startTime).getDay(),
+              startHour: new Date(mockDto.startTime).getHours(),
+              endHour: new Date(mockDto.endTime).getHours(),
+              price: 100,
+            },
+          ]),
           createQueryBuilder: jest.fn(() => ({
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
@@ -283,18 +320,6 @@ describe('BookingsService', () => {
         };
         return cb(mockManager);
       });
-
-      // Mock time slot repository to return valid slots
-      timeSlotRepository.find.mockResolvedValue([
-        {
-          id: 'slot-1',
-          courtId: 'court-1',
-          dayOfWeek: new Date(mockDto.startTime).getDay(),
-          startHour: new Date(mockDto.startTime).getHours(),
-          endHour: new Date(mockDto.endTime).getHours(),
-          price: 100,
-        },
-      ]);
 
       const result = await service.createBooking(mockDto, mockUserId);
       expect(result.id).toBe('new-booking');

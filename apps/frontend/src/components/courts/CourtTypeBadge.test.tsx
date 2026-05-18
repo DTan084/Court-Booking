@@ -6,7 +6,7 @@ import { CourtTypeBadge } from './CourtTypeBadge';
 describe('CourtTypeBadge', () => {
   it('renders indoor badge with blue classes', () => {
     render(<CourtTypeBadge courtType={CourtType.INDOOR} />);
-    const badge = screen.getByText(/Trong/i);
+    const badge = screen.getByText(/Indoor/i);
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain('bg-blue-100');
     expect(badge.className).toContain('text-blue-700');
@@ -14,7 +14,7 @@ describe('CourtTypeBadge', () => {
 
   it('renders outdoor badge with green classes', () => {
     render(<CourtTypeBadge courtType={CourtType.OUTDOOR} />);
-    const badge = screen.getByText(/Ngoai|Ngoài/i);
+    const badge = screen.getByText(/Outdoor/i);
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain('bg-green-100');
     expect(badge.className).toContain('text-green-700');

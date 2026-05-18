@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
+import { normalizeImageUrl, shouldBypassImageOptimizer } from '@/lib/image';
 import { CourtStatus } from '@/types';
 import type { Court, Feature } from '@/types';
 import { CourtTypeBadge } from './CourtTypeBadge';
@@ -17,6 +18,8 @@ const placeholderImage =
 export function CourtCard({ court }: CourtCardProps) {
   const inactive = court.status === CourtStatus.INACTIVE;
   const displayFeatures: Array<Feature> = (court.featureItems ?? []) as Feature[];
+  const primaryImageUrl = normalizeImageUrl(court.images?.[0]?.url) || placeholderImage;
+  const primaryImageUnoptimized = shouldBypassImageOptimizer(court.images?.[0]?.url);
 
   return (
     <Link
@@ -28,10 +31,11 @@ export function CourtCard({ court }: CourtCardProps) {
     >
       <div className="relative h-52 overflow-hidden">
         <Image
-          src={court.images?.[0]?.url ?? placeholderImage}
+          src={primaryImageUrl}
           alt={court.name}
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
+          unoptimized={primaryImageUnoptimized}
           className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />

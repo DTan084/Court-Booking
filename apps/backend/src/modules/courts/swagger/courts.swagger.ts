@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 // ── Request Bodies ─────────────────────────────────────────────────────────
 
 export class CreateCourtBody {
-  @ApiProperty({ example: 'Sân Cầu Lông ABC' })
+  @ApiProperty({ example: 'ABC Badminton Court' })
   name: string;
 
   @ApiProperty({
@@ -12,30 +12,30 @@ export class CreateCourtBody {
   })
   sportTypeId: string;
 
-  @ApiProperty({ example: '123 Nguyễn Huệ, Quận 1, TP.HCM' })
+  @ApiProperty({ example: '123 Nguyen Hue St, District 1, HCMC' })
   address: string;
 
   @ApiProperty({ example: 150000 })
   pricePerHour: number;
 
-  @ApiProperty({ example: 'Sân tiêu chuẩn thi đấu', required: false })
+  @ApiProperty({ example: 'Tournament standard court', required: false })
   description?: string;
 }
 
 export class UpdateCourtBody {
-  @ApiProperty({ example: 'Sân Cầu Lông ABC (Updated)', required: false })
+  @ApiProperty({ example: 'ABC Badminton Court (Updated)', required: false })
   name?: string;
 
   @ApiProperty({ example: '3faffe20-5fd1-47f5-87d9-bcc9869422b6', required: false })
   sportTypeId?: string;
 
-  @ApiProperty({ example: '456 Lê Lợi, Quận 1, TP.HCM', required: false })
+  @ApiProperty({ example: '456 Le Loi St, District 1, HCMC', required: false })
   address?: string;
 
   @ApiProperty({ example: 180000, required: false })
   pricePerHour?: number;
 
-  @ApiProperty({ example: 'Sân vừa được nâng cấp mặt sàn', required: false })
+  @ApiProperty({ example: 'Court floor newly upgraded', required: false })
   description?: string;
 }
 
@@ -64,13 +64,13 @@ export class CourtData {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
   id: string;
 
-  @ApiProperty({ example: 'Sân Cầu Lông ABC' })
+  @ApiProperty({ example: 'ABC Badminton Court' })
   name: string;
 
   @ApiProperty({ example: '3faffe20-5fd1-47f5-87d9-bcc9869422b6' })
   sportTypeId: string;
 
-  @ApiProperty({ example: '123 Nguyễn Huệ, Quận 1, TP.HCM' })
+  @ApiProperty({ example: '123 Nguyen Hue St, District 1, HCMC' })
   address: string;
 
   @ApiProperty({ example: 150000 })
@@ -104,7 +104,7 @@ export class CourtStatsData {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
   courtId: string;
 
-  @ApiProperty({ example: 'Sân Cầu Lông ABC' })
+  @ApiProperty({ example: 'ABC Badminton Court' })
   courtName: string;
 
   @ApiProperty({ example: { from: '2026-05-01', to: '2026-05-31' } })

@@ -19,7 +19,7 @@ export class BookingCourtData {
   @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
   id: string;
 
-  @ApiProperty({ example: 'Sân Cầu Lông ABC' })
+  @ApiProperty({ example: 'ABC Badminton Court' })
   name: string;
 
   @ApiProperty({ example: '3faffe20-5fd1-47f5-87d9-bcc9869422b6' })

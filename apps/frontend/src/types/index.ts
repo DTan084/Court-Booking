@@ -33,6 +33,7 @@ export interface Court {
   updatedAt: string;
   images?: CourtImage[];
   sportTypeId: string;
+  sportTypeName?: string | null;
   featureItems?: Feature[];
   isFeatured?: boolean;
   maxPlayers?: number | null;

@@ -12,6 +12,8 @@ import { BookingEntity } from './booking.entity';
 import { NotificationType } from '@court-booking/shared';
 
 @Entity('notifications')
+@Index('idx_notifications_user_is_read', ['userId', 'isRead'])
+@Index('idx_notifications_user_created_at', ['userId', 'createdAt'])
 export class NotificationEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -37,6 +39,7 @@ export class NotificationEntity {
   isRead: boolean;
 
   @Column({ type: 'uuid', name: 'booking_id', nullable: true })
+  @Index()
   bookingId: string | null;
 
   @ManyToOne(() => BookingEntity, { onDelete: 'SET NULL', nullable: true })

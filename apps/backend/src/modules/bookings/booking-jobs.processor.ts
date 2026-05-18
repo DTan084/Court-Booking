@@ -2,7 +2,7 @@ import { Processor, Process } from '@nestjs/bull';
 import { Job } from 'bull';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, Between, LessThan } from 'typeorm';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { BookingStatus, NotificationType } from '@court-booking/shared';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -36,21 +36,26 @@ export class BookingJobsProcessor {
 
     if (expiredBookings.length === 0) return;
 
+    let expiredCount = 0;
     for (const booking of expiredBookings) {
-      booking.status = BookingStatus.EXPIRED;
-      booking.expiredAt = now;
-      await this.bookingRepo.save(booking);
+      const result = await this.bookingRepo.update(
+        { id: booking.id, status: BookingStatus.PENDING_PAYMENT },
+        { status: BookingStatus.EXPIRED, expiredAt: now },
+      );
 
-      await this.notificationsService.create({
-        userId: booking.userId!,
-        type: NotificationType.BOOKING_EXPIRED,
-        title: 'Đặt sân đã hết hạn',
-        message: `Lịch đặt sân ${booking.court?.name || ''} của bạn đã bị hủy do quá hạn thanh toán 30 phút.`,
-        bookingId: booking.id,
-      });
+      if (result.affected && result.affected > 0) {
+        expiredCount++;
+        await this.notificationsService.create({
+          userId: booking.userId!,
+          type: NotificationType.BOOKING_EXPIRED,
+          title: 'Booking payment window expired',
+          message: `Your booking reservation for ${booking.court?.name || ''} has been cancelled due to payment timeout.`,
+          bookingId: booking.id,
+        });
+      }
     }
 
-    this.logger.log(`Expired and notified ${expiredBookings.length} booking(s)`);
+    this.logger.log(`Expired and notified ${expiredCount} booking(s)`);
   }
 
   /**
@@ -60,16 +65,39 @@ export class BookingJobsProcessor {
   async completeConfirmedBookings(_job: Job): Promise<void> {
     const now = new Date();
 
-    const result = await this.bookingRepo
-      .createQueryBuilder()
-      .update(BookingEntity)
-      .set({ status: BookingStatus.COMPLETED, completedAt: now })
-      .where('status = :status', { status: BookingStatus.CONFIRMED })
-      .andWhere('end_time < :now', { now })
-      .execute();
+    const completedTargets = await this.bookingRepo.find({
+      where: {
+        status: BookingStatus.CONFIRMED,
+        endTime: LessThan(now),
+      },
+      relations: ['court'],
+    });
 
-    if (result.affected && result.affected > 0) {
-      this.logger.log(`Completed ${result.affected} CONFIRMED booking(s)`);
+    if (completedTargets.length === 0) return;
+
+    let completedCount = 0;
+    for (const booking of completedTargets) {
+      const result = await this.bookingRepo.update(
+        { id: booking.id, status: BookingStatus.CONFIRMED },
+        { status: BookingStatus.COMPLETED, completedAt: now },
+      );
+
+      if (result.affected && result.affected > 0) {
+        completedCount++;
+        if (booking.userId) {
+          await this.notificationsService.create({
+            userId: booking.userId,
+            type: NotificationType.BOOKING_COMPLETED,
+            title: 'Booking completed',
+            message: `Your session at ${booking.court?.name || 'your court'} has been marked as completed.`,
+            bookingId: booking.id,
+          });
+        }
+      }
+    }
+
+    if (completedCount > 0) {
+      this.logger.log(`Completed and notified ${completedCount} booking(s)`);
     }
   }
 
@@ -88,7 +116,7 @@ export class BookingJobsProcessor {
     const pendingReminders = await this.bookingRepo.find({
       where: {
         status: BookingStatus.PENDING_PAYMENT,
-        paymentDeadline: LessThan(tenMinsFromNow),
+        paymentDeadline: Between(now, tenMinsFromNow),
         paymentReminderSent: false,
       },
       relations: ['court'],
@@ -98,8 +126,8 @@ export class BookingJobsProcessor {
       await this.notificationsService.create({
         userId: booking.userId!,
         type: NotificationType.PAYMENT_REMINDER,
-        title: 'Nhắc nhở thanh toán',
-        message: `Lịch đặt sân ${booking.court?.name || ''} của bạn sẽ hết hạn sau ít phút. Vui lòng thanh toán ngay để giữ chỗ!`,
+        title: 'Payment Reminder',
+        message: `Your booking reservation for ${booking.court?.name || ''} is expiring soon. Please complete your payment to secure your court.`,
         bookingId: booking.id,
       });
       booking.paymentReminderSent = true;
@@ -113,7 +141,7 @@ export class BookingJobsProcessor {
     const upcomingBookings = await this.bookingRepo.find({
       where: {
         status: BookingStatus.CONFIRMED,
-        startTime: LessThan(oneHourFromNow),
+        startTime: Between(now, oneHourFromNow),
         bookingReminderSent: false,
       },
       relations: ['court'],
@@ -127,8 +155,8 @@ export class BookingJobsProcessor {
       await this.notificationsService.create({
         userId: booking.userId!,
         type: NotificationType.BOOKING_REMINDER,
-        title: 'Nhắc nhở lịch chơi',
-        message: `Bạn có lịch chơi tại sân ${booking.court?.name || ''} vào lúc ${startTimeStr}. Đừng quên nhé!`,
+        title: 'Playtime Reminder',
+        message: `You have an upcoming booking at ${booking.court?.name || ''} at ${startTimeStr}. Enjoy your match!`,
         bookingId: booking.id,
       });
       booking.bookingReminderSent = true;

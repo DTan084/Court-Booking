@@ -33,7 +33,7 @@ describe('Pagination', () => {
     const onPageChange = vi.fn();
     render(<Pagination page={1} totalPages={5} onPageChange={onPageChange} />);
 
-    const prevButton = screen.getByRole('button', { name: /Trước/i });
+    const prevButton = screen.getByRole('button', { name: /Previous/i });
     expect(prevButton).toBeDisabled();
   });
 
@@ -41,7 +41,7 @@ describe('Pagination', () => {
     const onPageChange = vi.fn();
     render(<Pagination page={5} totalPages={5} onPageChange={onPageChange} />);
 
-    const nextButton = screen.getByRole('button', { name: /Sau/i });
+    const nextButton = screen.getByRole('button', { name: /Next/i });
     expect(nextButton).toBeDisabled();
   });
 
@@ -61,7 +61,7 @@ describe('Pagination', () => {
     const onPageChange = vi.fn();
     render(<Pagination page={3} totalPages={5} onPageChange={onPageChange} />);
 
-    const prevButton = screen.getByRole('button', { name: /Trước/i });
+    const prevButton = screen.getByRole('button', { name: /Previous/i });
     await user.click(prevButton);
 
     expect(onPageChange).toHaveBeenCalledWith(2);
@@ -72,7 +72,7 @@ describe('Pagination', () => {
     const onPageChange = vi.fn();
     render(<Pagination page={3} totalPages={5} onPageChange={onPageChange} />);
 
-    const nextButton = screen.getByRole('button', { name: /Sau/i });
+    const nextButton = screen.getByRole('button', { name: /Next/i });
     await user.click(nextButton);
 
     expect(onPageChange).toHaveBeenCalledWith(4);

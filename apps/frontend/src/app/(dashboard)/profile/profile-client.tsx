@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { useAuthStore } from '@/lib/auth';
 import { useUpdateProfile, useUploadAvatar } from '@/hooks/useUser';
 import { useMyBookingStats } from '@/hooks/useBookings';
+import { useRuntimeSettings } from '@/hooks/useRuntimeSettings';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -23,13 +24,13 @@ import { User, Camera, Mail, Phone, ShieldCheck, CalendarDays } from 'lucide-rea
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const profileSchema = z.object({
-  name: z.string().min(2, 'Ten phai co it nhat 2 ky tu'),
+  name: z.string().min(2, 'Full name must have at least 2 characters'),
   phone: z
     .string()
-    .regex(/^0\d{9}$/, 'So dien thoai khong hop le (phai la 10 chu so, bat dau bang 0)')
+    .regex(/^0\d{9}$/, 'Invalid phone number (must be 10 digits starting with 0)')
     .or(z.literal(''))
     .nullable(),
-  avatarUrl: z.string().url('URL anh khong hop le').or(z.literal('')).nullable(),
+  avatarUrl: z.string().url('Invalid image URL').or(z.literal('')).nullable(),
   dob: z.string().optional(),
 });
 
@@ -42,9 +43,13 @@ export function ProfileClient() {
   const avatarFileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = React.useState<string>('');
   const { data: myBookingStats } = useMyBookingStats();
+
+  const { data: settings } = useRuntimeSettings();
+  const cooldownDays = settings?.profileUpdateCooldownDays ?? 30;
+
   const updatedAt = user?.updatedAt ? new Date(user.updatedAt) : null;
   const nextProfileUpdateAt = updatedAt
-    ? new Date(updatedAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+    ? new Date(updatedAt.getTime() + cooldownDays * 24 * 60 * 60 * 1000)
     : null;
   const isProfileLocked =
     !!nextProfileUpdateAt &&
@@ -87,11 +92,13 @@ export function ProfileClient() {
       },
       {
         onSuccess: () => {
-          toast.success('Cap nhat thong tin thanh cong');
+          toast.success('Profile updated successfully');
         },
         onError: (error: unknown) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          toast.error((error as any).response?.data?.message || 'Co loi xay ra khi cap nhat ho so');
+          const apiError = error as { response?: { data?: { message?: string } } };
+          toast.error(
+            apiError.response?.data?.message || 'An error occurred while updating your profile',
+          );
         },
       },
     );
@@ -141,11 +148,11 @@ export function ProfileClient() {
                     onSuccess: (uploadedUrl) => {
                       setAvatarPreviewUrl(uploadedUrl || localPreview);
                       form.setValue('avatarUrl', uploadedUrl || '');
-                      toast.success('Upload avatar thanh cong, bam Luu thay doi de cap nhat DB');
+                      toast.success('Avatar uploaded successfully. Click Save changes to persist.');
                     },
                     onError: () => {
                       setAvatarPreviewUrl(user.avatarUrl || '');
-                      toast.error('Upload avatar that bai');
+                      toast.error('Failed to upload avatar');
                     },
                   });
                   e.currentTarget.value = '';
@@ -172,8 +179,8 @@ export function ProfileClient() {
               <div className="flex items-center gap-3 text-sm">
                 <Phone size={16} className="text-muted-foreground" />
                 <div>
-                  <p className="text-xs text-muted-foreground">So dien thoai</p>
-                  <p className="font-medium text-foreground">{user.phone || 'Chua cap nhat'}</p>
+                  <p className="text-xs text-muted-foreground">Phone Number</p>
+                  <p className="font-medium text-foreground">{user.phone || 'Not provided'}</p>
                 </div>
               </div>
             </div>
@@ -207,7 +214,9 @@ export function ProfileClient() {
             <div className="mb-6 flex items-center justify-between gap-4 border-b pb-4">
               <div>
                 <h3 className="text-xl font-semibold text-foreground">Personal Information</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Cap nhat ho so cua ban</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Update your profile information
+                </p>
               </div>
             </div>
 
@@ -215,8 +224,8 @@ export function ProfileClient() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 {isProfileLocked && nextProfileUpdateAt ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    Ban da cap nhat gan day. Co the cap nhat lai sau:{' '}
-                    {nextProfileUpdateAt.toLocaleString('vi-VN')}
+                    Profile recently updated. You can update once every {cooldownDays} days. You can
+                    update again after: {nextProfileUpdateAt.toLocaleString('en-US')}
                   </div>
                 ) : null}
                 <fieldset
@@ -229,12 +238,12 @@ export function ProfileClient() {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">Ho va ten</FormLabel>
+                          <FormLabel className="text-sm font-medium">Full Name</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                placeholder="Nhap ho va ten"
+                                placeholder="Enter full name"
                                 className="h-11 pl-10"
                                 {...field}
                               />
@@ -250,7 +259,7 @@ export function ProfileClient() {
                       <FormControl>
                         <Input value={user.email} disabled className="h-11 bg-muted/30" />
                       </FormControl>
-                      <FormDescription>Email khong the thay doi.</FormDescription>
+                      <FormDescription>Email address cannot be changed.</FormDescription>
                     </FormItem>
 
                     <FormField
@@ -258,7 +267,7 @@ export function ProfileClient() {
                       name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">So dien thoai</FormLabel>
+                          <FormLabel className="text-sm font-medium">Phone Number</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -280,7 +289,7 @@ export function ProfileClient() {
                       name="dob"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">Ngay sinh (DOB)</FormLabel>
+                          <FormLabel className="text-sm font-medium">Date of Birth (DOB)</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -298,7 +307,7 @@ export function ProfileClient() {
                     name="avatarUrl"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">URL anh dai dien</FormLabel>
+                        <FormLabel className="text-sm font-medium">Avatar Image URL</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <Camera className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -321,7 +330,7 @@ export function ProfileClient() {
                       className="h-11 px-6"
                       disabled={isPending || isProfileLocked}
                     >
-                      {isPending ? 'Dang cap nhat...' : 'Luu thay doi'}
+                      {isPending ? 'Updating...' : 'Save Changes'}
                     </Button>
                   </div>
                 </fieldset>

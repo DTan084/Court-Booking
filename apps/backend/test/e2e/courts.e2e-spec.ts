@@ -67,15 +67,15 @@ describe('CourtsController (e2e)', () => {
         .post('/api/courts')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          name: 'Sân E2E Test',
+          name: 'E2E Test Court',
           sportTypeId,
           courtType: 'INDOOR',
-          address: 'Địa chỉ E2E',
+          address: 'E2E Address',
           pricePerHour: 100000,
         });
 
       expect(res.status).toBe(201);
-      expect(res.body.name).toBe('Sân E2E Test');
+      expect(res.body.name).toBe('E2E Test Court');
       createdCourtId = res.body.id;
     });
 
@@ -118,10 +118,10 @@ describe('CourtsController (e2e)', () => {
       const res = await request(app.getHttpServer())
         .patch(`/api/courts/${createdCourtId}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ name: 'Sân E2E Updated' });
+        .send({ name: 'E2E Updated Court' });
 
       expect(res.status).toBe(200);
-      expect(res.body.name).toBe('Sân E2E Updated');
+      expect(res.body.name).toBe('E2E Updated Court');
     });
   });
 

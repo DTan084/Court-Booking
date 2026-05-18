@@ -19,7 +19,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Chỉ persist user info, không persist token (token ở httpOnly cookie)
+      // Only persist user info, do not persist token (token is stored in an httpOnly cookie)
     },
   ),
 );

@@ -14,7 +14,7 @@ import { RefreshTokenEntity } from '../../database/entities/refresh-token.entity
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -80,7 +80,7 @@ export class AuthService {
     if (!user) {
       this.logger.warn(`Login failed: User not found for email [${email}]`);
       await this.incrementFailedAttempts(email);
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     this.logger.debug(`User found for email [${email}], comparing passwords...`);
@@ -89,7 +89,7 @@ export class AuthService {
     if (!isPasswordValid) {
       this.logger.warn(`Login failed: Invalid password for email [${email}]`);
       await this.incrementFailedAttempts(email);
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     this.logger.log(`Login successful for user: ${email} (${user.id})`);
@@ -102,12 +102,59 @@ export class AuthService {
     return tokens;
   }
 
+  private async safeRedisGet(key: string): Promise<string | null> {
+    try {
+      return await this.redis.get(key);
+    } catch {
+      this.logger.warn(
+        `Redis unavailable while reading auth key "${key}". Skipping lockout check.`,
+      );
+      return null;
+    }
+  }
+
+  private async safeRedisIncr(key: string): Promise<number | null> {
+    try {
+      return await this.redis.incr(key);
+    } catch {
+      this.logger.warn(
+        `Redis unavailable while incrementing auth key "${key}". Skipping failed-attempt tracking.`,
+      );
+      return null;
+    }
+  }
+
+  private async safeRedisExpire(key: string, ttlSeconds: number): Promise<void> {
+    try {
+      await this.redis.expire(key, ttlSeconds);
+    } catch {
+      this.logger.warn(`Redis unavailable while expiring auth key "${key}".`);
+    }
+  }
+
+  private async safeRedisSetLockout(key: string, ttlSeconds: number): Promise<void> {
+    try {
+      await this.redis.set(key, 'true', 'EX', ttlSeconds);
+    } catch {
+      this.logger.warn(`Redis unavailable while setting auth lockout key "${key}".`);
+    }
+  }
+
+  private async safeRedisDel(...keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    try {
+      await this.redis.del(...keys);
+    } catch {
+      this.logger.warn(`Redis unavailable while deleting auth keys "${keys.join(', ')}".`);
+    }
+  }
+
   private async checkLockout(email: string) {
     const lockoutKey = `lockout:${email}`;
-    const isLocked = await this.redis.get(lockoutKey);
+    const isLocked = await this.safeRedisGet(lockoutKey);
     if (isLocked) {
       throw new UnauthorizedException(
-        'Tài khoản đã bị tạm khóa do nhập sai nhiều lần. Vui lòng thử lại sau 15 phút.',
+        'Account has been temporarily locked due to multiple failed login attempts. Please try again after 15 minutes.',
       );
     }
   }
@@ -118,20 +165,24 @@ export class AuthService {
     const maxAttempts = 5;
     const lockoutDuration = 15 * 60; // 15 minutes
 
-    const attempts = await this.redis.incr(attemptsKey);
+    const attempts = await this.safeRedisIncr(attemptsKey);
+    if (attempts === null) {
+      return;
+    }
+
     if (attempts === 1) {
-      await this.redis.expire(attemptsKey, 3600); // Reset attempts after 1 hour if no more failures
+      await this.safeRedisExpire(attemptsKey, 3600); // Reset attempts after 1 hour if no more failures
     }
 
     if (attempts >= maxAttempts) {
-      await this.redis.set(lockoutKey, 'true', 'EX', lockoutDuration);
-      await this.redis.del(attemptsKey);
+      await this.safeRedisSetLockout(lockoutKey, lockoutDuration);
+      await this.safeRedisDel(attemptsKey);
     }
   }
 
   private async resetFailedAttempts(email: string) {
     const attemptsKey = `failed_attempts:${email}`;
-    await this.redis.del(attemptsKey);
+    await this.safeRedisDel(attemptsKey);
   }
 
   async generateTokens(user: UserEntity) {
@@ -163,8 +214,10 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is required');
     }
 
+    const hashedToken = createHash('sha256').update(refreshToken).digest('hex');
+
     const existingToken = await this.refreshTokenRepository.findOne({
-      where: { token: refreshToken, revoked: false },
+      where: { token: hashedToken, revoked: false },
     });
 
     if (!existingToken) {
@@ -188,7 +241,8 @@ export class AuthService {
 
   async revokeRefreshToken(refreshToken: string) {
     if (!refreshToken) return;
-    await this.refreshTokenRepository.update({ token: refreshToken }, { revoked: true });
+    const hashedToken = createHash('sha256').update(refreshToken).digest('hex');
+    await this.refreshTokenRepository.update({ token: hashedToken }, { revoked: true });
   }
 
   private parseExpiresInToSeconds(expiresIn: string): number {
@@ -201,9 +255,10 @@ export class AuthService {
   }
 
   async storeRefreshToken(userId: string, token: string, expiresAt: Date) {
+    const hashedToken = createHash('sha256').update(token).digest('hex');
     const refreshToken = this.refreshTokenRepository.create({
       userId,
-      token,
+      token: hashedToken,
       expiresAt,
     });
 

@@ -19,19 +19,21 @@ export default function Error({
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4">
       <div className="text-center space-y-6 max-w-md">
         <div className="space-y-2">
-          <h1 className="text-4xl font-bold text-destructive">Đã xảy ra lỗi</h1>
+          <h1 className="text-4xl font-bold text-destructive">Something went wrong</h1>
           <p className="text-muted-foreground">
-            {error.message || 'Có lỗi xảy ra khi xử lý yêu cầu của bạn.'}
+            {error.message || 'An error occurred while processing your request.'}
           </p>
-          {error.digest && <p className="text-xs text-muted-foreground">Mã lỗi: {error.digest}</p>}
+          {error.digest && (
+            <p className="text-xs text-muted-foreground">Error Digest: {error.digest}</p>
+          )}
         </div>
 
         <div className="flex gap-4 justify-center">
           <Button onClick={reset} size="lg">
-            Thử lại
+            Try Again
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <a href="/">Về trang chủ</a>
+            <a href="/">Go to Home</a>
           </Button>
         </div>
       </div>

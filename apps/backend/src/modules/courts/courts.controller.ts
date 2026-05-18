@@ -16,7 +16,6 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
-  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -38,7 +37,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
-import type { Request } from 'express';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -313,7 +311,7 @@ export class CourtsController {
       }),
       fileFilter: (_req: any, file: any, cb: any) => {
         if (!file.mimetype.startsWith('image/')) {
-          cb(new BadRequestException('File upload phải là hình ảnh'), false);
+          cb(new BadRequestException('Uploaded file must be an image'), false);
           return;
         }
         cb(null, true);
@@ -325,14 +323,13 @@ export class CourtsController {
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: any,
     @Body() body: { altText?: string; displayOrder?: string },
-    @Req() req: Request,
   ) {
     if (!file) {
-      throw new BadRequestException('Vui lòng chọn file ảnh để upload');
+      throw new BadRequestException('Please select an image file to upload');
     }
 
     const dto: AddCourtImageDto = addCourtImageSchema.parse({
-      url: `${req.protocol}://${req.get('host')}/uploads/courts/${file.filename}`,
+      url: `/uploads/courts/${file.filename}`,
       altText: body.altText,
       displayOrder:
         body.displayOrder !== undefined && body.displayOrder !== ''

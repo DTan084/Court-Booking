@@ -15,6 +15,7 @@ const updateSettingsSchema = z.object({
   noCancelBeforeHours: z.number().int().min(1).max(168).optional(),
   analyticsStartHour: z.number().int().min(0).max(23).optional(),
   analyticsEndHour: z.number().int().min(1).max(24).optional(),
+  profileUpdateCooldownDays: z.number().int().min(0).max(365).optional(),
 });
 
 @Controller('admin/settings')

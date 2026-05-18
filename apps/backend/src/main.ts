@@ -21,6 +21,13 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
+  const isProd = configService.get<string>('NODE_ENV') === 'production';
+  const feUrl = configService.get<string>('FE_URL');
+
+  if (isProd && !feUrl) {
+    throw new Error('FE_URL environment variable is required in production');
+  }
+
   // Security - Helmet middleware
   app.use(
     helmet({
@@ -28,9 +35,9 @@ async function bootstrap() {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: [`'self'`],
-          styleSrc: [`'self'`, `'unsafe-inline'`],
+          styleSrc: [`'self'`],
           imgSrc: [`'self'`, 'data:', 'validator.swagger.io'],
-          scriptSrc: [`'self'`, `https: 'unsafe-inline'`, `'unsafe-eval'`],
+          scriptSrc: [`'self'`],
         },
       },
     }),
@@ -44,7 +51,7 @@ async function bootstrap() {
 
   // CORS configuration
   app.enableCors({
-    origin: configService.get<string>('FE_URL') || '*',
+    origin: isProd ? feUrl : feUrl || '*',
     credentials: true,
   });
 
@@ -60,20 +67,22 @@ async function bootstrap() {
     new ClassSerializerInterceptor(app.get(Reflector)),
   );
 
-  // Swagger API Documentation
-  const config = new DocumentBuilder()
-    .setTitle('Court Booking API')
-    .setDescription('The enterprise court booking system API description')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('Root', 'API information')
-    .addTag('Auth', 'User authentication and authorization')
-    .addTag('Courts', 'Court management and information')
-    .addTag('Bookings', 'Booking management')
-    .addTag('Health', 'Health check endpoints')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  // Swagger API Documentation (disabled in production)
+  if (!isProd) {
+    const config = new DocumentBuilder()
+      .setTitle('Court Booking API')
+      .setDescription('The enterprise court booking system API description')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('Root', 'API information')
+      .addTag('Auth', 'User authentication and authorization')
+      .addTag('Courts', 'Court management and information')
+      .addTag('Bookings', 'Booking management')
+      .addTag('Health', 'Health check endpoints')
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = configService.get<number>('PORT') || 3001;
   await app.listen(port);

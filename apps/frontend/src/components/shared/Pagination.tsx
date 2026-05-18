@@ -66,7 +66,7 @@ export function Pagination({ page, totalPages, onPageChange, className }: Pagina
         className="gap-1"
       >
         <ChevronLeft className="h-4 w-4" />
-        <span className="hidden sm:inline">Trước</span>
+        <span className="hidden sm:inline">Previous</span>
       </Button>
 
       {/* Page Numbers */}
@@ -105,7 +105,7 @@ export function Pagination({ page, totalPages, onPageChange, className }: Pagina
         disabled={page === totalPages}
         className="gap-1"
       >
-        <span className="hidden sm:inline">Sau</span>
+        <span className="hidden sm:inline">Next</span>
         <ChevronRight className="h-4 w-4" />
       </Button>
     </div>

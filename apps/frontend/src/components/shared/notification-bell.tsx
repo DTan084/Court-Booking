@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import * as React from 'react';
 import { Bell, Loader2 } from 'lucide-react';
@@ -20,7 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatDateTimeByTimezone } from '@/lib/datetime';
 import { formatDistanceToNow } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -35,7 +35,7 @@ export function NotificationBell() {
 
   React.useEffect(() => {
     if (unreadCount > prevUnreadCount) {
-      toast('Ban co thong bao moi', {
+      toast('You have a new notification', {
         icon: <Bell className="h-4 w-4 text-primary" />,
       });
     }
@@ -76,7 +76,7 @@ export function NotificationBell() {
       >
         <DropdownMenuLabel className="p-4 bg-muted/30 backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-bold">Thong bao</span>
+            <span className="text-sm font-bold">Notifications</span>
             {unreadCount > 0 && (
               <Button
                 variant="ghost"
@@ -84,7 +84,7 @@ export function NotificationBell() {
                 className="h-auto p-0 text-xs text-primary hover:bg-transparent font-semibold"
                 onClick={() => markAllAsRead()}
               >
-                Danh dau tat ca da doc
+                Mark all as read
               </Button>
             )}
           </div>
@@ -122,10 +122,10 @@ export function NotificationBell() {
                 <span className="text-[10px] text-muted-foreground font-medium">
                   {formatDistanceToNow(new Date(notification.createdAt), {
                     addSuffix: true,
-                    locale: vi,
+                    locale: enUS,
                   })}
                   {' · '}
-                  {formatDateTimeByTimezone(notification.createdAt, 'Asia/Ho_Chi_Minh', 'vi-VN')}
+                  {formatDateTimeByTimezone(notification.createdAt, 'Asia/Ho_Chi_Minh', 'en-US')}
                 </span>
               </DropdownMenuItem>
             ))
@@ -134,9 +134,7 @@ export function NotificationBell() {
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4 text-muted-foreground">
                 <Bell size={24} />
               </div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Ban khong co thong bao nao
-              </p>
+              <p className="text-sm font-medium text-muted-foreground">You have no notifications</p>
             </div>
           )}
         </div>

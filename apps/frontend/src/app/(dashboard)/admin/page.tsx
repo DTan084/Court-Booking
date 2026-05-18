@@ -173,7 +173,9 @@ export default function AdminDashboardPage() {
               <span key={label}>{label}</span>
             ))}
           </div>
-          <p className="mt-3 text-xs text-slate-500">Revenue 7 ngày gần nhất từ booking DB.</p>
+          <p className="mt-3 text-xs text-slate-500">
+            Revenue from the last 7 days derived from database bookings.
+          </p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-6">
@@ -194,7 +196,7 @@ export default function AdminDashboardPage() {
               </div>
             ))}
             {sportDistribution.length === 0 && (
-              <p className="text-sm text-slate-500">Chưa có dữ liệu booking theo môn thể thao.</p>
+              <p className="text-sm text-slate-500">No booking data available by sport yet.</p>
             )}
           </div>
         </div>
@@ -249,7 +251,7 @@ export default function AdminDashboardPage() {
             {recentBookings.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-6 py-8 text-center text-sm text-slate-500">
-                  Chưa có dữ liệu booking.
+                  No booking data available.
                 </td>
               </tr>
             )}

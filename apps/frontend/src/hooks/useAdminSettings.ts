@@ -12,6 +12,7 @@ export type AdminSettings = {
   noCancelBeforeHours: number;
   analyticsStartHour: number;
   analyticsEndHour: number;
+  profileUpdateCooldownDays: number;
 };
 
 const queryKey = ['admin', 'settings'] as const;

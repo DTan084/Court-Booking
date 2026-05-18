@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCancelBooking } from '@/hooks/useBookings';
 import { DoubleConfirmationDialog } from '@/components/shared/double-confirmation-dialog';
@@ -36,11 +36,12 @@ export function CancelDialog({ open, onOpenChange, booking }: CancelDialogProps)
       onConfirm={handleConfirm}
       isLoading={isPending}
       variant="destructive"
-      title="Xac nhan huy dat san"
-      confirmText="Xac nhan huy"
+      title="Confirm Booking Cancellation"
+      confirmText="Confirm Cancellation"
       description={
         <span>
-          Ban co chac muon huy dat san <strong>{booking.court?.name}</strong> luc{' '}
+          Are you sure you want to cancel the booking for <strong>{booking.court?.name}</strong>{' '}
+          scheduled at{' '}
           <strong>{formatDateTimeByTimezone(booking.startTime, timezone, locale)}</strong>?
         </span>
       }

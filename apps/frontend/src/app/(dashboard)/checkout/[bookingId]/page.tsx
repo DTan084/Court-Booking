@@ -2,8 +2,12 @@ import { Metadata } from 'next';
 import { CheckoutClient } from './checkout-client';
 
 export const metadata: Metadata = {
-  title: 'Thanh toán | Court Booking',
-  description: 'Hoàn tất thanh toán cho sân thể thao của bạn',
+  title: 'Checkout | Court Booking',
+  description: 'Complete your sport facility booking payment',
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 interface CheckoutPageProps {

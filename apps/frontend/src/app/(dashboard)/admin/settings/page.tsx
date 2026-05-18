@@ -21,6 +21,7 @@ const DEFAULTS: AdminSettings = {
   noCancelBeforeHours: 12,
   analyticsStartHour: 6,
   analyticsEndHour: 22,
+  profileUpdateCooldownDays: 30,
 };
 
 export default function AdminSettingsPage() {
@@ -126,6 +127,18 @@ export default function AdminSettingsPage() {
                   type="number"
                   value={form.analyticsEndHour}
                   onChange={(e) => update('analyticsEndHour', Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                  disabled={isLoading || isPending}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Profile Update Cooldown (days)
+                </label>
+                <input
+                  type="number"
+                  value={form.profileUpdateCooldownDays}
+                  onChange={(e) => update('profileUpdateCooldownDays', Number(e.target.value))}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
                   disabled={isLoading || isPending}
                 />

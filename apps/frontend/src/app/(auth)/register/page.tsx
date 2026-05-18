@@ -1,7 +1,17 @@
-import Image from 'next/image';
+﻿import Image from 'next/image';
+import type { Metadata } from 'next';
 import { RegisterForm } from '@/components/auth/RegisterForm';
 import { Navbar } from '@/components/shared/Navbar';
 import { SiteFooter } from '@/components/shared/SiteFooter';
+
+export const metadata: Metadata = {
+  title: 'Register',
+  description: 'Create your Tana account and start booking courts online.',
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function RegisterPage() {
   return (

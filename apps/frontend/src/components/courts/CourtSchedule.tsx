@@ -82,7 +82,7 @@ export function CourtSchedule({
         </div>
       ) : daySlots.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm text-muted-foreground">Không có khung giờ nào cho ngày này</p>
+          <p className="text-sm text-muted-foreground">No time slots available for this date</p>
         </div>
       ) : (
         <TimeSlotGrid

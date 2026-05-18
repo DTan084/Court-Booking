@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,6 +20,7 @@ import { BookingStatus } from '@/types';
 import { CountdownTimer } from '@/components/bookings/countdown-timer';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/auth';
+import { normalizeImageUrl, shouldBypassImageOptimizer } from '@/lib/image';
 import { calculateBookingPrice, formatCurrency } from '@/lib/utils';
 import { formatDateByTimezone, formatTimeByTimezone } from '@/lib/datetime';
 
@@ -158,8 +159,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
         <AlertTriangle className="h-12 w-12 text-destructive" />
-        <h2 className="text-xl font-semibold">KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin Ä‘áº·t sÃ¢n</h2>
-        <Button onClick={() => router.push('/courts')}>Quay láº¡i danh sÃ¡ch sÃ¢n</Button>
+        <h2 className="text-xl font-semibold">Booking information not found</h2>
+        <Button onClick={() => router.push('/courts')}>Back to courts list</Button>
       </div>
     );
   }
@@ -168,6 +169,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const hoursUntilStart = (new Date(booking.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
   const isWithinNoCancelWindow = hoursUntilStart <= 12;
   const primaryCourtImage = booking.court?.images?.[0]?.url ?? null;
+  const normalizedPrimaryCourtImage = normalizeImageUrl(primaryCourtImage);
+  const bypassPrimaryCourtImageOptimizer = shouldBypassImageOptimizer(primaryCourtImage);
 
   const handleCompletePayment = async () => {
     try {
@@ -211,9 +214,10 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                   <div className="h-48 w-full relative">
                     {primaryCourtImage && (
                       <Image
-                        src={primaryCourtImage}
+                        src={normalizedPrimaryCourtImage}
                         alt={booking.court?.name ?? 'Court image'}
                         fill
+                        unoptimized={bypassPrimaryCourtImageOptimizer}
                         className="object-cover"
                         sizes="(max-width: 768px) 100vw, 60vw"
                       />
@@ -356,9 +360,14 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     ? 'Please verify your booking details before proceeding to payment.'
                     : 'Complete your booking details below.'}
                 </p>
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                  <Lock className="h-3.5 w-3.5" />
-                  SSL secured checkout
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <Lock className="h-3.5 w-3.5" />
+                    SSL secured checkout
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-700">
+                    Simulation Mode
+                  </div>
                 </div>
               </div>
               <button
@@ -378,9 +387,10 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                         {primaryCourtImage && (
                           <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200">
                             <Image
-                              src={primaryCourtImage}
+                              src={normalizedPrimaryCourtImage}
                               alt={booking.court?.name ?? 'Court image'}
                               fill
+                              unoptimized={bypassPrimaryCourtImageOptimizer}
                               className="object-cover"
                               sizes="96px"
                             />
@@ -438,8 +448,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     <div className="mt-8 border-t border-slate-100 pt-8">
                       {isWithinNoCancelWindow && (
                         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                          Warning: Booking này bắt đầu trong vòng 12 giờ, bạn sẽ không thể hủy theo
-                          chính sách.
+                          Warning: This booking starts within 12 hours. You cannot cancel according
+                          to policy.
                         </div>
                       )}
                       <h4 className="text-lg font-semibold text-slate-900 mb-4">Selected Slots</h4>

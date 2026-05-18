@@ -26,7 +26,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Admin route protection dựa trên role trong JWT payload
+  // Admin route protection based on the role in the JWT payload
   if (isAdminRoute && token) {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));

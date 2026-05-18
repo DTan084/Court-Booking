@@ -11,9 +11,9 @@ export default function AdminCourtEditPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-6">
       <Link href="/admin/courts" className="text-sm text-[#944a00] hover:underline">
-        ← Quay lại danh sách sân
+        ← Back to Courts List
       </Link>
-      <h1 className="text-2xl font-bold">Quản lý hình ảnh sân</h1>
+      <h1 className="text-2xl font-bold">Manage Court Images</h1>
       <CourtImageManager courtId={courtId} />
     </div>
   );

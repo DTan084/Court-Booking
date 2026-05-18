@@ -3,8 +3,12 @@ import { ProfileClient } from './profile-client';
 import { UserAccountShell } from '@/components/account/UserAccountShell';
 
 export const metadata: Metadata = {
-  title: 'Hồ sơ cá nhân | Court Booking',
-  description: 'Quản lý thông tin cá nhân của bạn trên Court Booking',
+  title: 'My Profile | Court Booking',
+  description: 'Manage your personal information on Court Booking',
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function ProfilePage() {
