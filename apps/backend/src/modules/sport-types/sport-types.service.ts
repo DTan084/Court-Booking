@@ -1,31 +1,87 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import Redis from 'ioredis';
 import { IsNull, Repository } from 'typeorm';
 import { SportTypeEntity } from '../../database/entities/sport-type.entity';
 import { CourtEntity } from '../../database/entities/court.entity';
 
 @Injectable()
 export class SportTypesService {
+  private readonly logger = new Logger(SportTypesService.name);
+  private readonly CACHE_TTL_SECONDS = 300;
+  private readonly PUBLIC_CACHE_KEY = 'sport-types:public';
+  private readonly COURT_CACHE_PREFIX = 'court:';
+  private readonly COURTS_LIST_VERSION_KEY = 'courts:list:version';
+
   constructor(
     @InjectRepository(SportTypeEntity)
     private readonly sportTypeRepo: Repository<SportTypeEntity>,
     @InjectRepository(CourtEntity)
     private readonly courtRepo: Repository<CourtEntity>,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
+  private async safeCacheGet<T>(key: string): Promise<T | null> {
+    try {
+      const cached = await this.redis.get(key);
+      return cached ? (JSON.parse(cached) as T) : null;
+    } catch {
+      this.logger.warn(`Redis get failed for sport types cache key "${key}"`);
+      return null;
+    }
+  }
+
+  private async safeCacheSet(key: string, value: unknown): Promise<void> {
+    try {
+      await this.redis.setex(key, this.CACHE_TTL_SECONDS, JSON.stringify(value));
+    } catch {
+      this.logger.warn(`Redis set failed for sport types cache key "${key}"`);
+    }
+  }
+
+  private async invalidateCaches(sportTypeId?: string): Promise<void> {
+    try {
+      const multi = this.redis
+        .multi()
+        .del(this.PUBLIC_CACHE_KEY, 'sport-types:admin')
+        .incr(this.COURTS_LIST_VERSION_KEY);
+
+      if (sportTypeId) {
+        const courts = await this.courtRepo.find({
+          where: { sportTypeId, deletedAt: IsNull() },
+          select: ['id'],
+        });
+        for (const court of courts) {
+          multi.del(`${this.COURT_CACHE_PREFIX}${court.id}`);
+        }
+      }
+
+      await multi.exec();
+    } catch {
+      this.logger.warn('Redis invalidation failed for sport types caches');
+    }
+  }
+
   async listPublic() {
-    return this.sportTypeRepo.find({
+    const cached = await this.safeCacheGet<SportTypeEntity[]>(this.PUBLIC_CACHE_KEY);
+    if (cached) return cached;
+
+    const result = await this.sportTypeRepo.find({
       where: { isActive: true },
       order: { displayOrder: 'ASC', name: 'ASC' },
     });
+    await this.safeCacheSet(this.PUBLIC_CACHE_KEY, result);
+    return result;
   }
 
-  async listAdmin() {
+  async listAdmin(): Promise<Array<SportTypeEntity & { courtCount: number }>> {
     const sportTypes = await this.sportTypeRepo.find({
       order: { displayOrder: 'ASC', name: 'ASC' },
     });
@@ -57,7 +113,7 @@ export class SportTypesService {
     if (payload.color && !/^#[0-9A-Fa-f]{6}$/.test(payload.color)) {
       throw new BadRequestException('Color must be in #RRGGBB format');
     }
-    return this.sportTypeRepo.save(
+    const created = await this.sportTypeRepo.save(
       this.sportTypeRepo.create({
         name: payload.name.trim(),
         icon: payload.icon ?? null,
@@ -65,6 +121,8 @@ export class SportTypesService {
         displayOrder: payload.displayOrder ?? 0,
       }),
     );
+    await this.invalidateCaches();
+    return created;
   }
 
   async update(
@@ -84,7 +142,9 @@ export class SportTypesService {
       throw new BadRequestException('Color must be in #RRGGBB format');
     }
     Object.assign(item, payload);
-    return this.sportTypeRepo.save(item);
+    const updated = await this.sportTypeRepo.save(item);
+    await this.invalidateCaches(id);
+    return updated;
   }
 
   async remove(id: string) {
@@ -95,6 +155,7 @@ export class SportTypesService {
     const affectedCourts = await this.courtRepo.count({
       where: { sportTypeId: id, deletedAt: IsNull() },
     });
+    await this.invalidateCaches(id);
     return {
       message: 'Sport type has been hidden from list',
       id,
@@ -115,6 +176,7 @@ export class SportTypesService {
       );
     }
     await this.sportTypeRepo.remove(item);
+    await this.invalidateCaches(id);
     return { id };
   }
 }

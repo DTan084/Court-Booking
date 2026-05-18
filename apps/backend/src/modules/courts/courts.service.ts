@@ -26,6 +26,7 @@ export class CourtsService {
   private readonly COURT_CACHE_PREFIX = 'court:';
   private readonly COURTS_LIST_PREFIX = 'courts:list:';
   private readonly COURTS_LIST_VERSION_KEY = 'courts:list:version';
+  private readonly COURTS_DISTRICTS_CACHE_KEY = 'courts:districts';
 
   constructor(
     @InjectRepository(CourtEntity)
@@ -452,6 +453,11 @@ export class CourtsService {
    * REQ-21.4: GET /courts/districts — distinct districts of ACTIVE courts
    */
   async getDistricts(): Promise<string[]> {
+    const cached = await this.safeCacheGet(this.COURTS_DISTRICTS_CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached) as string[];
+    }
+
     const rows = await this.courtRepository
       .createQueryBuilder('c')
       .select('DISTINCT c.district', 'district')
@@ -461,7 +467,13 @@ export class CourtsService {
       .orderBy('district', 'ASC')
       .getRawMany();
 
-    return rows.map((r) => r.district as string);
+    const districts = rows.map((r) => r.district as string);
+    await this.safeCacheSet(
+      this.COURTS_DISTRICTS_CACHE_KEY,
+      this.CACHE_TTL,
+      JSON.stringify(districts),
+    );
+    return districts;
   }
 
   async getStats(id: string, query: GetCourtStatsDto) {
@@ -640,7 +652,11 @@ export class CourtsService {
 
   private async invalidateCourtsListCache(): Promise<void> {
     try {
-      await this.redis.incr(this.COURTS_LIST_VERSION_KEY);
+      await this.redis
+        .multi()
+        .incr(this.COURTS_LIST_VERSION_KEY)
+        .del(this.COURTS_DISTRICTS_CACHE_KEY)
+        .exec();
     } catch {
       // no-op
     }

@@ -102,9 +102,56 @@ export class AuthService {
     return tokens;
   }
 
+  private async safeRedisGet(key: string): Promise<string | null> {
+    try {
+      return await this.redis.get(key);
+    } catch {
+      this.logger.warn(
+        `Redis unavailable while reading auth key "${key}". Skipping lockout check.`,
+      );
+      return null;
+    }
+  }
+
+  private async safeRedisIncr(key: string): Promise<number | null> {
+    try {
+      return await this.redis.incr(key);
+    } catch {
+      this.logger.warn(
+        `Redis unavailable while incrementing auth key "${key}". Skipping failed-attempt tracking.`,
+      );
+      return null;
+    }
+  }
+
+  private async safeRedisExpire(key: string, ttlSeconds: number): Promise<void> {
+    try {
+      await this.redis.expire(key, ttlSeconds);
+    } catch {
+      this.logger.warn(`Redis unavailable while expiring auth key "${key}".`);
+    }
+  }
+
+  private async safeRedisSetLockout(key: string, ttlSeconds: number): Promise<void> {
+    try {
+      await this.redis.set(key, 'true', 'EX', ttlSeconds);
+    } catch {
+      this.logger.warn(`Redis unavailable while setting auth lockout key "${key}".`);
+    }
+  }
+
+  private async safeRedisDel(...keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    try {
+      await this.redis.del(...keys);
+    } catch {
+      this.logger.warn(`Redis unavailable while deleting auth keys "${keys.join(', ')}".`);
+    }
+  }
+
   private async checkLockout(email: string) {
     const lockoutKey = `lockout:${email}`;
-    const isLocked = await this.redis.get(lockoutKey);
+    const isLocked = await this.safeRedisGet(lockoutKey);
     if (isLocked) {
       throw new UnauthorizedException(
         'Account has been temporarily locked due to multiple failed login attempts. Please try again after 15 minutes.',
@@ -118,20 +165,24 @@ export class AuthService {
     const maxAttempts = 5;
     const lockoutDuration = 15 * 60; // 15 minutes
 
-    const attempts = await this.redis.incr(attemptsKey);
+    const attempts = await this.safeRedisIncr(attemptsKey);
+    if (attempts === null) {
+      return;
+    }
+
     if (attempts === 1) {
-      await this.redis.expire(attemptsKey, 3600); // Reset attempts after 1 hour if no more failures
+      await this.safeRedisExpire(attemptsKey, 3600); // Reset attempts after 1 hour if no more failures
     }
 
     if (attempts >= maxAttempts) {
-      await this.redis.set(lockoutKey, 'true', 'EX', lockoutDuration);
-      await this.redis.del(attemptsKey);
+      await this.safeRedisSetLockout(lockoutKey, lockoutDuration);
+      await this.safeRedisDel(attemptsKey);
     }
   }
 
   private async resetFailedAttempts(email: string) {
     const attemptsKey = `failed_attempts:${email}`;
-    await this.redis.del(attemptsKey);
+    await this.safeRedisDel(attemptsKey);
   }
 
   async generateTokens(user: UserEntity) {

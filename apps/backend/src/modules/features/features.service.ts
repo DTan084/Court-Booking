@@ -1,10 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import Redis from 'ioredis';
 import { In, Repository } from 'typeorm';
 import { FeatureEntity } from '../../database/entities/feature.entity';
 import { CourtFeatureEntity } from '../../database/entities/court-feature.entity';
@@ -12,6 +15,12 @@ import { CourtEntity } from '../../database/entities/court.entity';
 
 @Injectable()
 export class FeaturesService {
+  private readonly logger = new Logger(FeaturesService.name);
+  private readonly CACHE_TTL_SECONDS = 300;
+  private readonly PUBLIC_CACHE_KEY = 'features:public';
+  private readonly COURT_CACHE_PREFIX = 'court:';
+  private readonly COURTS_LIST_VERSION_KEY = 'courts:list:version';
+
   constructor(
     @InjectRepository(FeatureEntity)
     private readonly featureRepo: Repository<FeatureEntity>,
@@ -19,16 +28,55 @@ export class FeaturesService {
     private readonly courtFeatureRepo: Repository<CourtFeatureEntity>,
     @InjectRepository(CourtEntity)
     private readonly courtRepo: Repository<CourtEntity>,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
+  private async safeCacheGet<T>(key: string): Promise<T | null> {
+    try {
+      const cached = await this.redis.get(key);
+      return cached ? (JSON.parse(cached) as T) : null;
+    } catch {
+      this.logger.warn(`Redis get failed for features cache key "${key}"`);
+      return null;
+    }
+  }
+
+  private async safeCacheSet(key: string, value: unknown): Promise<void> {
+    try {
+      await this.redis.setex(key, this.CACHE_TTL_SECONDS, JSON.stringify(value));
+    } catch {
+      this.logger.warn(`Redis set failed for features cache key "${key}"`);
+    }
+  }
+
+  private async invalidateCaches(courtIds: string[] = []): Promise<void> {
+    try {
+      const multi = this.redis
+        .multi()
+        .del(this.PUBLIC_CACHE_KEY, 'features:admin')
+        .incr(this.COURTS_LIST_VERSION_KEY);
+      for (const courtId of courtIds) {
+        multi.del(`${this.COURT_CACHE_PREFIX}${courtId}`);
+      }
+      await multi.exec();
+    } catch {
+      this.logger.warn('Redis invalidation failed for features caches');
+    }
+  }
+
   async list() {
-    return this.featureRepo.find({
+    const cached = await this.safeCacheGet<FeatureEntity[]>(this.PUBLIC_CACHE_KEY);
+    if (cached) return cached;
+
+    const result = await this.featureRepo.find({
       where: { isActive: true },
       order: { category: 'ASC', name: 'ASC' },
     });
+    await this.safeCacheSet(this.PUBLIC_CACHE_KEY, result);
+    return result;
   }
 
-  async listAdmin() {
+  async listAdmin(): Promise<Array<FeatureEntity & { courtCount: number }>> {
     const features = await this.featureRepo.find({
       order: { category: 'ASC', name: 'ASC' },
     });
@@ -48,7 +96,7 @@ export class FeaturesService {
       .where('LOWER(feature.name) = LOWER(:name)', { name: payload.name })
       .getOne();
     if (existed) throw new ConflictException('Feature already exists');
-    return this.featureRepo.save(
+    const created = await this.featureRepo.save(
       this.featureRepo.create({
         name: payload.name.trim(),
         icon: payload.icon ?? null,
@@ -56,6 +104,8 @@ export class FeaturesService {
         isActive: true,
       }),
     );
+    await this.invalidateCaches();
+    return created;
   }
 
   async update(
@@ -73,7 +123,13 @@ export class FeaturesService {
       if (existed) throw new ConflictException('Feature already exists');
     }
     Object.assign(item, payload);
-    return this.featureRepo.save(item);
+    const updated = await this.featureRepo.save(item);
+    const linkedCourtIds = await this.courtFeatureRepo.find({
+      where: { featureId: id },
+      select: ['courtId'],
+    });
+    await this.invalidateCaches(linkedCourtIds.map((link) => link.courtId));
+    return updated;
   }
 
   async remove(id: string) {
@@ -82,6 +138,11 @@ export class FeaturesService {
     const usage = await this.courtFeatureRepo.count({ where: { featureId: id } });
     item.isActive = false;
     await this.featureRepo.save(item);
+    const linkedCourtIds = await this.courtFeatureRepo.find({
+      where: { featureId: id },
+      select: ['courtId'],
+    });
+    await this.invalidateCaches(linkedCourtIds.map((link) => link.courtId));
     return {
       message: 'Feature has been hidden from UI',
       id,
@@ -101,6 +162,7 @@ export class FeaturesService {
       throw new ConflictException(`Cannot delete feature currently in use by ${usage} courts`);
     }
     await this.featureRepo.remove(item);
+    await this.invalidateCaches();
     return { id };
   }
 
@@ -129,6 +191,7 @@ export class FeaturesService {
       );
     }
 
+    await this.invalidateCaches([courtId]);
     return this.getCourtFeatures(courtId);
   }
 

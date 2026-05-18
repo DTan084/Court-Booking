@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import Redis from 'ioredis';
 import { SystemSettingEntity } from '../../database/entities/system-setting.entity';
 
 const SETTING_DEFAULTS = {
@@ -38,10 +39,67 @@ export type RuntimeSettingsDto = {
 
 @Injectable()
 export class SettingsService {
+  private readonly logger = new Logger(SettingsService.name);
+  private readonly CACHE_TTL_SECONDS = 300;
+  private readonly ALL_DEFAULT_SETTINGS_CACHE_KEY = 'settings:defaults:all';
+
   constructor(
     @InjectRepository(SystemSettingEntity)
     private readonly settingRepo: Repository<SystemSettingEntity>,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
+
+  private async safeCacheGet(key: string): Promise<string | null> {
+    try {
+      return await this.redis.get(key);
+    } catch (error) {
+      this.logger.warn(`Redis get failed for settings cache key "${key}"`);
+      return null;
+    }
+  }
+
+  private async safeCacheSet(key: string, value: unknown): Promise<void> {
+    try {
+      await this.redis.setex(key, this.CACHE_TTL_SECONDS, JSON.stringify(value));
+    } catch (error) {
+      this.logger.warn(`Redis set failed for settings cache key "${key}"`);
+    }
+  }
+
+  private async safeCacheDel(key: string): Promise<void> {
+    try {
+      await this.redis.del(key);
+    } catch (error) {
+      this.logger.warn(`Redis delete failed for settings cache key "${key}"`);
+    }
+  }
+
+  private async getDefaultSettingsValuesCached(): Promise<Record<string, string>> {
+    const cached = await this.safeCacheGet(this.ALL_DEFAULT_SETTINGS_CACHE_KEY);
+    if (cached) {
+      try {
+        return JSON.parse(cached) as Record<string, string>;
+      } catch {
+        await this.safeCacheDel(this.ALL_DEFAULT_SETTINGS_CACHE_KEY);
+      }
+    }
+
+    const defaultKeys = Object.keys(SETTING_DEFAULTS);
+    const found = await this.settingRepo.find({
+      where: { key: In(defaultKeys) },
+    });
+
+    const values: Record<string, string> = {};
+    for (const key of defaultKeys) {
+      values[key] =
+        found.find((item) => item.key === key)?.value ??
+        SETTING_DEFAULTS[key as keyof typeof SETTING_DEFAULTS] ??
+        '';
+    }
+
+    await this.safeCacheSet(this.ALL_DEFAULT_SETTINGS_CACHE_KEY, values);
+    return values;
+  }
 
   private parseIntSafe(value: string, fallback: number): number {
     const parsed = Number.parseInt(value, 10);
@@ -49,16 +107,29 @@ export class SettingsService {
   }
 
   async getRawValues(keys: string[]): Promise<Record<string, string>> {
-    const found = await this.settingRepo.find({
-      where: { key: In(keys) },
-    });
     const map: Record<string, string> = {};
-    for (const key of keys) {
-      map[key] =
-        found.find((x) => x.key === key)?.value ??
-        SETTING_DEFAULTS[key as keyof typeof SETTING_DEFAULTS] ??
-        '';
+
+    const defaultSettingKeys = keys.filter(
+      (key): key is keyof typeof SETTING_DEFAULTS => key in SETTING_DEFAULTS,
+    );
+    const customKeys = keys.filter((key) => !(key in SETTING_DEFAULTS));
+
+    if (defaultSettingKeys.length > 0) {
+      const cachedDefaults = await this.getDefaultSettingsValuesCached();
+      for (const key of defaultSettingKeys) {
+        map[key] = cachedDefaults[key] ?? SETTING_DEFAULTS[key] ?? '';
+      }
     }
+
+    if (customKeys.length > 0) {
+      const found = await this.settingRepo.find({
+        where: { key: In(customKeys) },
+      });
+      for (const key of customKeys) {
+        map[key] = found.find((item) => item.key === key)?.value ?? '';
+      }
+    }
+
     return map;
   }
 
@@ -112,6 +183,7 @@ export class SettingsService {
       }
     }
 
+    await this.safeCacheDel(this.ALL_DEFAULT_SETTINGS_CACHE_KEY);
     return this.getAdminSettings();
   }
 
