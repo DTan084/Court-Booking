@@ -9,9 +9,9 @@ import type { FilterTab } from '@/components/bookings/BookingFilters';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { SkeletonBookingRow } from '@/components/shared/SkeletonBookingRow';
 import { UserAccountShell } from '@/components/account/UserAccountShell';
-import { History, MapPin, FileText, Settings } from 'lucide-react';
+import { Archive, History, Info, MapPin, FileText, Settings, Clock3 } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
-import { BookingStatus } from '@/types';
+import { BookingStatus, CourtStatus } from '@/types';
 import type { Booking, Court } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ type VenueStat = {
   courtName: string;
   address: string;
   imageUrl: string | null;
+  status: CourtStatus;
+  deletedAt: string | null;
   totalBookings: number;
   totalSpent: number;
   lastPlayedAt: string;
@@ -157,6 +159,8 @@ function BookingsPageContent() {
         courtName: booking.court.name,
         address: booking.court.address,
         imageUrl: booking.court.images?.[0]?.url ?? null,
+        status: booking.court.status,
+        deletedAt: booking.court.deletedAt ?? null,
         totalBookings: 1,
         totalSpent: Number(booking.totalPrice),
         lastPlayedAt: bookingEnd,
@@ -166,6 +170,8 @@ function BookingsPageContent() {
 
     existing.totalBookings += 1;
     existing.totalSpent += Number(booking.totalPrice);
+    existing.status = booking.court.status;
+    existing.deletedAt = booking.court.deletedAt ?? existing.deletedAt;
     if (new Date(bookingEnd) > new Date(existing.lastPlayedAt)) {
       existing.lastPlayedAt = bookingEnd;
     }
@@ -200,6 +206,18 @@ function BookingsPageContent() {
           (isSystemCancelled || isAdminCancelled || isCancelledPaid);
         const refundProcessed = booking.status === BookingStatus.CANCELLED && !!booking.refundedAt;
         const title = booking.court?.name ?? 'Unknown court';
+        const isVenueDeleted = booking.court?.deletedAt != null;
+        const isVenueUnavailable = booking.court?.status === CourtStatus.INACTIVE;
+        const venueAvailabilityLabel = isVenueDeleted
+          ? 'No Longer Available'
+          : isVenueUnavailable
+            ? 'Unavailable'
+            : null;
+        const venueAvailabilityHint = isVenueDeleted
+          ? 'This venue has been removed from the active court list. You can still review your booking history.'
+          : isVenueUnavailable
+            ? 'This venue is temporarily unavailable for new bookings.'
+            : null;
         const statusLabel = isSystemCancelled
           ? 'System Cancelled'
           : isUserCancelled
@@ -260,6 +278,24 @@ function BookingsPageContent() {
                   >
                     {statusLabel}
                   </span>
+                  {venueAvailabilityLabel && (
+                    <span
+                      title={venueAvailabilityHint ?? undefined}
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-bold uppercase',
+                        isVenueDeleted
+                          ? 'border-slate-300 bg-slate-100 text-slate-600'
+                          : 'border-amber-200 bg-amber-50 text-amber-700',
+                      )}
+                    >
+                      {isVenueDeleted ? (
+                        <Archive className="h-3 w-3" />
+                      ) : (
+                        <Clock3 className="h-3 w-3" />
+                      )}
+                      {venueAvailabilityLabel}
+                    </span>
+                  )}
                   {refundPending && (
                     <span className="rounded border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-700">
                       Refund Pending
@@ -291,6 +327,9 @@ function BookingsPageContent() {
                     <span>{formatCurrency(booking.totalPrice)}</span>
                   )}
                 </div>
+                {venueAvailabilityHint && (
+                  <p className="mt-2 text-[12px] text-slate-500">{venueAvailabilityHint}</p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -372,7 +411,11 @@ function BookingsPageContent() {
             {pastVenuesToShow.map((venue) => (
               <article
                 key={venue.courtId}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
+                className={cn(
+                  'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:shadow-xl',
+                  (venue.deletedAt || venue.status === CourtStatus.INACTIVE) &&
+                    'border-slate-300 bg-slate-50/70',
+                )}
               >
                 <div className="relative h-40">
                   {venue.imageUrl ? (
@@ -389,7 +432,26 @@ function BookingsPageContent() {
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-4 left-4 text-white">
-                    <h4 className="font-bold">{venue.courtName}</h4>
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <h4 className="font-bold">{venue.courtName}</h4>
+                      {venue.deletedAt ? (
+                        <span
+                          title="This venue has been removed from the active court list. You can still review your past visits here."
+                          className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700"
+                        >
+                          <Archive className="h-3 w-3" />
+                          No Longer Available
+                        </span>
+                      ) : venue.status === CourtStatus.INACTIVE ? (
+                        <span
+                          title="This venue is temporarily unavailable for new bookings."
+                          className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700"
+                        >
+                          <Clock3 className="h-3 w-3" />
+                          Unavailable
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="text-xs opacity-85">
                       Last played: {formatDateByTimezone(venue.lastPlayedAt, timezone, locale)}
                     </p>
@@ -408,12 +470,30 @@ function BookingsPageContent() {
                       {formatCurrency(venue.totalSpent)}
                     </p>
                   </div>
+                  {(venue.deletedAt || venue.status === CourtStatus.INACTIVE) && (
+                    <p className="mb-4 flex items-start gap-2 text-xs text-slate-500">
+                      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        {venue.deletedAt
+                          ? 'This venue is no longer listed for new bookings, but your visit history is preserved.'
+                          : 'This venue is temporarily unavailable. Browse other courts for a new booking.'}
+                      </span>
+                    </p>
+                  )}
                   <Button
-                    onClick={() => window.location.assign(`/courts/${venue.courtId}`)}
+                    onClick={() =>
+                      window.location.assign(
+                        venue.deletedAt || venue.status === CourtStatus.INACTIVE
+                          ? '/courts'
+                          : `/courts/${venue.courtId}`,
+                      )
+                    }
                     className="w-full bg-slate-50 text-slate-700 hover:bg-orange-600 hover:text-white"
                     variant="outline"
                   >
-                    Book Again
+                    {venue.deletedAt || venue.status === CourtStatus.INACTIVE
+                      ? 'Browse Courts'
+                      : 'Book Again'}
                   </Button>
                 </div>
               </article>

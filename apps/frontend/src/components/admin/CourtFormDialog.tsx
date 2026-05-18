@@ -346,7 +346,7 @@ export function CourtFormDialog({ open, onOpenChange, court, mode }: CourtFormDi
               disabled={isPending}
               className="flex-1"
             >
-              Huy
+              Cancel
             </Button>
             <Button type="submit" disabled={isPending} className="flex-1">
               {isPending ? 'Processing...' : mode === 'create' ? 'Create Court' : 'Update'}

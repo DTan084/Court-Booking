@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { CalendarCheck2, ChevronLeft, ChevronRight, Clock3, Plus, Search } from 'lucide-react';
+import {
+  Archive,
+  CalendarCheck2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Plus,
+  Search,
+} from 'lucide-react';
 import { BookingSource, BookingStatus, CancelledBy } from '@court-booking/shared';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { MetricCard } from '@/components/admin/MetricCard';
@@ -12,6 +20,7 @@ import { useSportTypes } from '@/hooks/useSportTypes';
 import { api } from '@/lib/api';
 import { formatDateByTimezone, formatTimeByTimezone } from '@/lib/datetime';
 import { formatCurrency } from '@/lib/utils';
+import { CourtStatus } from '@/types';
 
 export default function AdminBookingsPage() {
   const timezone = 'Asia/Ho_Chi_Minh';
@@ -243,6 +252,18 @@ export default function AdminBookingsPage() {
               const end = new Date(row.endTime);
               const now = new Date();
               const sourceLabel = row.bookingSource === 'WALK_IN' ? 'WALK-IN' : row.bookingSource;
+              const isVenueDeleted = row.court?.deletedAt != null;
+              const isVenueUnavailable = row.court?.status === CourtStatus.INACTIVE;
+              const venueAvailabilityLabel = isVenueDeleted
+                ? 'No Longer Available'
+                : isVenueUnavailable
+                  ? 'Unavailable'
+                  : null;
+              const venueAvailabilityHint = isVenueDeleted
+                ? 'This venue has been removed from the active court list.'
+                : isVenueUnavailable
+                  ? 'This venue is temporarily unavailable for new bookings.'
+                  : null;
               const isLive =
                 row.status === BookingStatus.CONFIRMED &&
                 start.getTime() <= now.getTime() &&
@@ -251,7 +272,28 @@ export default function AdminBookingsPage() {
               return (
                 <tr key={row.id} className="border-t border-slate-100">
                   <td className="px-6 py-4 font-semibold">{row.id.slice(0, 8)}</td>
-                  <td className="px-6 py-4">{row.court?.name ?? '-'}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span>{row.court?.name ?? '-'}</span>
+                      {venueAvailabilityLabel && (
+                        <span
+                          title={venueAvailabilityHint ?? undefined}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                            isVenueDeleted
+                              ? 'border-slate-300 bg-slate-100 text-slate-700'
+                              : 'border-amber-200 bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          {isVenueDeleted ? (
+                            <Archive className="h-3 w-3" />
+                          ) : (
+                            <Clock3 className="h-3 w-3" />
+                          )}
+                          {venueAvailabilityLabel}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="font-semibold text-slate-900">
                       {formatDateByTimezone(start, timezone, locale)}

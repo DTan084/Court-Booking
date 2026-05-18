@@ -4,10 +4,12 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
+  Archive,
   Calendar,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   MapPin,
   Users,
 } from 'lucide-react';
@@ -80,7 +82,7 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
   const { data: bookings } = useSchedule(params.id, formatDate(selectedDate));
 
   if (courtError) {
-    toast.error('Court not found');
+    toast.error('This venue is no longer available');
     router.push('/courts');
     return null;
   }
@@ -103,6 +105,16 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
   const displayFeatures: Array<Feature> = (court.featureItems ?? []) as Feature[];
 
   const isInactive = court.status === CourtStatus.INACTIVE;
+  const availabilityLabel = court.deletedAt
+    ? 'No Longer Available'
+    : isInactive
+      ? 'Unavailable'
+      : null;
+  const availabilityHint = court.deletedAt
+    ? 'This venue has been removed from the active court list. Browse other courts for a new booking.'
+    : isInactive
+      ? 'This venue is temporarily unavailable for new bookings. Existing live sessions may still finish as scheduled.'
+      : null;
   const daySlots = getDaySlots(timeSlots, selectedDate);
 
   const now = new Date();
@@ -203,6 +215,23 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
                       Featured
                     </span>
                   )}
+                  {availabilityLabel && (
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest',
+                        court.deletedAt
+                          ? 'bg-slate-100 text-slate-700'
+                          : 'bg-amber-50 text-amber-700',
+                      )}
+                    >
+                      {court.deletedAt ? (
+                        <Archive className="h-3 w-3" />
+                      ) : (
+                        <Clock3 className="h-3 w-3" />
+                      )}
+                      {availabilityLabel}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-3 flex items-center gap-2 text-slate-600">
                   <MapPin className="h-4 w-4" />
@@ -225,12 +254,23 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
               </div>
             </div>
 
-            {isInactive && (
-              <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
-                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+            {(isInactive || court.deletedAt) && (
+              <div
+                className={cn(
+                  'mb-4 flex items-start gap-3 rounded-xl p-4',
+                  court.deletedAt
+                    ? 'border border-slate-300 bg-slate-100 text-slate-800'
+                    : 'border border-amber-200 bg-amber-50 text-amber-900',
+                )}
+              >
+                {court.deletedAt ? (
+                  <Archive className="mt-0.5 h-5 w-5 shrink-0" />
+                ) : (
+                  <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                )}
                 <div>
-                  <p className="font-semibold">Court is temporarily unavailable</p>
-                  <p className="text-sm">Please select another court for booking.</p>
+                  <p className="font-semibold">{availabilityLabel}</p>
+                  <p className="text-sm">{availabilityHint}</p>
                 </div>
               </div>
             )}
@@ -414,7 +454,11 @@ export default function CourtDetailPage({ params }: { params: { id: string } }) 
                 type="button"
                 className="mt-4 h-12 w-full bg-[#944a00] text-white hover:bg-[#7f3f00]"
                 disabled={
-                  selectedSlotObjects.length === 0 || !slotsConsecutive || isInactive || isPending
+                  selectedSlotObjects.length === 0 ||
+                  !slotsConsecutive ||
+                  isInactive ||
+                  !!court.deletedAt ||
+                  isPending
                 }
                 onClick={handleCreateBooking}
               >

@@ -6,6 +6,7 @@ import { CancelDialog } from './CancelDialog';
 import { formatCurrency, cn } from '@/lib/utils';
 import { canCancelBooking } from '@/lib/booking-utils';
 import {
+  Archive,
   CreditCard,
   MapPin,
   Calendar,
@@ -13,9 +14,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Info,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { BookingStatus } from '@/types';
+import { BookingStatus, CourtStatus } from '@/types';
 import { formatCountdown } from '@/lib/booking-utils';
 import { CancelledBy } from '@court-booking/shared';
 import type { Booking, Court, BookingStatus as BookingStatusType } from '@/types';
@@ -97,6 +99,18 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
     booking.status === BookingStatus.COMPLETED ||
     booking.status === BookingStatus.CANCELLED ||
     booking.status === BookingStatus.EXPIRED;
+  const isCourtUnavailable =
+    booking.court?.deletedAt != null || booking.court?.status === CourtStatus.INACTIVE;
+  const venueAvailabilityLabel = booking.court?.deletedAt
+    ? 'No Longer Available'
+    : booking.court?.status === CourtStatus.INACTIVE
+      ? 'Unavailable'
+      : null;
+  const venueAvailabilityHint = booking.court?.deletedAt
+    ? 'This venue has been removed from the active court list. You can still review this booking.'
+    : booking.court?.status === CourtStatus.INACTIVE
+      ? 'This venue is temporarily unavailable for new bookings.'
+      : null;
 
   const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
     `Court Booking - ${courtName}`,
@@ -161,6 +175,24 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
             >
               {isAdminCancelled ? 'Admin Cancelled' : statusLabel}
             </span>
+            {venueAvailabilityLabel && (
+              <span
+                title={venueAvailabilityHint ?? undefined}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-widest',
+                  booking.court?.deletedAt
+                    ? 'border-slate-300 bg-slate-100 text-slate-600'
+                    : 'border-amber-200 bg-amber-50 text-amber-700',
+                )}
+              >
+                {booking.court?.deletedAt ? (
+                  <Archive className="h-3 w-3" />
+                ) : (
+                  <Clock3 className="h-3 w-3" />
+                )}
+                {venueAvailabilityLabel}
+              </span>
+            )}
             {refundPending && (
               <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-orange-700">
                 <Clock3 className="h-3 w-3" />
@@ -231,6 +263,12 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
               <span className="italic">{cancellationReason}</span>
             </div>
           )}
+          {venueAvailabilityHint && (
+            <p className="mt-3 flex items-start gap-2 text-xs text-slate-500">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{venueAvailabilityHint}</span>
+            </p>
+          )}
         </div>
 
         <div className="flex w-full flex-col items-end gap-3 md:w-auto">
@@ -277,10 +315,12 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
                 {canBookAgain && (
                   <Button
                     variant="outline"
-                    onClick={() => router.push(`/courts/${booking.courtId}`)}
+                    onClick={() =>
+                      router.push(isCourtUnavailable ? '/courts' : `/courts/${booking.courtId}`)
+                    }
                     className="rounded-lg border border-slate-200 px-5 py-2.5 font-semibold text-slate-700 transition-all hover:bg-slate-50"
                   >
-                    Book Again
+                    {isCourtUnavailable ? 'Browse Courts' : 'Book Again'}
                   </Button>
                 )}
                 {!canAddToCalendar && !canBookAgain && (
