@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
-import { Role } from '@court-booking/shared';
+import { BookingStatus, Role } from '@court-booking/shared';
 import { DataSource } from 'typeorm';
 
 describe('Bookings Concurrency (e2e)', () => {
@@ -83,19 +83,38 @@ describe('Bookings Concurrency (e2e)', () => {
         pricePerHour: 150000,
       });
     courtId = courtRes.body.id;
-  });
+
+    await request(app.getHttpServer())
+      .put(`/api/courts/${courtId}/time-slots`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        slots: Array.from({ length: 7 }, (_, dayOfWeek) => ({
+          dayOfWeek,
+          startHour: 8,
+          endHour: 10,
+          price: 150000,
+        })),
+      })
+      .expect(200);
+  }, 30000);
 
   afterAll(async () => {
-    // Cleanup bookings
-    await dataSource.query('DELETE FROM bookings WHERE court_id = $1', [courtId]);
-    // Cleanup court
-    await dataSource.query('DELETE FROM courts WHERE id = $1', [courtId]);
-    // Cleanup tokens & users
-    await dataSource.query(
-      "DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%_conc_%')",
-    );
-    await dataSource.query("DELETE FROM users WHERE email LIKE '%_conc_%'");
-    await app.close();
+    if (dataSource) {
+      if (courtId) {
+        await dataSource.query('DELETE FROM bookings WHERE court_id = $1', [courtId]);
+        await dataSource.query('DELETE FROM court_time_slots WHERE court_id = $1', [courtId]);
+        await dataSource.query('DELETE FROM courts WHERE id = $1', [courtId]);
+      }
+      await dataSource.query(
+        "DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%_conc_%')",
+      );
+      await dataSource.query("DELETE FROM users WHERE email LIKE '%_conc_%'");
+    }
+    if (app) {
+      const redis = app.get('REDIS_CLIENT');
+      if (redis) await redis.quit();
+      await app.close();
+    }
   });
 
   it('should prevent concurrent bookings on the same time slot (S3-07)', async () => {
@@ -126,5 +145,23 @@ describe('Bookings Concurrency (e2e)', () => {
     const statuses = [res1.status, res2.status];
     expect(statuses).toContain(201);
     expect(statuses).toContain(409);
-  });
+
+    const persisted = await dataSource.query(
+      `
+        SELECT id, status
+        FROM bookings
+        WHERE court_id = $1
+          AND start_time = $2
+          AND end_time = $3
+          AND (
+            status = $4
+            OR (status = $5 AND payment_deadline IS NOT NULL AND payment_deadline > NOW())
+          )
+      `,
+      [courtId, startTime, endTime, BookingStatus.CONFIRMED, BookingStatus.PENDING_PAYMENT],
+    );
+
+    expect(persisted).toHaveLength(1);
+    expect([BookingStatus.CONFIRMED, BookingStatus.PENDING_PAYMENT]).toContain(persisted[0].status);
+  }, 30000);
 });
