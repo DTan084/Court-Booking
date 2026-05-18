@@ -16,8 +16,9 @@ import { UpsertTimeSlotsDto } from './dto/upsert-time-slots.dto';
 import { AddCourtImageDto } from './dto/add-court-image.dto';
 import { ReorderCourtImagesDto } from './dto/reorder-court-images.dto';
 import { BookingEntity } from '../../database/entities/booking.entity';
-import { BookingStatus, CancelledBy } from '@court-booking/shared';
+import { BookingStatus, CancelledBy, NotificationType } from '@court-booking/shared';
 import { CourtStatus } from '../../database/entities/court.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CourtsService {
@@ -40,6 +41,7 @@ export class CourtsService {
     @InjectRepository(SportTypeEntity)
     private readonly sportTypeRepository: Repository<SportTypeEntity>,
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
@@ -368,6 +370,7 @@ export class CourtsService {
     cancellationNote: string,
   ): Promise<number> {
     const now = new Date();
+    const court = await this.courtRepository.findOne({ where: { id: courtId } });
     const targets = await this.dataSource.getRepository(BookingEntity).find({
       where: [
         { courtId, status: BookingStatus.PENDING_PAYMENT },
@@ -394,6 +397,18 @@ export class CourtsService {
       }
     }
     await this.dataSource.getRepository(BookingEntity).save(futureTargets);
+
+    for (const booking of futureTargets) {
+      if (!booking.userId) continue;
+      await this.notificationsService.create({
+        userId: booking.userId,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: 'Booking cancelled by system',
+        message: `Your booking at ${court?.name || 'this court'} was cancelled because the venue is unavailable. ${cancellationNote}`,
+        bookingId: booking.id,
+      });
+    }
+
     return futureTargets.length;
   }
 

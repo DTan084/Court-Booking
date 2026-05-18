@@ -615,46 +615,118 @@ async function runSeedFull() {
   );
 
   // ── 8. Notifications ───────────────────────────────────────────────────────
-  const userBookings = allBookings.filter((b) => b.userId === user1.id);
+  const findBooking = (predicate: (booking: BookingEntity) => boolean) => {
+    const found = allBookings.find(predicate);
+    if (!found) {
+      throw new Error('Expected seeded booking was not found for notifications');
+    }
+    return found;
+  };
+
+  const userConfirmedLive = findBooking(
+    (booking) =>
+      booking.userId === user1.id && booking.note === '[visual-seed] Live booking for user1',
+  );
+  const userPendingPayment = findBooking(
+    (booking) => booking.userId === user1.id && booking.status === BookingStatus.PENDING_PAYMENT,
+  );
+  const userUpcomingConfirmed = findBooking(
+    (booking) =>
+      booking.userId === user1.id &&
+      booking.status === BookingStatus.CONFIRMED &&
+      booking.bookingReminderSent === false &&
+      booking.paymentMethod === 'CASH',
+  );
+  const userCompleted = findBooking(
+    (booking) =>
+      booking.userId === user1.id &&
+      booking.status === BookingStatus.COMPLETED &&
+      booking.completedAt !== null,
+  );
+  const userCancelled = findBooking(
+    (booking) => booking.userId === user1.id && booking.cancelledBy === CancelledBy.USER,
+  );
+  const adminCancelled = findBooking(
+    (booking) => booking.userId === user2.id && booking.cancelledBy === CancelledBy.ADMIN,
+  );
+  const expiredBooking = findBooking(
+    (booking) => booking.userId === user2.id && booking.status === BookingStatus.EXPIRED,
+  );
+  const systemCancelled = findBooking(
+    (booking) => booking.userId === user3.id && booking.cancelledBy === CancelledBy.SYSTEM,
+  );
+
   await notificationRepo.save([
     notificationRepo.create({
       userId: user1.id,
-      bookingId: userBookings[0]?.id ?? null,
+      bookingId: userConfirmedLive.id,
       type: NotificationType.BOOKING_CONFIRMED,
-      title: 'Đặt sân thành công',
-      message: 'Booking của bạn đã được xác nhận. Hẹn gặp bạn tại sân!',
+      title: 'Booking confirmed',
+      message: 'Your booking has been confirmed. See you at the court.',
       isRead: false,
     }),
     notificationRepo.create({
       userId: user1.id,
-      bookingId: userBookings[1]?.id ?? null,
+      bookingId: userPendingPayment.id,
       type: NotificationType.PAYMENT_REMINDER,
-      title: 'Nhắc thanh toán',
-      message: 'Vui lòng thanh toán trước hạn để giữ chỗ đặt sân.',
+      title: 'Payment reminder',
+      message: 'Please complete payment before the deadline to keep your reservation.',
       isRead: false,
     }),
     notificationRepo.create({
       userId: user1.id,
-      bookingId: userBookings[2]?.id ?? null,
+      bookingId: userUpcomingConfirmed.id,
       type: NotificationType.BOOKING_REMINDER,
-      title: 'Nhắc lịch chơi',
-      message: 'Bạn có lịch chơi vào ngày mai lúc 8:00. Đừng quên nhé!',
+      title: 'Upcoming play reminder',
+      message: 'You have an upcoming session tomorrow at 08:00.',
       isRead: true,
     }),
     notificationRepo.create({
       userId: user1.id,
-      bookingId: userBookings[3]?.id ?? null,
+      bookingId: userCancelled.id,
       type: NotificationType.BOOKING_CANCELLED,
-      title: 'Đặt sân đã hủy',
-      message: 'Booking của bạn đã được hủy thành công.',
+      title: 'Booking cancelled',
+      message: 'Your booking was cancelled at your request.',
       isRead: true,
+    }),
+    notificationRepo.create({
+      userId: user1.id,
+      bookingId: userCompleted.id,
+      type: NotificationType.BOOKING_COMPLETED,
+      title: 'Booking completed',
+      message: 'Your session has been marked as completed.',
+      isRead: true,
+    }),
+    notificationRepo.create({
+      userId: user1.id,
+      bookingId: userCancelled.id,
+      type: NotificationType.REFUND_PROCESSED,
+      title: 'Refund processed',
+      message: 'Your refund has been processed successfully.',
+      isRead: false,
     }),
     notificationRepo.create({
       userId: user2.id,
-      bookingId: null,
-      type: NotificationType.BOOKING_CONFIRMED,
-      title: 'Đặt sân thành công',
-      message: 'Booking tại Premium Tennis Court đã được xác nhận.',
+      bookingId: adminCancelled.id,
+      type: NotificationType.BOOKING_CANCELLED,
+      title: 'Booking cancelled by admin',
+      message: 'Your booking was cancelled by staff because the court became unavailable.',
+      isRead: false,
+    }),
+    notificationRepo.create({
+      userId: user2.id,
+      bookingId: expiredBooking.id,
+      type: NotificationType.BOOKING_EXPIRED,
+      title: 'Booking expired',
+      message: 'Your reservation expired because payment was not completed in time.',
+      isRead: false,
+    }),
+    notificationRepo.create({
+      userId: user3.id,
+      bookingId: systemCancelled.id,
+      type: NotificationType.BOOKING_CANCELLED,
+      title: 'Booking cancelled by system',
+      message: 'Your booking was cancelled automatically by system policy.',
       isRead: false,
     }),
   ]);

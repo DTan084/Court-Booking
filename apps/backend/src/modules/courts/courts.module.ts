@@ -10,6 +10,7 @@ import { CourtsService } from './courts.service';
 import { CourtsController } from './courts.controller';
 import { BookingsModule } from '../bookings/bookings.module';
 import { RedisModule } from '../../common/redis/redis.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RedisModule } from '../../common/redis/redis.module';
     ]),
     forwardRef(() => BookingsModule),
     RedisModule,
+    NotificationsModule,
   ],
   controllers: [CourtsController],
   providers: [CourtsService],

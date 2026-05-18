@@ -65,16 +65,39 @@ export class BookingJobsProcessor {
   async completeConfirmedBookings(_job: Job): Promise<void> {
     const now = new Date();
 
-    const result = await this.bookingRepo
-      .createQueryBuilder()
-      .update(BookingEntity)
-      .set({ status: BookingStatus.COMPLETED, completedAt: now })
-      .where('status = :status', { status: BookingStatus.CONFIRMED })
-      .andWhere('end_time < :now', { now })
-      .execute();
+    const completedTargets = await this.bookingRepo.find({
+      where: {
+        status: BookingStatus.CONFIRMED,
+        endTime: LessThan(now),
+      },
+      relations: ['court'],
+    });
 
-    if (result.affected && result.affected > 0) {
-      this.logger.log(`Completed ${result.affected} CONFIRMED booking(s)`);
+    if (completedTargets.length === 0) return;
+
+    let completedCount = 0;
+    for (const booking of completedTargets) {
+      const result = await this.bookingRepo.update(
+        { id: booking.id, status: BookingStatus.CONFIRMED },
+        { status: BookingStatus.COMPLETED, completedAt: now },
+      );
+
+      if (result.affected && result.affected > 0) {
+        completedCount++;
+        if (booking.userId) {
+          await this.notificationsService.create({
+            userId: booking.userId,
+            type: NotificationType.BOOKING_COMPLETED,
+            title: 'Booking completed',
+            message: `Your session at ${booking.court?.name || 'your court'} has been marked as completed.`,
+            bookingId: booking.id,
+          });
+        }
+      }
+    }
+
+    if (completedCount > 0) {
+      this.logger.log(`Completed and notified ${completedCount} booking(s)`);
     }
   }
 

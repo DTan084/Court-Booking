@@ -10,6 +10,7 @@ import { CourtFeatureEntity } from '../../database/entities/court-feature.entity
 import { FeatureEntity } from '../../database/entities/feature.entity';
 import { SportTypeEntity } from '../../database/entities/sport-type.entity';
 import { CourtType } from '@court-booking/shared';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('CourtsService', () => {
   let service: CourtsService;
@@ -146,6 +147,12 @@ describe('CourtsService', () => {
           provide: 'REDIS_CLIENT',
           useValue: mockRedis,
         },
+        {
+          provide: NotificationsService,
+          useValue: {
+            create: jest.fn().mockResolvedValue({}),
+          },
+        },
       ],
     }).compile();
 
@@ -217,7 +224,7 @@ describe('CourtsService', () => {
       const result = await service.findAll(query);
 
       expect(result).toEqual({
-        data: [{ ...mockCourt, featureItems: [] }],
+        data: [{ ...mockCourt, images: [], featureItems: [] }],
         meta: {
           total: 1,
           page: 1,

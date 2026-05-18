@@ -33,6 +33,93 @@ export class BookingsService {
     return driverError?.code === '23P01' || driverError?.code === '23505';
   }
 
+  private getCourtLabel(
+    booking: Pick<BookingEntity, 'court'> & { court?: { name?: string } | null },
+  ) {
+    return booking.court?.name || 'your court';
+  }
+
+  private getBookingScheduleLabels(
+    booking: Pick<BookingEntity, 'startTime' | 'court'> & { court?: { name?: string } | null },
+  ) {
+    const start = new Date(booking.startTime);
+    return {
+      courtName: this.getCourtLabel(booking),
+      startTimeStr: start.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      startDateStr: start.toLocaleDateString('vi-VN'),
+    };
+  }
+
+  private async loadBookingWithCourt(id: string): Promise<BookingEntity> {
+    const booking = await this.bookingRepository.findOne({
+      where: { id },
+      relations: ['court'],
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+    return booking;
+  }
+
+  private createConfirmedNotification(booking: BookingEntity, message?: string): Promise<unknown> {
+    const { courtName, startTimeStr, startDateStr } = this.getBookingScheduleLabels(booking);
+    return this.notificationsService.create({
+      userId: booking.userId!,
+      type: NotificationType.BOOKING_CONFIRMED,
+      title: 'Booking Confirmed',
+      message:
+        message ||
+        `You have successfully booked ${courtName} at ${startTimeStr} on ${startDateStr}.`,
+      bookingId: booking.id,
+    });
+  }
+
+  private createCancellationNotification(booking: BookingEntity): Promise<unknown> {
+    const { courtName, startTimeStr, startDateStr } = this.getBookingScheduleLabels(booking);
+    const cancelledBy = booking.cancelledBy ?? CancelledBy.USER;
+
+    if (cancelledBy === CancelledBy.ADMIN) {
+      return this.notificationsService.create({
+        userId: booking.userId!,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: 'Booking cancelled by admin',
+        message: `Your booking for ${courtName} at ${startTimeStr} on ${startDateStr} was cancelled by our staff.${booking.cancelledReason ? ` Reason: ${booking.cancelledReason}.` : ''}`,
+        bookingId: booking.id,
+      });
+    }
+
+    if (cancelledBy === CancelledBy.SYSTEM) {
+      return this.notificationsService.create({
+        userId: booking.userId!,
+        type: NotificationType.BOOKING_CANCELLED,
+        title: 'Booking cancelled by system',
+        message: `Your booking for ${courtName} at ${startTimeStr} on ${startDateStr} was cancelled automatically.${booking.cancellationNote ? ` ${booking.cancellationNote}` : ''}`,
+        bookingId: booking.id,
+      });
+    }
+
+    return this.notificationsService.create({
+      userId: booking.userId!,
+      type: NotificationType.BOOKING_CANCELLED,
+      title: 'Booking Cancelled',
+      message: `Your booking for ${courtName} at ${startTimeStr} on ${startDateStr} has been successfully cancelled.`,
+      bookingId: booking.id,
+    });
+  }
+
+  private createRefundNotification(booking: BookingEntity): Promise<unknown> {
+    const { courtName } = this.getBookingScheduleLabels(booking);
+    return this.notificationsService.create({
+      userId: booking.userId!,
+      type: NotificationType.REFUND_PROCESSED,
+      title: 'Refund processed',
+      message: `A refund of ${Number(booking.refundAmount || 0).toLocaleString('vi-VN')} VND for your booking at ${courtName} has been processed.`,
+      bookingId: booking.id,
+    });
+  }
+
   constructor(
     @InjectRepository(BookingEntity)
     private readonly bookingRepository: Repository<BookingEntity>,
@@ -262,22 +349,10 @@ export class BookingsService {
       return manager.save(booking);
     });
 
-    // REQ-23.2: Notification on CONFIRMED
-    const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
-
-    this.notificationsService
-      .create({
-        userId: savedBooking.userId!,
-        type: NotificationType.BOOKING_CONFIRMED,
-        title: 'Booking Confirmed',
-        message: `You have successfully booked court ${savedBooking.court?.name || 'sport'} at ${startTimeStr} on ${startDateStr}.`,
-        bookingId: savedBooking.id,
-      })
-      .catch(console.error);
+    const bookingWithCourt = await this.loadBookingWithCourt(savedBooking.id).catch(
+      () => savedBooking,
+    );
+    this.createConfirmedNotification(bookingWithCourt).catch(console.error);
 
     return savedBooking;
   }
@@ -360,22 +435,10 @@ export class BookingsService {
       return manager.save(booking);
     });
 
-    // REQ-23.2: Notification on CANCELLED
-    const startTimeStr = new Date(savedBooking.startTime).toLocaleTimeString('vi-VN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const startDateStr = new Date(savedBooking.startTime).toLocaleDateString('vi-VN');
-
-    this.notificationsService
-      .create({
-        userId: savedBooking.userId!,
-        type: NotificationType.BOOKING_CANCELLED,
-        title: 'Booking Cancelled',
-        message: `Your booking for ${savedBooking.court?.name || ''} at ${startTimeStr} on ${startDateStr} has been successfully cancelled.`,
-        bookingId: savedBooking.id,
-      })
-      .catch(console.error);
+    const bookingWithCourt = await this.loadBookingWithCourt(savedBooking.id).catch(
+      () => savedBooking,
+    );
+    this.createCancellationNotification(bookingWithCourt).catch(console.error);
 
     return savedBooking;
   }
@@ -539,7 +602,7 @@ export class BookingsService {
       throw new BadRequestException('Booking must start and end on the hour (e.g. 08:00, 10:00)');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const savedBooking = await this.dataSource.transaction(async (manager) => {
       const court = await manager.findOne(CourtEntity, {
         where: { id: courtId },
         lock: { mode: 'pessimistic_write' },
@@ -608,20 +671,20 @@ export class BookingsService {
         throw error;
       }
 
-      if (saved.userId) {
-        this.notificationsService
-          .create({
-            userId: saved.userId,
-            type: NotificationType.BOOKING_CONFIRMED,
-            title: 'Booking Confirmed',
-            message: 'Your booking has been confirmed by our staff.',
-            bookingId: saved.id,
-          })
-          .catch(console.error);
-      }
-
       return saved;
     });
+
+    if (savedBooking.userId) {
+      const bookingWithCourt = await this.loadBookingWithCourt(savedBooking.id).catch(
+        () => savedBooking,
+      );
+      this.createConfirmedNotification(
+        bookingWithCourt,
+        'Your booking has been confirmed by our staff.',
+      ).catch(console.error);
+    }
+
+    return savedBooking;
   }
 
   async getAdminBookings(query: {
@@ -851,7 +914,10 @@ export class BookingsService {
     bookingId: string,
     payload: { cancelledReason?: string; cancellationNote?: string; cancelledBy?: CancelledBy },
   ) {
-    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId },
+      relations: ['court'],
+    });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.status === BookingStatus.COMPLETED) {
       throw new BadRequestException('Cannot cancel a completed booking');
@@ -861,11 +927,18 @@ export class BookingsService {
     booking.cancelledBy = payload.cancelledBy ?? CancelledBy.ADMIN;
     booking.cancelledReason = payload.cancelledReason ?? null;
     booking.cancellationNote = payload.cancellationNote ?? null;
-    return this.bookingRepository.save(booking);
+    const saved = await this.bookingRepository.save(booking);
+    if (saved.userId) {
+      this.createCancellationNotification(saved).catch(console.error);
+    }
+    return saved;
   }
 
   async refundBooking(bookingId: string, refundAmount: number): Promise<BookingEntity> {
-    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId },
+      relations: ['court'],
+    });
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.refundedAt) throw new ConflictException('Booking has already been refunded');
 
@@ -882,7 +955,11 @@ export class BookingsService {
     }
     booking.refundedAt = new Date();
     booking.refundAmount = refundAmount;
-    return this.bookingRepository.save(booking);
+    const saved = await this.bookingRepository.save(booking);
+    if (saved.userId) {
+      this.createRefundNotification(saved).catch(console.error);
+    }
+    return saved;
   }
 
   async updateAdminBooking(

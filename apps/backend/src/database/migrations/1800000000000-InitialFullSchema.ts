@@ -52,8 +52,9 @@ export class InitialFullSchema1800000000000 implements MigrationInterface {
     await queryRunner.query(`
       DO $$ BEGIN
         CREATE TYPE "public"."notifications_type_enum" AS ENUM(
-          'BOOKING_CONFIRMED','BOOKING_CANCELLED','BOOKING_REMINDER',
-          'PAYMENT_REMINDER','SYSTEM_ANNOUNCEMENT','BOOKING_COMPLETED'
+          'BOOKING_CONFIRMED','PAYMENT_REMINDER','BOOKING_REMINDER',
+          'BOOKING_EXPIRED','BOOKING_CANCELLED','BOOKING_COMPLETED',
+          'REFUND_PROCESSED','SYSTEM_ANNOUNCEMENT'
         );
       EXCEPTION WHEN duplicate_object THEN NULL; END $$
     `);
