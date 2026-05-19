@@ -1,28 +1,26 @@
-// TODO: Zod Validation Pipe
-// - Nhận Zod schema, validate request body
-// - Trả 400 Bad Request với chi tiết lỗi nếu invalid
-// - Usage: @Body(new ZodValidationPipe(schema))
-
-import {
-  PipeTransform,
-  Injectable,
-  ArgumentMetadata,
-  BadRequestException,
-} from '@nestjs/common';
-import { ZodSchema } from 'zod';
+import { PipeTransform, Injectable, ArgumentMetadata, BadRequestException } from '@nestjs/common';
+import { ZodSchema, ZodError } from 'zod';
 
 @Injectable()
 export class ZodValidationPipe implements PipeTransform {
   constructor(private schema: ZodSchema) {}
 
-  transform(value: unknown, metadata: ArgumentMetadata) {
-    const result = this.schema.safeParse(value);
-    if (!result.success) {
-      throw new BadRequestException({
-        message: 'Validation failed',
-        errors: result.error.flatten().fieldErrors,
-      });
+  transform(value: any, metadata: ArgumentMetadata) {
+    if (metadata.type !== 'body' && metadata.type !== 'query') {
+      return value;
     }
-    return result.data;
+
+    try {
+      const parsedValue = this.schema.parse(value);
+      return parsedValue;
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException({
+          message: 'Validation failed',
+          errors: error.errors,
+        });
+      }
+      throw new BadRequestException('Validation failed');
+    }
   }
 }

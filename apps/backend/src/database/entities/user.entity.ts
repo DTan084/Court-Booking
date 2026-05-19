@@ -1,39 +1,52 @@
-// TODO: User Entity
-// - @Entity("users")
-// - Columns: id (UUID), name, email, password_hash, phone, role, created_at, updated_at, deleted_at
-// - @OneToMany(() => Booking, b => b.user)
-
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { BookingEntity } from './booking.entity';
+import { RefreshTokenEntity } from './refresh-token.entity';
+import { Role } from '@court-booking/shared';
+import { Exclude } from 'class-transformer';
 
 @Entity('users')
 export class UserEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   name: string;
 
-  @Column({ unique: true, length: 255 })
+  @Column({ type: 'varchar', length: 255, unique: true })
   email: string;
 
-  @Column({ name: 'password_hash' })
+  @Exclude()
+  @Column({ type: 'varchar', length: 255, name: 'password_hash' })
   passwordHash: string;
 
-  @Column({ nullable: true, length: 20 })
-  phone: string;
+  @Column({ type: 'enum', enum: Role, default: Role.USER })
+  role: Role;
 
-  @Column({ default: 'user' })
-  role: string;
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phone: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Column({ type: 'varchar', length: 500, name: 'avatar_url', nullable: true })
+  avatarUrl: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  dob: string | null;
+
+  @OneToMany(() => BookingEntity, (booking) => booking.user)
+  bookings: BookingEntity[];
+
+  @OneToMany(() => RefreshTokenEntity, (token) => token.user)
+  refreshTokens: RefreshTokenEntity[];
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
-
-  @DeleteDateColumn({ name: 'deleted_at' })
-  deletedAt: Date;
-
-  // TODO: @OneToMany(() => BookingEntity, booking => booking.user)
-  // bookings: BookingEntity[];
 }

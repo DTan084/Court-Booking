@@ -11,8 +11,10 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": true,
+    "strictPropertyInitialization": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {

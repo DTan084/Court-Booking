@@ -1,0 +1,44 @@
+{
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "Literal[value='ADMIN']",
+        "message": "Use Role.ADMIN instead of string literal 'ADMIN'."
+      },
+      {
+        "selector": "Literal[value='USER']",
+        "message": "Use Role.USER instead of string literal 'USER'."
+      },
+      {
+        "selector": "Literal[value='ACTIVE']",
+        "message": "Use CourtStatus.ACTIVE instead of string literal 'ACTIVE'."
+      },
+      {
+        "selector": "Literal[value='INACTIVE']",
+        "message": "Use CourtStatus.INACTIVE instead of string literal 'INACTIVE'."
+      },
+      {
+        "selector": "Literal[value='PENDING_PAYMENT']",
+        "message": "Use BookingStatus.PENDING_PAYMENT instead of string literal."
+      },
+      {
+        "selector": "Literal[value='CONFIRMED']",
+        "message": "Use BookingStatus.CONFIRMED instead of string literal."
+      },
+      {
+        "selector": "Literal[value='CANCELLED']",
+        "message": "Use BookingStatus.CANCELLED instead of string literal."
+      },
+      {
+        "selector": "Literal[value='COMPLETED']",
+        "message": "Use BookingStatus.COMPLETED instead of string literal."
+      },
+      {
+        "selector": "Literal[value='EXPIRED']",
+        "message": "Use BookingStatus.EXPIRED instead of string literal."
+      }
+    ]
+  }
+}

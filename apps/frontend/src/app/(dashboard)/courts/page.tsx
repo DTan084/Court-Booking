@@ -1,16 +1,27 @@
-// TODO: Courts listing page (Server Component)
-// - Fetch courts list from API
-// - Filter + Pagination
-// - Render CourtCard grid
+import type { Metadata } from 'next';
+import { SITE_NAME, getAbsoluteUrl } from '@/lib/site';
+import CourtsPageClient from './courts-page-client';
 
-export default async function CourtsPage() {
-  // TODO: Fetch courts (Server Component)
-  return (
-    <div>
-      <h1>Danh sách sân</h1>
-      {/* TODO: Filter bar */}
-      {/* TODO: CourtCard grid */}
-      {/* TODO: Pagination */}
-    </div>
-  );
+export const metadata: Metadata = {
+  title: 'Browse Sports Courts and Venues',
+  description:
+    'Browse tennis, badminton, basketball, and multi-sport courts with filters for sport, price, features, and availability.',
+  alternates: {
+    canonical: getAbsoluteUrl('/courts'),
+  },
+  openGraph: {
+    title: `Browse Sports Courts and Venues | ${SITE_NAME}`,
+    description:
+      'Find courts by sport, price, capacity, and amenities before booking your next session online.',
+    url: getAbsoluteUrl('/courts'),
+  },
+  twitter: {
+    title: `Browse Sports Courts and Venues | ${SITE_NAME}`,
+    description:
+      'Search sports courts by availability, features, and price before you reserve your next game.',
+  },
+};
+
+export default function CourtsPage() {
+  return <CourtsPageClient />;
 }

@@ -1,19 +1,297 @@
-// TODO: useBookings hook
-// - useQuery GET /bookings/me
-// - useMutation POST /bookings (create)
-// - useMutation PATCH /bookings/:id/cancel
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { api, queryKeys } from '@/lib/api';
+import { toast } from 'sonner';
+import type { AxiosError } from 'axios';
+import type { Booking, Court, PaginatedResult, BookingStatus, BookingSource } from '@/types';
 
-// import { useQuery, useMutation } from '@tanstack/react-query';
-// import { api } from '@/lib/api';
+// ==================== TYPES ====================
 
-export function useBookings() {
-  // TODO: return useQuery for booking list
+export interface GetBookingsParams {
+  page: number;
+  limit: number;
+  status?: BookingStatus;
+  statusGroup?: 'failed';
+  fromDate?: string; // YYYY-MM-DD
+  toDate?: string; // YYYY-MM-DD
+  [key: string]: unknown; // Add index signature
 }
 
+export interface MyBookingStats {
+  totalBookings: number;
+  upcomingBookings: number;
+  totalSpend: number;
+}
+
+export interface CreateBookingDto {
+  courtId: string;
+  startTime: string; // ISO 8601
+  endTime: string; // ISO 8601
+}
+
+export interface CreateAdminBookingDto {
+  courtId: string;
+  startTime: string;
+  endTime: string;
+  userId?: string | null;
+  guestName?: string;
+  guestPhone?: string;
+  note?: string;
+  paymentMethod?: string;
+  bookingSource?: BookingSource;
+}
+
+export interface AdminOverview {
+  window: { dateFrom: string; dateTo: string };
+  activeBookings: number;
+  newCustomers: number;
+  completedBookings: number;
+  totalRevenue: number;
+  bookedHours: number;
+  availableHours: number;
+  occupancyRate: number;
+}
+
+export type BookingWithCourt = Booking & { court: Court };
+
+type ApiErrorPayload = {
+  error?: { message?: string };
+  message?: string;
+};
+
+// ==================== HOOKS ====================
+
+/**
+ * Hook to fetch user's bookings with pagination and filters
+ */
+export function useMyBookings(params: GetBookingsParams) {
+  return useQuery<PaginatedResult<BookingWithCourt>>({
+    queryKey: queryKeys.bookings.myList(params),
+    queryFn: async () => {
+      const response = await api.get('/bookings/me', { params });
+      const payload = response.data?.data ?? response.data;
+
+      if (payload?.meta && payload?.data) {
+        return payload as PaginatedResult<BookingWithCourt>;
+      }
+
+      if (payload?.totalPages !== undefined) {
+        return {
+          data: payload.data ?? [],
+          meta: {
+            total: payload.total ?? payload.data?.length ?? 0,
+            page: payload.page ?? 1,
+            limit: payload.limit ?? payload.data?.length ?? 0,
+            totalPages: payload.totalPages ?? 1,
+          },
+        } as PaginatedResult<BookingWithCourt>;
+      }
+
+      return payload as PaginatedResult<BookingWithCourt>;
+    },
+    staleTime: 1 * 60 * 1000, // 1 minute
+    placeholderData: keepPreviousData, // Keep previous data while fetching new page
+  });
+}
+
+export function useMyBookingStats() {
+  return useQuery<MyBookingStats>({
+    queryKey: ['bookings', 'me', 'stats'],
+    queryFn: async () => {
+      const response = await api.get('/bookings/me/stats');
+      return response.data?.data ?? response.data;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * Hook to create a new booking
+ */
 export function useCreateBooking() {
-  // TODO: return useMutation for creating booking
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (dto: CreateBookingDto) => {
+      const response = await api.post<{ success: boolean; data: BookingWithCourt }>(
+        '/bookings',
+        dto,
+      );
+      return response.data.data;
+    },
+    onSuccess: (data, variables) => {
+      // Build date string from UTC parts of startTime (matches backend query format)
+      const startDate = new Date(variables.startTime);
+      const y = startDate.getUTCFullYear();
+      const m = String(startDate.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(startDate.getUTCDate()).padStart(2, '0');
+      const date = `${y}-${m}-${d}`;
+
+      // Force immediate refetch of the schedule (not just mark stale)
+      queryClient.refetchQueries({
+        queryKey: queryKeys.courts.schedule(variables.courtId, date),
+      });
+
+      // Also refetch all schedules for this court to cover any date mismatch
+      queryClient.refetchQueries({
+        queryKey: ['courts', variables.courtId, 'schedule'],
+        type: 'active',
+      });
+
+      // Invalidate user's booking list
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.bookings.all,
+      });
+
+      toast.success('Booking created successfully!');
+    },
+    onError: (error: AxiosError<ApiErrorPayload>) => {
+      const status = error.response?.status;
+      const message = error.response?.data?.error?.message || error.response?.data?.message || '';
+
+      if (status === 409) {
+        toast.error('This time slot is already booked, please select another time');
+      } else if (status === 400 && message.toLowerCase().includes('time slot')) {
+        toast.error("Invalid time slot for this court's schedule");
+      } else if (status === 400) {
+        toast.error(`Error: ${message || 'Invalid input data'}`);
+      } else {
+        toast.error('Failed to create booking, please try again');
+      }
+    },
+  });
 }
 
+/**
+ * Hook to cancel a booking
+ */
 export function useCancelBooking() {
-  // TODO: return useMutation for cancelling booking
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.patch<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}/cancel`,
+      );
+      return response.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.courts.all });
+      toast.success('Booking cancelled successfully');
+    },
+    onError: (error: AxiosError<ApiErrorPayload>) => {
+      const message = error.response?.data?.message || '';
+      toast.error(message || 'Failed to cancel booking, please try again');
+    },
+  });
+}
+
+/**
+ * Hook to fetch a single booking detail (REQ-18.10)
+ */
+export function useBooking(id: string, options?: { refetchInterval?: number }) {
+  return useQuery<BookingWithCourt>({
+    queryKey: queryKeys.bookings.detail(id),
+    queryFn: async () => {
+      const response = await api.get<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}`,
+      );
+      return response.data.data;
+    },
+    enabled: !!id,
+    ...options,
+  });
+}
+
+/**
+ * Hook to confirm payment (REQ-17)
+ */
+export function useConfirmPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<{ success: boolean; data: BookingWithCourt }>(
+        `/bookings/${id}/confirm-payment`,
+      );
+      return response.data.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
+      toast.success('Payment confirmed successfully!');
+    },
+    onError: (error: AxiosError<ApiErrorPayload>) => {
+      const status = error.response?.status;
+      const message = error.response?.data?.message || '';
+
+      if (status === 400 && message.toLowerCase().includes('expired')) {
+        toast.error('Booking payment window has expired');
+      } else if (status === 409) {
+        toast.error('This booking is already paid');
+      } else {
+        toast.error('Failed to confirm payment, please try again');
+      }
+    },
+  });
+}
+
+export function useAdminBookings(params: {
+  page: number;
+  limit: number;
+  status?: BookingStatus;
+  statusView?: 'CANCELLED_GROUP' | 'REFUND_PENDING';
+  bookingSource?: BookingSource;
+  courtId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+  sportTypeId?: string;
+  day?: string;
+}) {
+  return useQuery<
+    PaginatedResult<BookingWithCourt> & {
+      summary?: {
+        total: number;
+        confirmed: number;
+        confirmedOrCompleted: number;
+        adminWalkIn: number;
+        cancelled: number;
+        liveSessions: number;
+        dailyRevenue: number;
+      };
+    }
+  >({
+    queryKey: queryKeys.adminBookings.list(params),
+    queryFn: async () => {
+      const response = await api.get('/admin/bookings', { params });
+      return response.data.data;
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useAdminOverview(params: { dateFrom: string; dateTo: string }) {
+  return useQuery<AdminOverview>({
+    queryKey: ['admin-overview', params],
+    queryFn: async () => {
+      const response = await api.get('/admin/bookings/overview', { params });
+      return response.data.data;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCreateAdminBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dto: CreateAdminBookingDto) => {
+      const response = await api.post('/admin/bookings', dto);
+      return response.data.data as BookingWithCourt;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-bookings'] });
+      toast.success('Admin booking created successfully');
+    },
+  });
 }

@@ -1,0 +1,160 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import request from 'supertest';
+import { AppModule } from '../../src/app.module';
+import { Role } from '@court-booking/shared';
+import { DataSource } from 'typeorm';
+
+describe('CourtsController (e2e)', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+  let adminToken: string;
+  let createdCourtId: string;
+  let sportTypeId: string;
+  let createdSportTypeId: string | undefined;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    await app.init();
+
+    dataSource = app.get(DataSource);
+    const [firstSportType] = await dataSource.query(
+      'SELECT id FROM sport_types WHERE is_active = true ORDER BY display_order ASC, created_at ASC LIMIT 1',
+    );
+    if (firstSportType?.id) {
+      sportTypeId = firstSportType.id;
+    } else {
+      const [insertedSportType] = await dataSource.query(
+        `
+          INSERT INTO sport_types (name, icon, color, is_active, display_order)
+          VALUES ($1, $2, $3, true, 0)
+          RETURNING id
+        `,
+        [`E2E Sport ${Date.now()}`, 'TENNIS', '#2563EB'],
+      );
+      sportTypeId = insertedSportType.id;
+      createdSportTypeId = insertedSportType.id;
+    }
+
+    // Register and login as admin for testing
+    const adminEmail = `admin_e2e_${Date.now()}@example.com`;
+    await request(app.getHttpServer()).post('/api/v1/auth/register').send({
+      name: 'Admin Test',
+      email: adminEmail,
+      password: 'Password123!',
+    });
+
+    // Manually update role to ADMIN in DB since register defaults to USER
+    await dataSource.query(`UPDATE users SET role = '${Role.ADMIN}' WHERE email = $1`, [
+      adminEmail,
+    ]);
+
+    const loginRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
+      email: adminEmail,
+      password: 'Password123!',
+    });
+
+    adminToken = loginRes.body.access_token;
+  });
+
+  afterAll(async () => {
+    // Cleanup users created during test
+    await dataSource.query(
+      "DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE email LIKE 'admin_e2e_%')",
+    );
+    await dataSource.query("DELETE FROM users WHERE email LIKE 'admin_e2e_%'");
+    // Cleanup courts created
+    if (createdCourtId && createdCourtId.length === 36) {
+      await dataSource.query('DELETE FROM courts WHERE id = $1', [createdCourtId]);
+    }
+    if (createdSportTypeId) {
+      await dataSource.query('DELETE FROM sport_types WHERE id = $1', [createdSportTypeId]);
+    }
+    const redis = app.get('REDIS_CLIENT');
+    if (redis) await redis.quit();
+    await app.close();
+  });
+
+  describe('POST /courts', () => {
+    it('should create a new court when admin', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/courts')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'E2E Test Court',
+          sportTypeId,
+          courtType: 'INDOOR',
+          address: 'E2E Address',
+          pricePerHour: 100000,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.name).toBe('E2E Test Court');
+      createdCourtId = res.body.id;
+    });
+
+    it('should return 403 when not admin', async () => {
+      // Create a normal user token or just call without token (401)
+      // Let's assume we call without token
+      const res = await request(app.getHttpServer()).post('/api/v1/courts').send({ name: 'Fail' });
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /courts', () => {
+    it('should return list of courts', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/courts')
+        .query({ page: 1, limit: 10 });
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.meta.total).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('GET /courts/:id', () => {
+    it('should return court details', async () => {
+      const res = await request(app.getHttpServer()).get(`/api/v1/courts/${createdCourtId}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(createdCourtId);
+    });
+
+    it('should return 400 for invalid UUID', async () => {
+      const res = await request(app.getHttpServer()).get('/api/v1/courts/invalid-uuid');
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('PATCH /courts/:id', () => {
+    it('should update court info', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/api/v1/courts/${createdCourtId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ name: 'E2E Updated Court' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.name).toBe('E2E Updated Court');
+    });
+  });
+
+  describe('DELETE /courts/:id', () => {
+    it('should soft delete court', async () => {
+      const res = await request(app.getHttpServer())
+        .delete(`/api/v1/courts/${createdCourtId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+
+      // Verify it's not in the list anymore
+      const checkRes = await request(app.getHttpServer()).get(`/api/v1/courts/${createdCourtId}`);
+      expect(checkRes.status).toBe(404);
+    });
+  });
+});

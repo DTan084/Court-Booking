@@ -1,42 +1,89 @@
-// TODO: Court Entity
-// - @Entity("courts")
-// - Columns: id (UUID), name, sport_type, address, description, price_per_hour, is_active
-// - @OneToMany(() => Booking, b => b.court)
+﻿import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
+import { BookingEntity } from './booking.entity';
+import { CourtTimeSlotEntity } from './court-time-slot.entity';
+import { CourtType } from '@court-booking/shared';
+import { CourtImageEntity } from './court-image.entity';
+import { SportTypeEntity } from './sport-type.entity';
+import { CourtFeatureEntity } from './court-feature.entity';
 
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+export enum CourtStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
 
 @Entity('courts')
 export class CourtEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 200 })
+  @Index()
+  @Column({ type: 'varchar', length: 150 })
   name: string;
 
-  @Column({ name: 'sport_type', length: 50 })
-  sportType: string;
+  @Index('idx_courts_sport_type_id')
+  @Column({ type: 'uuid', name: 'sport_type_id' })
+  sportTypeId: string;
 
-  @Column({ length: 500 })
+  @ManyToOne(() => SportTypeEntity)
+  @JoinColumn({ name: 'sport_type_id' })
+  sportTypeRef: SportTypeEntity;
+
+  @Column({ type: 'text' })
   address: string;
 
-  @Column({ type: 'text', nullable: true })
-  description: string;
+  @Index()
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  district: string | null;
 
-  @Column({ name: 'price_per_hour', type: 'decimal', precision: 10, scale: 2 })
+  @Index({ where: 'deleted_at IS NULL' })
+  @Column({ type: 'enum', enum: CourtType, default: CourtType.OUTDOOR, name: 'court_type' })
+  courtType: CourtType;
+
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
+  @OneToMany(() => CourtImageEntity, (img) => img.court, { cascade: true, eager: false })
+  images: CourtImageEntity[];
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'price_per_hour' })
   pricePerHour: number;
 
-  @Column({ name: 'is_active', default: true })
-  isActive: boolean;
+  @Column({ type: 'enum', enum: CourtStatus, default: CourtStatus.ACTIVE })
+  status: CourtStatus;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @Index('idx_courts_is_featured')
+  @Column({ type: 'boolean', name: 'is_featured', default: false })
+  isFeatured: boolean;
+
+  @Column({ type: 'integer', name: 'max_players', nullable: true })
+  maxPlayers: number | null;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
+  deletedAt: Date | null;
+
+  @OneToMany(() => BookingEntity, (booking) => booking.court)
+  bookings: BookingEntity[];
+
+  @OneToMany(() => CourtTimeSlotEntity, (slot) => slot.court, { cascade: true })
+  timeSlots: CourtTimeSlotEntity[];
+
+  @OneToMany(() => CourtFeatureEntity, (link) => link.court)
+  featureLinks: CourtFeatureEntity[];
+
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
-
-  @DeleteDateColumn({ name: 'deleted_at' })
-  deletedAt: Date;
-
-  // TODO: @OneToMany(() => BookingEntity, booking => booking.court)
-  // bookings: BookingEntity[];
 }

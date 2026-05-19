@@ -1,0 +1,39 @@
+{
+  "name": "court-booking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enterprise Court Booking System - Monorepo",
+  "scripts": {
+    "dev": "pnpm --parallel -r run dev",
+    "dev:be": "pnpm --filter @court-booking/backend run dev",
+    "dev:fe": "pnpm --filter @court-booking/frontend run dev",
+    "build": "pnpm -r run build",
+    "build:be": "pnpm --filter @court-booking/backend run build",
+    "build:fe": "pnpm --filter @court-booking/frontend run build",
+    "test": "pnpm -r run test",
+    "test:be": "pnpm --filter @court-booking/backend run test",
+    "test:cov": "pnpm --filter @court-booking/backend run test:cov",
+    "lint": "pnpm -r run lint",
+    "format": "pnpm -r run format",
+    "clean": "pnpm -r exec powershell -Command \"Remove-Item -Recurse -Force -ErrorAction SilentlyContinue node_modules, dist, .next, .turbo\"",
+    "prepare": "node -e \"if (process.env.HUSKY === '0') process.exit(0)\" || husky"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

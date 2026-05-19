@@ -1,16 +1,150 @@
-// TODO: Auth Controller
-// - @Post("/register") register(@Body() dto: RegisterDto)
-// - @Post("/login") login(@Body() dto: LoginDto)
-// - @UseGuards(JwtAuthGuard) cho protected routes
-
-import { Controller } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UsePipes,
+  HttpCode,
+  HttpStatus,
+  Get,
+  UseGuards,
+  Res,
+  Req,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { RegisterDto, registerSchema } from './dto/register.dto';
+import { LoginDto, loginSchema } from './dto/login.dto';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { JwtAuthGuard } from './guards/jwt.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '@court-booking/shared';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiErrorResponse } from '../../common/swagger/api-response.swagger';
+import { ConfigService } from '@nestjs/config';
+import {
+  RegisterBody,
+  RegisterResponse,
+  LoginBody,
+  LoginResponse,
+  UserProfileResponse,
+} from './swagger/auth.swagger';
+import { Response, Request } from 'express';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  // TODO: POST /auth/register
-  // TODO: POST /auth/login
-  // TODO: POST /auth/refresh
+  @Post('register')
+  @ApiOperation({ summary: 'Register a new user' })
+  @ApiBody({ type: RegisterBody })
+  @ApiResponse({ status: 201, description: 'User registered successfully', type: RegisterResponse })
+  @ApiResponse({ status: 409, description: 'Email already in use', type: ApiErrorResponse })
+  @HttpCode(HttpStatus.CREATED)
+  @UsePipes(new ZodValidationPipe(registerSchema))
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: 'Login and get tokens' })
+  @ApiBody({ type: LoginBody })
+  @ApiResponse({ status: 200, description: 'Login successful', type: LoginResponse })
+  @ApiResponse({ status: 401, description: 'Invalid credentials', type: ApiErrorResponse })
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(loginSchema))
+  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const tokens = await this.authService.login(loginDto);
+    this.setAuthCookies(res, tokens.access_token, tokens.refresh_token);
+    return tokens;
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiResponse({ status: 200, description: 'Token refreshed', type: LoginResponse })
+  @ApiResponse({ status: 401, description: 'Invalid refresh token', type: ApiErrorResponse })
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = req.cookies?.refresh_token;
+    const tokens = await this.authService.refreshTokens(refreshToken);
+    this.setAuthCookies(res, tokens.access_token, tokens.refresh_token);
+    return tokens;
+  }
+
+  @Post('logout')
+  @ApiOperation({ summary: 'Logout and revoke refresh token' })
+  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @HttpCode(HttpStatus.OK)
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = req.cookies?.refresh_token;
+    await this.authService.revokeRefreshToken(refreshToken);
+    this.clearAuthCookies(res);
+    return { message: 'Logged out successfully' };
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: 'Current user profile', type: UserProfileResponse })
+  @ApiResponse({ status: 401, description: 'Unauthorized', type: ApiErrorResponse })
+  @UseGuards(JwtAuthGuard)
+  async getMe(@CurrentUser() user: any) {
+    return user;
+  }
+
+  @Get('admin')
+  @ApiOperation({ summary: 'Admin only endpoint' })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: 'Admin access granted' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin only', type: ApiErrorResponse })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async adminOnly() {
+    return { message: 'Welcome Admin!' };
+  }
+
+  private setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
+    const isProduction = this.configService.get<string>('app.nodeEnv') === 'production';
+    const accessExpiresIn = this.configService.get<string>('jwt.expiresIn') || '15m';
+    const refreshExpiresIn = this.configService.get<string>('jwt.refreshExpiresIn') || '7d';
+
+    res.cookie('access_token', accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: this.parseExpiresInToMs(accessExpiresIn),
+      path: '/',
+    });
+
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: this.parseExpiresInToMs(refreshExpiresIn),
+      path: '/api/v1/auth/refresh',
+    });
+  }
+
+  private clearAuthCookies(res: Response) {
+    res.clearCookie('access_token', { path: '/' });
+    res.clearCookie('refresh_token', { path: '/api/v1/auth/refresh' });
+  }
+
+  private parseExpiresInToMs(expiresIn: string): number {
+    const match = expiresIn.match(/^(\d+)([smhd])$/);
+    if (!match) return 15 * 60 * 1000;
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+    const multipliers: Record<string, number> = {
+      s: 1000,
+      m: 60 * 1000,
+      h: 60 * 60 * 1000,
+      d: 24 * 60 * 60 * 1000,
+    };
+    return value * (multipliers[unit] ?? 1);
+  }
 }

@@ -1,6 +1,9 @@
-// TODO: UpdateCourtDto
-// - Partial of CreateCourtDto
+import { courtBaseSchema } from './create-court.dto';
+import { z } from 'zod';
+import { CourtStatus } from '../../../database/entities/court.entity';
 
-export class UpdateCourtDto {
-  // TODO: Define with Zod schema (partial)
-}
+export const updateCourtSchema = courtBaseSchema.partial().extend({
+  status: z.nativeEnum(CourtStatus).optional(),
+});
+
+export type UpdateCourtDto = z.infer<typeof updateCourtSchema>;

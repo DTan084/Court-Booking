@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Start Services for E2E
+        run: |
+          cp .env.e2e .env
+          docker compose -f infra/docker-compose.yml --env-file .env.docker up -d postgres redis
+          for i in {1..15}; do docker exec court-booking-db pg_isready -U postgres && break || sleep 2; done
+          for i in {1..15}; do docker exec court-booking-redis redis-cli -a "change_this_redis_password" ping && break || sleep 2; done
+
+      - name: Run Migrations for E2E
+        run: pnpm --filter @court-booking/backend run migration:run
+
+      - name: Run E2E Tests
+        run: pnpm --filter @court-booking/backend run test:e2e
+
+      - name: Build
+        run: pnpm build
+
+      - name: Stop Services
+        if: always()
+        run: docker compose -f infra/docker-compose.yml --env-file .env.docker down -v
