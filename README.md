@@ -46,8 +46,8 @@ The platform supports:
 
 | Layer    | Stack                                                                   |
 | -------- | ----------------------------------------------------------------------- |
-| Frontend | Next.js 14, React 18, TypeScript, TanStack Query, Zustand, Tailwind CSS |
-| Backend  | NestJS 10, TypeORM, PostgreSQL 16, Bull, Redis, Winston                 |
+| Frontend | Next.js 16, React 19, TypeScript, TanStack Query, Zustand, Tailwind CSS |
+| Backend  | NestJS 11, TypeORM, PostgreSQL 17, Bull, Redis, Winston                 |
 | Shared   | Workspace package for shared types, enums, and contracts                |
 | Auth     | JWT access/refresh flow with httpOnly cookies                           |
 | Infra    | Docker Compose, Nginx                                                   |
@@ -80,7 +80,7 @@ flowchart LR
 court-booking/
 ├── apps/
 │   ├── backend/               NestJS API service
-│   └── frontend/              Next.js 14 web application
+│   └── frontend/              Next.js 16 web application
 ├── packages/
 │   └── shared/                Shared enums and types
 ├── infra/
@@ -104,8 +104,8 @@ court-booking/
 
 For local non-Docker development:
 
-- PostgreSQL 16+
-- Redis 7+
+- PostgreSQL 17+
+- Redis 8+
 
 ### Quick Start with Docker
 

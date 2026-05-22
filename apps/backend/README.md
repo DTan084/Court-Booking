@@ -17,9 +17,9 @@ The backend is responsible for:
 
 | Area          | Stack           |
 | ------------- | --------------- |
-| Framework     | NestJS 10       |
+| Framework     | NestJS 11       |
 | ORM           | TypeORM 0.3     |
-| Database      | PostgreSQL 16   |
+| Database      | PostgreSQL 17   |
 | Queue         | Bull            |
 | Cache / Infra | Redis, ioredis  |
 | Auth          | JWT, Passport   |

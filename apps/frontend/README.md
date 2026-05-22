@@ -1,6 +1,6 @@
 # Frontend Application
 
-This package contains the Next.js 14 frontend for the Court Booking platform.
+This package contains the Next.js 16 frontend for the Court Booking platform.
 
 ## Responsibilities
 
@@ -17,8 +17,8 @@ The frontend is responsible for:
 
 | Area          | Stack                   |
 | ------------- | ----------------------- |
-| Framework     | Next.js 14 App Router   |
-| UI Runtime    | React 18                |
+| Framework     | Next.js 16 App Router   |
+| UI Runtime    | React 19                |
 | Language      | TypeScript              |
 | Data Fetching | TanStack Query          |
 | State         | Zustand                 |
@@ -42,7 +42,7 @@ apps/frontend/
 ├── Dockerfile
 ├── next.config.js
 ├── package.json
-└── vitest.config.mjs
+└── vitest.config.js
 ```
 
 ## Route Structure
@@ -113,12 +113,12 @@ through the Nginx reverse proxy.
 
 Frontend-specific runtime variables:
 
-| Variable               | Required | Purpose                                              |
-| ---------------------- | -------- | ---------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL`  | Yes      | Browser-facing API origin                            |
-| `NEXT_PUBLIC_SITE_URL` | Yes      | Public site origin for canonical and SEO metadata    |
-| `NEXTAUTH_URL`         | Yes      | Frontend auth-related base URL                       |
-| `NEXTAUTH_SECRET`      | Yes      | Auth-related secret used by the frontend environment |
+| Variable               | Required | Purpose                                             |
+| ---------------------- | -------- | --------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`  | Yes      | Browser-facing API origin                           |
+| `NEXT_PUBLIC_SITE_URL` | Yes      | Public site origin for canonical and SEO metadata   |
+| `NEXTAUTH_URL`         | Optional | Reserved for optional Auth.js/NextAuth integrations |
+| `NEXTAUTH_SECRET`      | Optional | Reserved for optional Auth.js/NextAuth integrations |
 
 In local development, frontend-specific values usually live in:
 
