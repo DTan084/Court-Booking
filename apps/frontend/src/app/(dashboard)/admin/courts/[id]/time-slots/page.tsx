@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { ArrowLeft, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCourt } from '@/hooks/useCourt';
@@ -8,9 +9,11 @@ import { useTimeSlots } from '@/hooks/useTimeSlots';
 import { TimeSlotEditor } from '@/components/admin/TimeSlotEditor';
 import { SkeletonCard } from '@/components/shared/SkeletonCard';
 
-export default function TimeSlotManagerPage({ params }: { params: { id: string } }) {
-  const { data: court, isLoading: courtLoading } = useCourt(params.id);
-  const { data: timeSlots, isLoading: slotsLoading } = useTimeSlots(params.id);
+export default function TimeSlotManagerPage() {
+  const params = useParams<{ id: string }>();
+  const courtId = params.id;
+  const { data: court, isLoading: courtLoading } = useCourt(courtId);
+  const { data: timeSlots, isLoading: slotsLoading } = useTimeSlots(courtId);
 
   const isLoading = courtLoading || slotsLoading;
 
@@ -42,7 +45,7 @@ export default function TimeSlotManagerPage({ params }: { params: { id: string }
       {isLoading ? (
         <SkeletonCard count={4} />
       ) : court && timeSlots ? (
-        <TimeSlotEditor courtId={params.id} timeSlots={timeSlots} />
+        <TimeSlotEditor courtId={courtId} timeSlots={timeSlots} />
       ) : (
         <div className="rounded-lg border bg-card p-12 text-center">
           <p className="text-muted-foreground">Court not found.</p>

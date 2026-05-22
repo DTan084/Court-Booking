@@ -259,7 +259,6 @@ export function useReorderCourtImages(courtId: string) {
       const message = error.response?.data?.error?.message || error.response?.data?.message || '';
       toast.error(message || 'Failed to reorder images, please try again');
       // Debug quickly in browser console when BE returns validation details.
-      // eslint-disable-next-line no-console
       console.error('reorder court images failed:', error.response?.data);
     },
   });

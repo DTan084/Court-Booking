@@ -11,15 +11,16 @@ export const metadata: Metadata = {
 };
 
 interface CheckoutPageProps {
-  params: {
+  params: Promise<{
     bookingId: string;
-  };
+  }>;
 }
 
-export default function CheckoutPage({ params }: CheckoutPageProps) {
+export default async function CheckoutPage({ params }: CheckoutPageProps) {
+  const { bookingId } = await params;
   return (
     <div className="container mx-auto py-10 animate-in fade-in duration-500">
-      <CheckoutClient bookingId={params.bookingId} />
+      <CheckoutClient bookingId={bookingId} />
     </div>
   );
 }
