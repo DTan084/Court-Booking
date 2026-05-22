@@ -98,7 +98,7 @@ court-booking/
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 24+
 - pnpm 9+
 - Docker Desktop
 
