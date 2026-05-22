@@ -258,7 +258,7 @@ importers:
         specifier: ^16.2.6
         version: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       next-auth:
-        specifier: ^4.0.0
+        specifier: ^4.24.14
         version: 4.24.14(next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       react:
         specifier: ^19.2.6
@@ -9128,10 +9128,10 @@ packages:
     peerDependencies:
       preact: '>=10'
 
-  preact@10.29.1:
+  preact@10.29.2:
     resolution:
       {
-        integrity: sha512-gQCLc/vWroE8lIpleXtdJhTFDogTdZG9AjMUpVkDf2iTCNwYNWA+u16dL41TqUDJO4gm2IgrcMv3uTpjd4Pwmg==,
+        integrity: sha512-7tNmwg/7mzzAoB/8kSg6Hl37JraAZw3Z3A0JSY7VXlZwo82Xn0G7wKbNNs2qoF4ZEEsQGTwDAroNdqKs1ofJxQ==,
       }
 
   prelude-ls@1.2.1:
@@ -16934,8 +16934,8 @@ snapshots:
       next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       oauth: 0.9.15
       openid-client: 5.7.1
-      preact: 10.29.1
-      preact-render-to-string: 5.2.6(preact@10.29.1)
+      preact: 10.29.2
+      preact-render-to-string: 5.2.6(preact@10.29.2)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
       uuid: 8.3.2
@@ -17359,12 +17359,12 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  preact-render-to-string@5.2.6(preact@10.29.1):
+  preact-render-to-string@5.2.6(preact@10.29.2):
     dependencies:
-      preact: 10.29.1
+      preact: 10.29.2
       pretty-format: 3.8.0
 
-  preact@10.29.1: {}
+  preact@10.29.2: {}
 
   prelude-ls@1.2.1: {}
 
