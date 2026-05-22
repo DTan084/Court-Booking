@@ -19,7 +19,7 @@
     "prepare": "node -e \"if (process.env.HUSKY === '0') process.exit(0)\" || husky"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=24.0.0",
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@9.15.0",

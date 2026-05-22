@@ -11,6 +11,7 @@ import { AuthService } from './auth.service';
 import { AuthCleanupService } from './auth.cleanup.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RedisModule } from '../../common/redis/redis.module';
+import type { StringValue } from 'ms';
 
 @Module({
   imports: [
@@ -20,12 +21,15 @@ import { RedisModule } from '../../common/redis/redis.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.secret'),
-        signOptions: {
-          expiresIn: configService.get<string>('jwt.expiresIn'),
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const expiresIn = configService.get<string>('jwt.expiresIn') ?? '15m';
+        return {
+          secret: configService.getOrThrow<string>('jwt.secret'),
+          signOptions: {
+            expiresIn: expiresIn as StringValue,
+          },
+        };
+      },
     }),
     RedisModule,
   ],

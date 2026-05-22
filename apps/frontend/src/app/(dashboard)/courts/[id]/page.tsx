@@ -6,9 +6,9 @@ import { getAbsoluteImageUrl, getAbsoluteUrl, SITE_NAME, SITE_DESCRIPTION } from
 import { CourtStatus } from '@/types';
 
 type CourtDetailPageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 function cleanText(value?: string | null): string | null {
@@ -68,7 +68,8 @@ function buildVenueDescription(court: {
 }
 
 export async function generateMetadata({ params }: CourtDetailPageProps): Promise<Metadata> {
-  const court = await fetchCourtForSeo(params.id);
+  const { id } = await params;
+  const court = await fetchCourtForSeo(id);
 
   if (!court) {
     return {
@@ -121,7 +122,8 @@ export async function generateMetadata({ params }: CourtDetailPageProps): Promis
 }
 
 export default async function CourtDetailPage({ params }: CourtDetailPageProps) {
-  const court = await fetchCourtForSeo(params.id);
+  const { id } = await params;
+  const court = await fetchCourtForSeo(id);
 
   if (!court) {
     notFound();
@@ -157,7 +159,7 @@ export default async function CourtDetailPage({ params }: CourtDetailPageProps) 
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <CourtDetailPageClient params={params} />
+      <CourtDetailPageClient params={{ id }} />
     </>
   );
 }
