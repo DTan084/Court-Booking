@@ -30,12 +30,16 @@ import { CourtFeatureEntity } from './database/entities/court-feature.entity';
 import { SlotTemplateEntity } from './database/entities/slot-template.entity';
 import { SlotTemplateItemEntity } from './database/entities/slot-template-item.entity';
 import { SystemSettingEntity } from './database/entities/system-setting.entity';
+import { PaymentProviderEntity } from './database/entities/payment-provider.entity';
+import { PaymentEntity } from './database/entities/payment.entity';
+import { PaymentEventEntity } from './database/entities/payment-event.entity';
 import { RedisModule } from './common/redis/redis.module';
 import { winstonConfig } from './config/winston.config';
 import { SportTypesModule } from './modules/sport-types/sport-types.module';
 import { FeaturesModule } from './modules/features/features.module';
 import { SlotTemplatesModule } from './modules/slot-templates/slot-templates.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -94,6 +98,9 @@ import { SettingsModule } from './modules/settings/settings.module';
           SlotTemplateEntity,
           SlotTemplateItemEntity,
           SystemSettingEntity,
+          PaymentProviderEntity,
+          PaymentEntity,
+          PaymentEventEntity,
         ],
         synchronize: configService.get<boolean>('database.synchronize', false),
         logging: configService.get<boolean>('database.logging', false),
@@ -117,6 +124,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     FeaturesModule,
     SlotTemplatesModule,
     SettingsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [
