@@ -1,6 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, LessThan, Repository } from 'typeorm';
+import { BookingStatus } from '@court-booking/shared';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { PaymentEntity, PaymentStatus } from '../../database/entities/payment.entity';
 import {
@@ -17,9 +18,14 @@ import {
   PaymentProviderCode,
 } from './providers/payment-provider.interface';
 import { VNPayProvider } from './providers/vnpay.provider';
+import { ConfigType } from '@nestjs/config';
+import paymentsConfig from '../../config/payments.config';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
   private readonly providers: Record<PaymentProviderCode, PaymentProviderAdapter>;
 
   constructor(
@@ -31,6 +37,11 @@ export class PaymentsService {
     private readonly paymentEventRepository: Repository<PaymentEventEntity>,
     @InjectRepository(BookingEntity)
     private readonly bookingRepository: Repository<BookingEntity>,
+    @Inject(paymentsConfig.KEY)
+    private readonly paymentCfg: ConfigType<typeof paymentsConfig>,
+    @InjectQueue('payment-jobs')
+    private readonly paymentQueue: Queue,
+    private readonly dataSource: DataSource,
     vnpayProvider: VNPayProvider,
     momoProvider: MoMoProvider,
     paypalProvider: PayPalProvider,
@@ -45,6 +56,14 @@ export class PaymentsService {
   async initiatePayment(payload: InitiatePaymentDto, initiatedBy: string) {
     const booking = await this.bookingRepository.findOne({ where: { id: payload.bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
+    if (![BookingStatus.PENDING_PAYMENT].includes(booking.status)) {
+      throw new BadRequestException(`Booking is not payable in state ${booking.status}`);
+    }
+
+    const enabledProviders = new Set(this.paymentCfg.providersEnabled);
+    if (!enabledProviders.has(payload.provider)) {
+      throw new BadRequestException(`Payment provider ${payload.provider} is disabled by config`);
+    }
 
     const provider = await this.paymentProviderRepository.findOne({
       where: { code: payload.provider },
@@ -156,51 +175,154 @@ export class PaymentsService {
     ipAddress: string | null,
   ) {
     const verification = await this.providers[providerCode].verifyWebhook(payload, headers);
-
     const providerOrderId = verification.providerOrderId;
     if (!providerOrderId) {
       throw new BadRequestException('Missing provider order id');
     }
 
-    const payment = await this.paymentRepository.findOne({
-      where: { providerCode, providerOrderId },
+    const txResult = await this.dataSource.transaction(async (manager) => {
+      const payment = await manager.findOne(PaymentEntity, {
+        where: { providerCode, providerOrderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!payment) throw new NotFoundException('Payment not found for webhook');
+
+      await manager.save(
+        PaymentEventEntity,
+        manager.create(PaymentEventEntity, {
+          paymentId: payment.id,
+          eventType: 'WEBHOOK_IN',
+          direction: PaymentEventDirection.IN,
+          payload,
+          isVerified: verification.verified,
+          ipAddress,
+        }),
+      );
+
+      if (!verification.verified) {
+        throw new BadRequestException('Invalid signature');
+      }
+
+      if (verification.providerTxnId) {
+        payment.providerTxnId = verification.providerTxnId;
+      }
+
+      // Idempotent terminal handling: if already terminal and incoming status is same, acknowledge.
+      if (
+        [PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.CANCELLED].includes(
+          payment.status,
+        )
+      ) {
+        return { ok: true, paymentId: payment.id, status: payment.status };
+      }
+
+      if (verification.paymentStatus === 'SUCCESS') {
+        payment.status = PaymentStatus.SUCCESS;
+        payment.completedAt = new Date();
+      } else if (verification.paymentStatus === 'FAILED') {
+        payment.status = PaymentStatus.FAILED;
+        payment.completedAt = new Date();
+      } else if (verification.paymentStatus === 'CANCELLED') {
+        payment.status = PaymentStatus.CANCELLED;
+        payment.completedAt = new Date();
+      } else {
+        payment.status = PaymentStatus.PROCESSING;
+      }
+
+      await manager.save(payment);
+
+      if (payment.status === PaymentStatus.SUCCESS) {
+        const booking = await manager.findOne(BookingEntity, {
+          where: { id: payment.bookingId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (booking && booking.status === BookingStatus.PENDING_PAYMENT) {
+          booking.status = BookingStatus.CONFIRMED;
+          booking.paidAt = booking.paidAt ?? new Date();
+          booking.successfulPaymentId = payment.id;
+          await manager.save(booking);
+        } else {
+          // Financially successful payment but booking not yet converged -> reconcile.
+          payment.status = PaymentStatus.RECONCILING;
+          await manager.save(payment);
+        }
+      }
+
+      return { ok: true, paymentId: payment.id, status: payment.status };
     });
-    if (!payment) throw new NotFoundException('Payment not found for webhook');
+
+    if (txResult.status === PaymentStatus.RECONCILING) {
+      await this.enqueueReconcile(txResult.paymentId);
+    }
+    return txResult;
+  }
+
+  async enqueueReconcile(paymentId: string) {
+    await this.paymentQueue.add(
+      'reconcile-payment',
+      { paymentId },
+      {
+        removeOnComplete: true,
+        removeOnFail: 20,
+        attempts: 10,
+        backoff: { type: 'exponential', delay: 30000 },
+      },
+    );
+  }
+
+  async reconcileStalePayments() {
+    const stale = new Date(Date.now() - this.paymentCfg.reconcileStaleMinutes * 60_000);
+    const pending = await this.paymentRepository.find({
+      where: [
+        { status: PaymentStatus.PENDING, initiatedAt: LessThan(stale) },
+        { status: PaymentStatus.PROCESSING, initiatedAt: LessThan(stale) },
+        { status: PaymentStatus.RECONCILING, updatedAt: LessThan(stale) },
+      ],
+      select: { id: true },
+      take: 200,
+    });
+    for (const item of pending) {
+      await this.enqueueReconcile(item.id);
+    }
+    if (pending.length > 0) {
+      this.logger.log(`Queued ${pending.length} payment(s) for reconciliation`);
+    }
+  }
+
+  async reconcilePayment(paymentId: string) {
+    const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
+    if (!payment) throw new NotFoundException('Payment not found');
+    const provider = this.providers[payment.providerCode as PaymentProviderCode];
+    const query = await provider.queryPayment({
+      providerOrderId: payment.providerOrderId,
+      providerTxnId: payment.providerTxnId,
+    });
 
     await this.paymentEventRepository.save(
       this.paymentEventRepository.create({
         paymentId: payment.id,
-        eventType: 'WEBHOOK_IN',
-        direction: PaymentEventDirection.IN,
-        payload,
-        isVerified: verification.verified,
-        ipAddress,
+        eventType: 'RECONCILE_OUT',
+        direction: PaymentEventDirection.OUT,
+        payload: query.raw,
       }),
     );
 
-    if (!verification.verified) {
-      throw new BadRequestException('Invalid signature');
+    if (query.providerTxnId) {
+      payment.providerTxnId = query.providerTxnId;
     }
-
-    if (verification.providerTxnId) {
-      payment.providerTxnId = verification.providerTxnId;
-    }
-
-    if (verification.paymentStatus === 'SUCCESS') {
+    if (query.paymentStatus === 'SUCCESS') {
       payment.status = PaymentStatus.SUCCESS;
-      payment.completedAt = new Date();
-    } else if (verification.paymentStatus === 'FAILED') {
+      payment.completedAt = payment.completedAt ?? new Date();
+    } else if (query.paymentStatus === 'FAILED') {
       payment.status = PaymentStatus.FAILED;
-      payment.completedAt = new Date();
-    } else if (verification.paymentStatus === 'CANCELLED') {
+      payment.completedAt = payment.completedAt ?? new Date();
+    } else if (query.paymentStatus === 'CANCELLED') {
       payment.status = PaymentStatus.CANCELLED;
-      payment.completedAt = new Date();
+      payment.completedAt = payment.completedAt ?? new Date();
     } else {
-      payment.status = PaymentStatus.PROCESSING;
+      payment.status = PaymentStatus.RECONCILING;
     }
-
     await this.paymentRepository.save(payment);
-
-    return { ok: true, paymentId: payment.id, status: payment.status };
+    return { paymentId: payment.id, status: payment.status };
   }
 }

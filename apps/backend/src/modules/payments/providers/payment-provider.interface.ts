@@ -27,6 +27,12 @@ export interface RefundResult {
   raw: Record<string, unknown>;
 }
 
+export interface QueryPaymentResult {
+  paymentStatus: 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'PROCESSING';
+  providerTxnId?: string;
+  raw: Record<string, unknown>;
+}
+
 export interface PaymentProviderAdapter {
   readonly code: PaymentProviderCode;
   createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult>;
@@ -34,6 +40,10 @@ export interface PaymentProviderAdapter {
     payload: Record<string, unknown>,
     headers?: Record<string, string>,
   ): Promise<VerifyWebhookResult>;
+  queryPayment(paymentRef: {
+    providerOrderId?: string | null;
+    providerTxnId?: string | null;
+  }): Promise<QueryPaymentResult>;
   refund(
     paymentRef: { providerOrderId?: string | null; providerTxnId?: string | null },
     amount?: number,

@@ -17,6 +17,7 @@ import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
 import bookingConfig from './config/booking.config';
+import paymentsConfig from './config/payments.config';
 import { UserEntity } from './database/entities/user.entity';
 import { CourtEntity } from './database/entities/court.entity';
 import { CourtTimeSlotEntity } from './database/entities/court-time-slot.entity';
@@ -46,7 +47,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '../../.env',
-      load: [appConfig, databaseConfig, jwtConfig, redisConfig, bookingConfig],
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig, bookingConfig, paymentsConfig],
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

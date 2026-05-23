@@ -90,39 +90,85 @@ The local runtime stack is defined in:
 
 The backend reads values from the repository root environment files.
 
-| Variable                            | Required | Purpose                                  |
-| ----------------------------------- | -------- | ---------------------------------------- |
-| `NODE_ENV`                          | Yes      | Runtime environment                      |
-| `PORT`                              | Yes      | Backend listen port                      |
-| `FE_URL`                            | Yes      | Frontend origin used for CORS            |
-| `DB_HOST`                           | Yes      | PostgreSQL host                          |
-| `DB_PORT`                           | Yes      | PostgreSQL port                          |
-| `DB_NAME`                           | Yes      | PostgreSQL database                      |
-| `DB_USER`                           | Yes      | PostgreSQL user                          |
-| `DB_PASSWORD`                       | Yes      | PostgreSQL password                      |
-| `JWT_SECRET`                        | Yes      | JWT signing secret                       |
-| `JWT_EXPIRES_IN`                    | Yes      | Access token TTL                         |
-| `JWT_REFRESH_EXPIRES_IN`            | Yes      | Refresh token TTL                        |
-| `REDIS_HOST`                        | Yes      | Redis host                               |
-| `REDIS_PORT`                        | Yes      | Redis port                               |
-| `REDIS_USERNAME`                    | No       | Redis ACL username                       |
-| `REDIS_PASSWORD`                    | No       | Redis password                           |
-| `REDIS_DB`                          | No       | App Redis DB index                       |
-| `REDIS_QUEUE_DB`                    | No       | Bull queue Redis DB index                |
-| `REDIS_APP_PREFIX`                  | No       | App Redis key prefix                     |
-| `REDIS_TLS_ENABLED`                 | No       | Toggle Redis TLS                         |
-| `REDIS_CONNECT_TIMEOUT_MS`          | No       | Redis connect timeout                    |
-| `REDIS_COMMAND_TIMEOUT_MS`          | No       | Redis command timeout                    |
-| `REDIS_ENABLE_OFFLINE_QUEUE`        | No       | App Redis offline queue behavior         |
-| `REDIS_QUEUE_ENABLE_OFFLINE_QUEUE`  | No       | Bull Redis offline queue behavior        |
-| `BOOKING_MIN_CANCEL_HOURS`          | Yes      | Cancellation policy threshold            |
-| `BOOKING_MAX_DURATION_HOURS`        | Yes      | Maximum booking duration                 |
-| `BOOKING_JOB_SCHEDULER_ENABLED`     | No       | Enables repeatable job registration      |
-| `BOOKING_JOB_SCHEDULER_LOCK_TTL_MS` | No       | Startup lock TTL for scheduler bootstrap |
+| Variable                             | Required | Purpose                                  |
+| ------------------------------------ | -------- | ---------------------------------------- |
+| `NODE_ENV`                           | Yes      | Runtime environment                      |
+| `PORT`                               | Yes      | Backend listen port                      |
+| `FE_URL`                             | Yes      | Frontend origin used for CORS            |
+| `DB_HOST`                            | Yes      | PostgreSQL host                          |
+| `DB_PORT`                            | Yes      | PostgreSQL port                          |
+| `DB_NAME`                            | Yes      | PostgreSQL database                      |
+| `DB_USER`                            | Yes      | PostgreSQL user                          |
+| `DB_PASSWORD`                        | Yes      | PostgreSQL password                      |
+| `JWT_SECRET`                         | Yes      | JWT signing secret                       |
+| `JWT_EXPIRES_IN`                     | Yes      | Access token TTL                         |
+| `JWT_REFRESH_EXPIRES_IN`             | Yes      | Refresh token TTL                        |
+| `REDIS_HOST`                         | Yes      | Redis host                               |
+| `REDIS_PORT`                         | Yes      | Redis port                               |
+| `REDIS_USERNAME`                     | No       | Redis ACL username                       |
+| `REDIS_PASSWORD`                     | No       | Redis password                           |
+| `REDIS_DB`                           | No       | App Redis DB index                       |
+| `REDIS_QUEUE_DB`                     | No       | Bull queue Redis DB index                |
+| `REDIS_APP_PREFIX`                   | No       | App Redis key prefix                     |
+| `REDIS_TLS_ENABLED`                  | No       | Toggle Redis TLS                         |
+| `REDIS_CONNECT_TIMEOUT_MS`           | No       | Redis connect timeout                    |
+| `REDIS_COMMAND_TIMEOUT_MS`           | No       | Redis command timeout                    |
+| `REDIS_ENABLE_OFFLINE_QUEUE`         | No       | App Redis offline queue behavior         |
+| `REDIS_QUEUE_ENABLE_OFFLINE_QUEUE`   | No       | Bull Redis offline queue behavior        |
+| `BOOKING_MIN_CANCEL_HOURS`           | Yes      | Cancellation policy threshold            |
+| `BOOKING_MAX_DURATION_HOURS`         | Yes      | Maximum booking duration                 |
+| `BOOKING_JOB_SCHEDULER_ENABLED`      | No       | Enables repeatable job registration      |
+| `BOOKING_JOB_SCHEDULER_LOCK_TTL_MS`  | No       | Startup lock TTL for scheduler bootstrap |
+| `PAYMENT_PROVIDERS_ENABLED`          | No       | Enabled providers list (CSV)             |
+| `PAYMENT_RECONCILE_INTERVAL_MINUTES` | No       | Reconcile scan cron step in minutes      |
+| `PAYMENT_RECONCILE_STALE_MINUTES`    | No       | Stale threshold before reconcile enqueue |
+| `PAYMENT_JOB_SCHEDULER_ENABLED`      | No       | Enables payment reconcile scheduler      |
+| `PAYMENT_JOB_SCHEDULER_LOCK_TTL_MS`  | No       | Startup lock TTL for payment scheduler   |
+| `VNPAY_TMN_CODE`                     | Yes\*    | VNPay terminal code                      |
+| `VNPAY_HASH_SECRET`                  | Yes\*    | VNPay HMAC secret                        |
+| `VNPAY_PAY_URL`                      | Yes\*    | VNPay payment endpoint                   |
+| `VNPAY_RETURN_URL`                   | Yes\*    | Frontend return URL after VNPay redirect |
+| `MOMO_PARTNER_CODE`                  | Yes\*    | MoMo partner code                        |
+| `MOMO_ACCESS_KEY`                    | Yes\*    | MoMo access key                          |
+| `MOMO_SECRET_KEY`                    | Yes\*    | MoMo HMAC secret                         |
+| `MOMO_API_URL`                       | Yes\*    | MoMo create-order API base URL           |
+| `MOMO_RETURN_URL`                    | Yes\*    | Frontend return URL after MoMo redirect  |
+| `MOMO_IPN_URL`                       | Yes\*    | Public backend webhook URL for MoMo      |
+| `PAYPAL_CLIENT_ID`                   | Yes\*    | PayPal client id                         |
+| `PAYPAL_CLIENT_SECRET`               | Yes\*    | PayPal client secret                     |
+| `PAYPAL_WEBHOOK_ID`                  | Yes\*    | PayPal webhook id for verification       |
+| `PAYPAL_API_URL`                     | Yes\*    | PayPal API base URL                      |
+| `PAYPAL_WEBHOOK_VERIFY_STRICT`       | No       | Enforce strict webhook verification      |
 
 Reference template:
 
 - [`../../.env.example`](../../.env.example)
+
+`*`: Required when that provider is enabled in `PAYMENT_PROVIDERS_ENABLED`.
+
+## Payment Setup (Production)
+
+Current payment module already includes:
+
+- payment entities (`payments`, `payment_events`, `payment_providers`)
+- initiate/status/refund APIs
+- provider-specific webhook endpoints
+- reconcile queue (`payment-jobs`) and stale payment scanner
+
+Provider API integration is still scaffolded (query/refund/create flow placeholders), so before production go-live you must complete provider API calls in provider adapters.
+
+### Webhook Endpoints To Register
+
+- `POST /api/v1/payments/vnpay/ipn`
+- `POST /api/v1/payments/momo/webhook`
+- `POST /api/v1/payments/paypal/webhook`
+
+Important operational requirements:
+
+- expose backend via HTTPS public URL (no localhost)
+- whitelist payment provider outbound IP ranges if your edge firewall is strict
+- keep webhook signatures enabled and rotate secrets periodically
+- monitor `payment_events` for replay/debug and reconciliation visibility
 
 ## API Endpoints
 
@@ -373,3 +419,9 @@ Queue startup behavior depends on the queue Redis settings in `.env` / `.env.doc
 - `REDIS_QUEUE_ENABLE_OFFLINE_QUEUE`
 - `REDIS_QUEUE_DB`
 - `REDIS_QUEUE_PREFIX`
+
+## Payment Deployment Guide
+
+For local webhook testing via ngrok and production rollout checklist:
+
+- [`../../docs/payment-local-ngrok-and-production.md`](../../docs/payment-local-ngrok-and-production.md)
