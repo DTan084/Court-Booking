@@ -119,6 +119,7 @@ The backend reads values from the repository root environment files.
 | `BOOKING_MAX_DURATION_HOURS`         | Yes      | Maximum booking duration                 |
 | `BOOKING_JOB_SCHEDULER_ENABLED`      | No       | Enables repeatable job registration      |
 | `BOOKING_JOB_SCHEDULER_LOCK_TTL_MS`  | No       | Startup lock TTL for scheduler bootstrap |
+| `PAYMENT_ENABLED`                    | No       | Global payment feature flag              |
 | `PAYMENT_PROVIDERS_ENABLED`          | No       | Enabled providers list (CSV)             |
 | `PAYMENT_RECONCILE_INTERVAL_MINUTES` | No       | Reconcile scan cron step in minutes      |
 | `PAYMENT_RECONCILE_STALE_MINUTES`    | No       | Stale threshold before reconcile enqueue |
@@ -147,6 +148,7 @@ Current payment module already includes:
 - reconcile queue (`payment-jobs`) and stale payment scanner
 
 Provider API integration is still scaffolded (query/refund/create flow placeholders), so before production go-live you must complete provider API calls in provider adapters.
+VNPay adapter is implemented for sandbox-first flow; production rollout still requires full sandbox/prod validation and runbook checks.
 
 ### Webhook Endpoints To Register
 
@@ -223,6 +225,17 @@ Swagger:
 | `GET`   | `/bookings/me`                  | Current user's bookings      |
 | `GET`   | `/bookings/me/stats`            | Current user's booking stats |
 | `GET`   | `/bookings/:id`                 | Booking detail               |
+
+### Payments
+
+| Method  | Path                      | Description                                         |
+| ------- | ------------------------- | --------------------------------------------------- |
+| `POST`  | `/payments/initiate`      | Initiate VNPay payment (authenticated)              |
+| `GET`   | `/payments/:id/status`    | Read payment and booking status snapshot            |
+| `PATCH` | `/payments/:id/refund`    | Refund payment (admin only)                         |
+| `POST`  | `/payments/:id/reconcile` | Trigger reconcile by payment id (admin)             |
+| `GET`   | `/payments/admin/lookup`  | Lookup by `providerOrderId`/`providerTxnId` (admin) |
+| `POST`  | `/payments/vnpay/ipn`     | VNPay webhook callback (public, signature-verified) |
 
 ### Admin Bookings
 
