@@ -31,6 +31,7 @@ describe('PaymentsService', () => {
     count: jest.fn(),
     save: jest.fn(),
     create: jest.fn((v) => v),
+    createQueryBuilder: jest.fn(),
   });
 
   const mockQueue = () => ({
@@ -578,11 +579,37 @@ describe('PaymentsService', () => {
         getCount: jest.fn().mockResolvedValue(1),
       };
       paymentRepository.createQueryBuilder.mockReturnValue(qb);
+      const eventRepository = (service as any).paymentEventRepository;
+      const attemptQb = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([{ paymentId: 'payment-m1', attemptCount: '3' }]),
+      };
+      const latestQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            paymentId: 'payment-m1',
+            createdAt: new Date('2026-05-24T10:00:00.000Z'),
+            payload: { message: 'query timeout' },
+          },
+        ]),
+      };
+      eventRepository.createQueryBuilder
+        .mockReturnValueOnce(attemptQb)
+        .mockReturnValueOnce(latestQb);
 
       const result = await service.listManualReviewPayments({ page: 1, limit: 20 });
       expect(result.data.length).toBe(1);
       expect(result.meta.total).toBe(1);
       expect(result.data[0].paymentStatus).toBe('RECONCILING');
+      expect(result.data[0].attemptCount).toBe(3);
+      expect(result.data[0].lastReconcileError).toBe('query timeout');
     });
   });
 });

@@ -233,6 +233,7 @@ export class PaymentsService {
         'payment.bookingId as bookingId',
         'booking.status as bookingStatus',
         'event.createdAt as manualReviewAt',
+        'event.payload as eventPayload',
       ])
       .orderBy('event.createdAt', 'DESC')
       .offset(skip)
@@ -243,6 +244,35 @@ export class PaymentsService {
     }
 
     const [rows, total] = await Promise.all([qb.getRawMany(), qb.getCount()]);
+    const paymentIds = rows.map((row) => String(row.id));
+    const [attemptRows, latestReconcileEvents] = paymentIds.length
+      ? await Promise.all([
+          this.paymentEventRepository
+            .createQueryBuilder('evt')
+            .select('evt.paymentId', 'paymentId')
+            .addSelect('COUNT(*)', 'attemptCount')
+            .where('evt.eventType = :eventType', { eventType: 'RECONCILE_OUT' })
+            .andWhere('evt.paymentId IN (:...paymentIds)', { paymentIds })
+            .groupBy('evt.paymentId')
+            .getRawMany<{ paymentId: string; attemptCount: string }>(),
+          this.paymentEventRepository
+            .createQueryBuilder('evt')
+            .where('evt.eventType = :eventType', { eventType: 'RECONCILE_OUT' })
+            .andWhere('evt.paymentId IN (:...paymentIds)', { paymentIds })
+            .orderBy('evt.createdAt', 'DESC')
+            .getMany(),
+        ])
+      : [[], []];
+
+    const attemptsByPaymentId = new Map<string, number>(
+      attemptRows.map((r) => [r.paymentId, Number(r.attemptCount)]),
+    );
+    const latestReconcileByPaymentId = new Map<string, PaymentEventEntity>();
+    for (const evt of latestReconcileEvents) {
+      if (!latestReconcileByPaymentId.has(evt.paymentId)) {
+        latestReconcileByPaymentId.set(evt.paymentId, evt);
+      }
+    }
 
     return {
       data: rows.map((row) => ({
@@ -256,6 +286,14 @@ export class PaymentsService {
         bookingId: row.bookingId,
         bookingStatus: row.bookingStatus ?? null,
         manualReviewAt: row.manualReviewAt,
+        reason:
+          (row.eventPayload?.reason as string | undefined) ?? 'reconcile_max_attempts_exceeded',
+        attemptCount: attemptsByPaymentId.get(String(row.id)) ?? 0,
+        lastReconcileAt:
+          latestReconcileByPaymentId.get(String(row.id))?.createdAt?.toISOString() ?? null,
+        lastReconcileError:
+          this.extractReconcileError(latestReconcileByPaymentId.get(String(row.id))?.payload) ??
+          null,
       })),
       meta: {
         page,
@@ -589,6 +627,17 @@ export class PaymentsService {
     const lastPayload = lastEvent.payload || {};
     const fields = ['vnp_TxnRef', 'vnp_TransactionNo', 'vnp_ResponseCode', 'vnp_Amount'];
     return fields.every((f) => String(lastPayload[f] ?? '') === String(payload[f] ?? ''));
+  }
+
+  private extractReconcileError(
+    payload: Record<string, unknown> | null | undefined,
+  ): string | undefined {
+    if (!payload) return undefined;
+    const msg = payload.message;
+    if (typeof msg === 'string' && msg.trim()) return msg;
+    const note = payload.note;
+    if (typeof note === 'string' && note.trim()) return note;
+    return undefined;
   }
 
   private async hasExceededReconcileAttempts(paymentId: string): Promise<boolean> {
