@@ -47,7 +47,7 @@ export class PaymentsService {
     };
   }
 
-  async initiatePayment(payload: InitiatePaymentDto, initiatedBy: string) {
+  async initiatePayment(payload: InitiatePaymentDto, initiatedBy: string, clientIp?: string) {
     const booking = await this.bookingRepository.findOne({ where: { id: payload.bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
     if (![BookingStatus.PENDING_PAYMENT].includes(booking.status)) {
@@ -82,6 +82,7 @@ export class PaymentsService {
       bookingId: booking.id,
       amount: Number(payment.amount),
       currency: payment.currency,
+      clientIp,
     });
 
     payment.providerOrderId = createResult.providerOrderId;
@@ -200,6 +201,20 @@ export class PaymentsService {
 
       if (verification.providerTxnId) {
         payment.providerTxnId = verification.providerTxnId;
+      }
+
+      if (providerCode === 'VNPAY') {
+        const payloadAmount = Number(payload.vnp_Amount ?? 0);
+        const expectedAmount = Math.round(Number(payment.amount) * 100);
+        if (!Number.isFinite(payloadAmount) || payloadAmount <= 0) {
+          throw new BadRequestException('Missing or invalid VNPay amount');
+        }
+        if (payment.currency !== 'VND') {
+          throw new BadRequestException('Invalid payment currency for VNPay');
+        }
+        if (payloadAmount !== expectedAmount) {
+          throw new BadRequestException('VNPay amount mismatch');
+        }
       }
 
       // Idempotent terminal handling: if already terminal and incoming status is same, acknowledge.

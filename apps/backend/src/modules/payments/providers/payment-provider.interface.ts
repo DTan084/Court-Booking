@@ -6,6 +6,7 @@ export interface CreatePaymentInput {
   amount: number;
   currency: string;
   returnUrl?: string;
+  clientIp?: string;
 }
 
 export interface CreatePaymentResult {

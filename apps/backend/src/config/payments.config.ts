@@ -24,5 +24,6 @@ export default registerAs('payments', () => ({
     returnUrl: process.env.VNPAY_RETURN_URL || '',
     locale: process.env.VNPAY_LOCALE || 'vn',
     orderType: process.env.VNPAY_ORDER_TYPE || 'other',
+    expireMinutes: parseInt(process.env.VNPAY_EXPIRE_MINUTES || '15', 10),
   },
 }));

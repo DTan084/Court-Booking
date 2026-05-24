@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Ip,
+  Param,
+  Patch,
+  Post,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { initiatePaymentSchema } from './dto/initiate-payment.dto';
@@ -14,9 +23,10 @@ export class PaymentsController {
     @Body(new ZodValidationPipe(initiatePaymentSchema))
     body: { bookingId: string; provider: 'VNPAY' },
     @CurrentUser() user: { id?: string } | undefined,
+    @Ip() ip: string,
   ) {
     if (!user?.id) throw new UnauthorizedException();
-    return this.paymentsService.initiatePayment(body, user.id);
+    return this.paymentsService.initiatePayment(body, user.id, ip ?? undefined);
   }
 
   @Get(':id/status')

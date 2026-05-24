@@ -23,7 +23,11 @@ export class VNPayProvider implements PaymentProviderAdapter {
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
     const orderId = `VNPAY-${input.paymentId}`;
-    const createDate = this.toVnpDate(new Date());
+    const now = new Date();
+    const createDate = this.toVnpDate(now);
+    const expireDate = this.toVnpDate(
+      new Date(now.getTime() + this.paymentCfg.vnpay.expireMinutes * 60_000),
+    );
     const amount = Math.round(input.amount * 100);
     const params: Record<string, string> = {
       vnp_Version: this.version,
@@ -31,10 +35,11 @@ export class VNPayProvider implements PaymentProviderAdapter {
       vnp_TmnCode: this.paymentCfg.vnpay.tmnCode,
       vnp_Amount: String(amount),
       vnp_CreateDate: createDate,
+      vnp_ExpireDate: expireDate,
       vnp_CurrCode: 'VND',
-      vnp_IpAddr: '127.0.0.1',
+      vnp_IpAddr: input.clientIp || '127.0.0.1',
       vnp_Locale: this.paymentCfg.vnpay.locale || 'vn',
-      vnp_OrderInfo: `Thanh toan dat san ${input.bookingId}`,
+      vnp_OrderInfo: this.normalizeOrderInfo(`Thanh toan dat san ${input.bookingId}`),
       vnp_OrderType: this.paymentCfg.vnpay.orderType || 'other',
       vnp_ReturnUrl: input.returnUrl || this.paymentCfg.vnpay.returnUrl,
       vnp_TxnRef: orderId,
@@ -83,7 +88,7 @@ export class VNPayProvider implements PaymentProviderAdapter {
 
     return {
       verified: expected.toLowerCase() === secureHash.toLowerCase(),
-      paymentStatus: responseCode === '00' ? 'SUCCESS' : 'FAILED',
+      paymentStatus: this.mapIpnStatus(responseCode),
       providerTxnId: payload.vnp_TransactionNo ? String(payload.vnp_TransactionNo) : undefined,
       providerOrderId: payload.vnp_TxnRef ? String(payload.vnp_TxnRef) : undefined,
       raw: payload,
@@ -246,10 +251,11 @@ export class VNPayProvider implements PaymentProviderAdapter {
   }
 
   private toVnpDate(d: Date): string {
+    const plus7 = new Date(d.getTime() + 7 * 60 * 60 * 1000);
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(
-      d.getHours(),
-    )}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    return `${plus7.getUTCFullYear()}${pad(plus7.getUTCMonth() + 1)}${pad(plus7.getUTCDate())}${pad(
+      plus7.getUTCHours(),
+    )}${pad(plus7.getUTCMinutes())}${pad(plus7.getUTCSeconds())}`;
   }
 
   private signPipe(payload: Record<string, string>, fields: string[]): string {
@@ -275,5 +281,21 @@ export class VNPayProvider implements PaymentProviderAdapter {
     if (transactionStatus === '24') return 'CANCELLED' as const;
     if (transactionStatus) return 'FAILED' as const;
     return 'PROCESSING' as const;
+  }
+
+  private mapIpnStatus(responseCode: string) {
+    if (responseCode === '00') return 'SUCCESS' as const;
+    if (responseCode === '24') return 'CANCELLED' as const;
+    if (!responseCode) return 'PROCESSING' as const;
+    return 'FAILED' as const;
+  }
+
+  private normalizeOrderInfo(input: string): string {
+    return input
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9 _.-]/g, '')
+      .trim()
+      .slice(0, 255);
   }
 }

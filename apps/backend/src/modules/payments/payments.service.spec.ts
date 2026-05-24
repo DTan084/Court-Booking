@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { getQueueToken } from '@nestjs/bull';
 import { DataSource } from 'typeorm';
 import { BookingStatus } from '@court-booking/shared';
+import { BadRequestException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PaymentEntity, PaymentStatus } from '../../database/entities/payment.entity';
 import { PaymentProviderEntity } from '../../database/entities/payment-provider.entity';
@@ -154,6 +155,52 @@ describe('PaymentsService', () => {
 
       expect(result.status).toBe(PaymentStatus.RECONCILING);
       expect(payment.status).toBe(PaymentStatus.RECONCILING);
+    });
+  });
+
+  describe('handleWebhook', () => {
+    it('rejects VNPay webhook when amount does not match payment amount', async () => {
+      const payment = {
+        id: 'payment-3',
+        bookingId: 'booking-3',
+        providerCode: 'VNPAY',
+        providerOrderId: 'VNPAY-payment-3',
+        providerTxnId: null,
+        amount: 100000, // expect vnp_Amount = 10000000
+        currency: 'VND',
+        status: PaymentStatus.PENDING,
+      } as PaymentEntity;
+
+      (service as any).providers.VNPAY.verifyWebhook.mockResolvedValue({
+        verified: true,
+        paymentStatus: 'SUCCESS',
+        providerOrderId: 'VNPAY-payment-3',
+        providerTxnId: 'txn-3',
+        raw: {},
+      });
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockResolvedValue(payment),
+          save: jest.fn().mockImplementation((entity: any) => Promise.resolve(entity)),
+          create: jest.fn().mockImplementation((_e: any, data: any) => data),
+        };
+        return cb(manager);
+      });
+
+      await expect(
+        service.handleWebhook(
+          'VNPAY',
+          {
+            vnp_TxnRef: 'VNPAY-payment-3',
+            vnp_Amount: '1000',
+            vnp_TransactionNo: 'txn-3',
+            vnp_ResponseCode: '00',
+          },
+          {},
+          '127.0.0.1',
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });
