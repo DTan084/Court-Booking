@@ -127,18 +127,9 @@ The backend reads values from the repository root environment files.
 | `VNPAY_TMN_CODE`                     | Yes\*    | VNPay terminal code                      |
 | `VNPAY_HASH_SECRET`                  | Yes\*    | VNPay HMAC secret                        |
 | `VNPAY_PAY_URL`                      | Yes\*    | VNPay payment endpoint                   |
+| `VNPAY_QUERY_URL`                    | No       | VNPay query transaction API URL          |
+| `VNPAY_REFUND_URL`                   | No       | VNPay refund API URL                     |
 | `VNPAY_RETURN_URL`                   | Yes\*    | Frontend return URL after VNPay redirect |
-| `MOMO_PARTNER_CODE`                  | Yes\*    | MoMo partner code                        |
-| `MOMO_ACCESS_KEY`                    | Yes\*    | MoMo access key                          |
-| `MOMO_SECRET_KEY`                    | Yes\*    | MoMo HMAC secret                         |
-| `MOMO_API_URL`                       | Yes\*    | MoMo create-order API base URL           |
-| `MOMO_RETURN_URL`                    | Yes\*    | Frontend return URL after MoMo redirect  |
-| `MOMO_IPN_URL`                       | Yes\*    | Public backend webhook URL for MoMo      |
-| `PAYPAL_CLIENT_ID`                   | Yes\*    | PayPal client id                         |
-| `PAYPAL_CLIENT_SECRET`               | Yes\*    | PayPal client secret                     |
-| `PAYPAL_WEBHOOK_ID`                  | Yes\*    | PayPal webhook id for verification       |
-| `PAYPAL_API_URL`                     | Yes\*    | PayPal API base URL                      |
-| `PAYPAL_WEBHOOK_VERIFY_STRICT`       | No       | Enforce strict webhook verification      |
 
 Reference template:
 
@@ -152,7 +143,7 @@ Current payment module already includes:
 
 - payment entities (`payments`, `payment_events`, `payment_providers`)
 - initiate/status/refund APIs
-- provider-specific webhook endpoints
+- VNPay webhook endpoint
 - reconcile queue (`payment-jobs`) and stale payment scanner
 
 Provider API integration is still scaffolded (query/refund/create flow placeholders), so before production go-live you must complete provider API calls in provider adapters.
@@ -160,8 +151,6 @@ Provider API integration is still scaffolded (query/refund/create flow placehold
 ### Webhook Endpoints To Register
 
 - `POST /api/v1/payments/vnpay/ipn`
-- `POST /api/v1/payments/momo/webhook`
-- `POST /api/v1/payments/paypal/webhook`
 
 Important operational requirements:
 

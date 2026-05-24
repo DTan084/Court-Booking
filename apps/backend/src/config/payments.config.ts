@@ -6,7 +6,7 @@ const parseBoolean = (value: string | undefined, fallback: boolean) => {
 };
 
 export default registerAs('payments', () => ({
-  providersEnabled: (process.env.PAYMENT_PROVIDERS_ENABLED || 'VNPAY,MOMO,PAYPAL')
+  providersEnabled: (process.env.PAYMENT_PROVIDERS_ENABLED || 'VNPAY')
     .split(',')
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean),
@@ -24,20 +24,5 @@ export default registerAs('payments', () => ({
     returnUrl: process.env.VNPAY_RETURN_URL || '',
     locale: process.env.VNPAY_LOCALE || 'vn',
     orderType: process.env.VNPAY_ORDER_TYPE || 'other',
-  },
-  momo: {
-    partnerCode: process.env.MOMO_PARTNER_CODE || '',
-    accessKey: process.env.MOMO_ACCESS_KEY || '',
-    secretKey: process.env.MOMO_SECRET_KEY || '',
-    apiUrl: process.env.MOMO_API_URL || '',
-    returnUrl: process.env.MOMO_RETURN_URL || '',
-    ipnUrl: process.env.MOMO_IPN_URL || '',
-  },
-  paypal: {
-    clientId: process.env.PAYPAL_CLIENT_ID || '',
-    clientSecret: process.env.PAYPAL_CLIENT_SECRET || '',
-    webhookId: process.env.PAYPAL_WEBHOOK_ID || '',
-    apiUrl: process.env.PAYPAL_API_URL || '',
-    verifyStrict: parseBoolean(process.env.PAYPAL_WEBHOOK_VERIFY_STRICT, false),
   },
 }));

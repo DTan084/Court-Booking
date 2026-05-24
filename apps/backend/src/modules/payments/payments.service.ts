@@ -11,8 +11,6 @@ import {
 import { PaymentProviderEntity } from '../../database/entities/payment-provider.entity';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
-import { MoMoProvider } from './providers/momo.provider';
-import { PayPalProvider } from './providers/paypal.provider';
 import {
   PaymentProviderAdapter,
   PaymentProviderCode,
@@ -43,13 +41,9 @@ export class PaymentsService {
     private readonly paymentQueue: Queue,
     private readonly dataSource: DataSource,
     vnpayProvider: VNPayProvider,
-    momoProvider: MoMoProvider,
-    paypalProvider: PayPalProvider,
   ) {
     this.providers = {
       VNPAY: vnpayProvider,
-      MOMO: momoProvider,
-      PAYPAL: paypalProvider,
     };
   }
 
@@ -77,7 +71,7 @@ export class PaymentsService {
         bookingId: booking.id,
         providerCode: payload.provider,
         amount: Number(booking.totalPrice),
-        currency: payload.provider === 'PAYPAL' ? 'USD' : 'VND',
+        currency: 'VND',
         status: PaymentStatus.PENDING,
         initiatedBy,
       }),

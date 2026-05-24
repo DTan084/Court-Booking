@@ -1,4 +1,4 @@
-export type PaymentProviderCode = 'VNPAY' | 'MOMO' | 'PAYPAL';
+export type PaymentProviderCode = 'VNPAY';
 
 export interface CreatePaymentInput {
   paymentId: string;

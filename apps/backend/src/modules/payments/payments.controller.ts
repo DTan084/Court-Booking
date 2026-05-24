@@ -12,7 +12,7 @@ export class PaymentsController {
   @Post('initiate')
   initiate(
     @Body(new ZodValidationPipe(initiatePaymentSchema))
-    body: { bookingId: string; provider: 'VNPAY' | 'MOMO' | 'PAYPAL' },
+    body: { bookingId: string; provider: 'VNPAY' },
     @CurrentUser() user: { id?: string } | undefined,
   ) {
     if (!user?.id) throw new UnauthorizedException();
