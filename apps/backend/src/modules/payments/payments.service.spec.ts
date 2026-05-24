@@ -71,6 +71,7 @@ describe('PaymentsService', () => {
           },
         },
         { provide: getQueueToken('payment-jobs'), useFactory: mockQueue },
+        { provide: 'REDIS_CLIENT', useValue: { set: jest.fn().mockResolvedValue('OK') } },
         { provide: DataSource, useFactory: mockDataSource },
         { provide: VNPayProvider, useFactory: mockProvider },
       ],
@@ -491,6 +492,12 @@ describe('PaymentsService', () => {
       });
       const eventRepository = (service as any).paymentEventRepository;
       eventRepository.count.mockResolvedValue(2);
+      const recentReasonQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      eventRepository.createQueryBuilder.mockReturnValue(recentReasonQb);
 
       await service.reconcileStalePayments();
 

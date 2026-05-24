@@ -23,6 +23,7 @@ import { ConfigType } from '@nestjs/config';
 import paymentsConfig from '../../config/payments.config';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
+import Redis from 'ioredis';
 
 @Injectable()
 export class PaymentsService {
@@ -42,6 +43,8 @@ export class PaymentsService {
     private readonly paymentCfg: ConfigType<typeof paymentsConfig>,
     @InjectQueue('payment-jobs')
     private readonly paymentQueue: Queue,
+    @Inject('REDIS_CLIENT')
+    private readonly redis: Redis,
     private readonly dataSource: DataSource,
     vnpayProvider: VNPayProvider,
   ) {
@@ -602,6 +605,16 @@ export class PaymentsService {
           payment.status === PaymentStatus.RECONCILING &&
           payment.updatedAt < orphanCutoff
         ) {
+          const skippedRecently = await this.hasRecentManualReviewReason(
+            item.id,
+            'orphan_refund_skipped_pending_booking',
+          );
+          if (skippedRecently) {
+            this.logPaymentSignal('payment_compensation_orphan_refund_skipped_recently', {
+              paymentId: item.id,
+            });
+            continue;
+          }
           await this.enqueueRefundOrphanSuccess(item.id);
           this.logger.warn(
             `Queued orphan refund compensation for paymentId=${item.id} after reconcile attempts exceeded`,
@@ -715,6 +728,10 @@ export class PaymentsService {
   async refundOrphanSuccess(paymentId: string) {
     this.ensurePaymentsEnabled();
 
+    let shouldEnqueueApplySuccessful = false;
+    let manualReviewReasonToMark: string | null = null;
+    let logPendingBookingCompensation = false;
+
     const result = await this.dataSource.transaction(async (manager) => {
       const payment = await manager.findOne(PaymentEntity, {
         where: { id: paymentId },
@@ -730,12 +747,21 @@ export class PaymentsService {
         where: { id: payment.bookingId },
         lock: { mode: 'pessimistic_write' },
       });
-      const canKeepPaymentAsSuccess =
-        booking &&
-        (booking.status === BookingStatus.CONFIRMED ||
-          booking.status === BookingStatus.PENDING_PAYMENT);
+      const canKeepPaymentAsSuccess = booking && booking.status === BookingStatus.CONFIRMED;
       if (canKeepPaymentAsSuccess) {
         return { paymentId: payment.id, status: payment.status, skipped: true };
+      }
+
+      if (booking?.status === BookingStatus.PENDING_PAYMENT) {
+        shouldEnqueueApplySuccessful = true;
+        manualReviewReasonToMark = 'orphan_refund_skipped_pending_booking';
+        logPendingBookingCompensation = true;
+        return {
+          paymentId: payment.id,
+          status: payment.status,
+          skipped: true,
+          requeuedApplySuccessful: true,
+        };
       }
 
       const provider = this.providers[payment.providerCode as PaymentProviderCode];
@@ -800,6 +826,18 @@ export class PaymentsService {
       });
       return { paymentId: payment.id, status: payment.status };
     });
+
+    if (shouldEnqueueApplySuccessful) {
+      await this.enqueueApplySuccessfulPayment(paymentId);
+    }
+    if (manualReviewReasonToMark) {
+      await this.markManualReviewRequired(paymentId, manualReviewReasonToMark);
+    }
+    if (logPendingBookingCompensation) {
+      this.logPaymentSignal('payment_compensation_orphan_skipped_pending_booking', {
+        paymentId,
+      });
+    }
 
     return result;
   }
@@ -891,6 +929,9 @@ export class PaymentsService {
   }
 
   private async markManualReviewRequired(paymentId: string, reason: string): Promise<void> {
+    const acquired = await this.tryAcquireManualReviewDedupeLock(paymentId, reason);
+    if (!acquired) return;
+
     const cutoff = new Date(Date.now() - this.paymentCfg.manualReviewCooldownMinutes * 60_000);
     const exists = await this.paymentEventRepository
       .createQueryBuilder('evt')
@@ -915,6 +956,38 @@ export class PaymentsService {
       }),
     );
     this.logPaymentSignal('payment_manual_review_required', { paymentId, reason });
+  }
+
+  private async hasRecentManualReviewReason(paymentId: string, reason: string): Promise<boolean> {
+    const cutoff = new Date(Date.now() - this.paymentCfg.manualReviewCooldownMinutes * 60_000);
+    const found = await this.paymentEventRepository
+      .createQueryBuilder('evt')
+      .where('evt.paymentId = :paymentId', { paymentId })
+      .andWhere("evt.eventType = 'MANUAL_REVIEW_REQUIRED'")
+      .andWhere("evt.payload->>'reason' = :reason", { reason })
+      .andWhere('evt.createdAt >= :cutoff', { cutoff })
+      .getOne();
+    return Boolean(found);
+  }
+
+  private async tryAcquireManualReviewDedupeLock(
+    paymentId: string,
+    reason: string,
+  ): Promise<boolean> {
+    const ttlMs = Math.max(60_000, this.paymentCfg.manualReviewCooldownMinutes * 60_000);
+    const key = `payments:manual-review:${paymentId}:${reason}`;
+    try {
+      const setResult = await this.redis.set(key, '1', 'PX', ttlMs, 'NX');
+      return setResult === 'OK';
+    } catch (error) {
+      this.logger.warn(
+        `Manual review dedupe lock fallback for paymentId=${paymentId}, reason=${reason}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      // On Redis issue, fallback to DB-based dedupe only.
+      return true;
+    }
   }
 
   private logPaymentSignal(event: string, data: Record<string, unknown>) {

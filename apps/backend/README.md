@@ -217,6 +217,52 @@ Alert rules to configure in your logging/monitoring system:
 3. reconcile queue backlog growth / retry saturation.
 4. orphan compensation queue events appearing in production.
 
+Failure ownership and SLA:
+
+1. `invalid signature` spike:
+   - owner: backend on-call + ops
+   - SLA: acknowledge in 15 minutes, mitigation in 60 minutes
+2. reconcile queue lag / retry saturation:
+   - owner: backend on-call
+   - SLA: acknowledge in 15 minutes, backlog stabilized in 120 minutes
+3. `payment_manual_review_required` spike:
+   - owner: backend on-call + support ops
+   - SLA: acknowledge in 30 minutes, triage each case in 4 hours
+4. orphan compensation triggered:
+   - owner: backend lead + finance/support ops
+   - SLA: acknowledge in 30 minutes, business resolution in 1 business day
+
+Practical alert wiring:
+
+1. Datadog (logs-based monitors):
+   - Query (signature fail spike):
+     - `service:backend @event:payment_webhook_invalid_signature`
+   - Query (manual review spike):
+     - `service:backend @event:payment_manual_review_required`
+   - Query (reconcile queue burst):
+     - `service:backend @event:payment_reconcile_batch_queued @count:[50 TO *]`
+2. Grafana + Loki:
+   - Signature fail:
+     - `{app="backend"} |= "payment_webhook_invalid_signature"`
+   - Manual review:
+     - `{app="backend"} |= "payment_manual_review_required"`
+   - Orphan compensation:
+     - `{app="backend"} |= "payment_compensation_orphan_refund_queued"`
+3. ELK / Kibana:
+   - KQL:
+     - `event:"payment_manual_review_required"`
+     - `event:"payment_compensation_orphan_refund_queued"`
+     - `event:"payment_compensation_orphan_refunded"`
+
+Dashboard minimum metrics (by day and provider):
+
+1. payment initiate count.
+2. payment success count.
+3. success rate = success/initiate.
+4. manual review count.
+5. reconciling backlog count.
+6. webhook invalid-signature count.
+
 ### Operations Playbook (SQL/API Quick Commands)
 
 Lookup by provider order id:
@@ -268,6 +314,31 @@ Post-deploy checklist:
 2. webhook callback receives `RspCode=00` on valid request.
 3. no abnormal `RspCode=97/99` spike.
 4. no unexpected growth in `RECONCILING` backlog.
+
+### VNPay Secret Rotation Rollback (Failure Path)
+
+Scenario: after rotating `VNPAY_HASH_SECRET`, valid callbacks start failing signature verification.
+
+Rollback steps:
+
+1. Pause payment traffic if possible (temporary checkout maintenance or provider disable toggle).
+2. Revert `VNPAY_HASH_SECRET` to previous known-good secret in secret manager.
+3. Redeploy backend with reverted secret.
+4. Validate with one sandbox/prod callback:
+   - expect `RspCode=00`
+   - verify `payment_events.is_verified=true`.
+5. Replay pending affected payments:
+   - run `POST /api/v1/payments/:id/reconcile` for impacted payment ids.
+6. If failures persist:
+   - verify `VNPAY_TMN_CODE` still matches merchant
+   - verify no URL rewrite altered callback query string
+   - escalate to VNPay support with callback samples.
+
+Post-incident actions:
+
+1. Record incident timeline and impacted transaction count.
+2. Add pre-rotation canary test (1 real callback) before full cutover.
+3. Enforce dual-control approval for secret rotation.
 
 ## API Endpoints
 

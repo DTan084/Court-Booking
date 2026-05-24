@@ -12,16 +12,19 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { PaymentsService } from '../payments.service';
+import { Logger } from '@nestjs/common';
 
 type VnpIpnResponse = { RspCode: '00' | '01' | '02' | '04' | '97' | '99'; Message: string };
 
 @Controller('payments/vnpay')
 export class VNPayWebhookController {
+  private readonly logger = new Logger(VNPayWebhookController.name);
+
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('ipn')
   @HttpCode(200)
-  @Throttle({ default: { limit: 300, ttl: 60000 } })
+  @Throttle({ default: { limit: 1000, ttl: 60000 } })
   async receive(
     @Body() body: Record<string, unknown>,
     @Headers() headers: Record<string, string>,
@@ -37,7 +40,7 @@ export class VNPayWebhookController {
 
   @Get('ipn')
   @HttpCode(200)
-  @Throttle({ default: { limit: 300, ttl: 60000 } })
+  @Throttle({ default: { limit: 1000, ttl: 60000 } })
   async receiveGet(
     @Query() query: Record<string, unknown>,
     @Headers() headers: Record<string, string>,
@@ -58,6 +61,7 @@ export class VNPayWebhookController {
     if (error instanceof BadRequestException) {
       const message = this.extractMessage(error).toLowerCase();
       if (message.includes('invalid signature')) {
+        this.logWebhookSignal('payment_webhook_invalid_signature');
         return { RspCode: '97', Message: 'Invalid signature' };
       }
       if (message.includes('payments are disabled by configuration')) {
@@ -77,6 +81,10 @@ export class VNPayWebhookController {
       return { RspCode: '99', Message: 'Input invalid' };
     }
     return { RspCode: '99', Message: 'Unknown error' };
+  }
+
+  private logWebhookSignal(event: string) {
+    this.logger.warn(JSON.stringify({ event, provider: 'VNPAY' }));
   }
 
   private extractMessage(error: BadRequestException): string {
