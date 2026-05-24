@@ -20,6 +20,13 @@ describe('VNPayWebhookController', () => {
     expect(result).toEqual({ RspCode: '00', Message: 'Confirm Success' });
   });
 
+  it('returns success ack on successful GET webhook handling', async () => {
+    (paymentsService.handleWebhook as jest.Mock).mockResolvedValue({ ok: true });
+
+    const result = await controller.receiveGet({}, {}, '127.0.0.1');
+    expect(result).toEqual({ RspCode: '00', Message: 'Confirm Success' });
+  });
+
   it('maps NotFoundException to order not found response', async () => {
     (paymentsService.handleWebhook as jest.Mock).mockRejectedValue(new NotFoundException());
 

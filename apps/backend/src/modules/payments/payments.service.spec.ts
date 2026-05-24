@@ -65,6 +65,8 @@ describe('PaymentsService', () => {
             providersEnabled: ['VNPAY'],
             reconcileStaleMinutes: 10,
             reconcileMaxAttempts: 2,
+            compensationAutoRefundEnabled: false,
+            compensationOrphanMinutes: 30,
             vnpay: { tmnCode: 'TESTCODE' },
           },
         },
@@ -456,9 +458,19 @@ describe('PaymentsService', () => {
 
     it('marks manual review and skips enqueue when attempts exceed max', async () => {
       paymentRepository.find.mockResolvedValue([{ id: 'payment-b' }]);
+      paymentRepository.findOne.mockResolvedValue({
+        status: PaymentStatus.PROCESSING,
+        updatedAt: new Date(),
+      });
       const eventRepository = (service as any).paymentEventRepository;
       eventRepository.count.mockResolvedValue(2);
-      eventRepository.findOne.mockResolvedValue(null);
+      const manualReviewQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      eventRepository.createQueryBuilder.mockReturnValue(manualReviewQb);
       eventRepository.create.mockImplementation((v: any) => v);
       eventRepository.save.mockResolvedValue({});
 
@@ -467,6 +479,27 @@ describe('PaymentsService', () => {
       const queue = (service as any).paymentQueue;
       expect(queue.add).not.toHaveBeenCalled();
       expect(eventRepository.save).toHaveBeenCalled();
+    });
+
+    it('enqueues refund-orphan-success when auto-refund is enabled for stale reconciling orphan', async () => {
+      (service as any).paymentCfg.compensationAutoRefundEnabled = true;
+      (service as any).paymentCfg.compensationOrphanMinutes = 30;
+      paymentRepository.find.mockResolvedValue([{ id: 'payment-orphan' }]);
+      paymentRepository.findOne.mockResolvedValue({
+        status: PaymentStatus.RECONCILING,
+        updatedAt: new Date(Date.now() - 31 * 60_000),
+      });
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.count.mockResolvedValue(2);
+
+      await service.reconcileStalePayments();
+
+      const queue = (service as any).paymentQueue;
+      expect(queue.add).toHaveBeenCalledWith(
+        'refund-orphan-success',
+        { paymentId: 'payment-orphan' },
+        expect.any(Object),
+      );
     });
   });
 

@@ -529,6 +529,10 @@ export class PaymentsService {
 
     if (txResult.status === PaymentStatus.RECONCILING) {
       await this.enqueueApplySuccessfulPayment(txResult.paymentId);
+      this.logPaymentSignal('payment_webhook_reconciling', {
+        paymentId: txResult.paymentId,
+        providerCode,
+      });
     }
     return txResult;
   }
@@ -559,8 +563,22 @@ export class PaymentsService {
     );
   }
 
+  async enqueueRefundOrphanSuccess(paymentId: string) {
+    await this.paymentQueue.add(
+      'refund-orphan-success',
+      { paymentId },
+      {
+        removeOnComplete: true,
+        removeOnFail: 20,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 60000 },
+      },
+    );
+  }
+
   async reconcileStalePayments() {
     const stale = new Date(Date.now() - this.paymentCfg.reconcileStaleMinutes * 60_000);
+    const orphanCutoff = new Date(Date.now() - this.paymentCfg.compensationOrphanMinutes * 60_000);
     const pending = await this.paymentRepository.find({
       where: [
         { status: PaymentStatus.PENDING, initiatedAt: LessThan(stale) },
@@ -571,16 +589,32 @@ export class PaymentsService {
       take: 200,
     });
     for (const item of pending) {
-      const exceeded = await this.hasExceededReconcileAttempts(item.id);
-      if (exceeded) {
-        await this.markManualReviewRequired(item.id);
-        continue;
-      }
       const payment = await this.paymentRepository.findOne({
         where: { id: item.id },
-        select: { status: true },
+        select: { status: true, updatedAt: true },
       });
-      if (payment?.status === PaymentStatus.RECONCILING) {
+      if (!payment) continue;
+
+      const exceeded = await this.hasExceededReconcileAttempts(item.id);
+      if (exceeded) {
+        if (
+          this.paymentCfg.compensationAutoRefundEnabled &&
+          payment.status === PaymentStatus.RECONCILING &&
+          payment.updatedAt < orphanCutoff
+        ) {
+          await this.enqueueRefundOrphanSuccess(item.id);
+          this.logger.warn(
+            `Queued orphan refund compensation for paymentId=${item.id} after reconcile attempts exceeded`,
+          );
+          this.logPaymentSignal('payment_compensation_orphan_refund_queued', {
+            paymentId: item.id,
+          });
+          continue;
+        }
+        await this.markManualReviewRequired(item.id, 'reconcile_max_attempts_exceeded');
+        continue;
+      }
+      if (payment.status === PaymentStatus.RECONCILING) {
         await this.enqueueApplySuccessfulPayment(item.id);
       } else {
         await this.enqueueReconcile(item.id);
@@ -588,6 +622,7 @@ export class PaymentsService {
     }
     if (pending.length > 0) {
       this.logger.log(`Queued ${pending.length} payment(s) for reconciliation`);
+      this.logPaymentSignal('payment_reconcile_batch_queued', { count: pending.length });
     }
   }
 
@@ -677,6 +712,98 @@ export class PaymentsService {
     return { paymentId: updated.id, status: updated.status };
   }
 
+  async refundOrphanSuccess(paymentId: string) {
+    this.ensurePaymentsEnabled();
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const payment = await manager.findOne(PaymentEntity, {
+        where: { id: paymentId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!payment) throw new NotFoundException('Payment not found');
+
+      if (![PaymentStatus.SUCCESS, PaymentStatus.RECONCILING].includes(payment.status)) {
+        return { paymentId: payment.id, status: payment.status, skipped: true };
+      }
+
+      const booking = await manager.findOne(BookingEntity, {
+        where: { id: payment.bookingId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const canKeepPaymentAsSuccess =
+        booking &&
+        (booking.status === BookingStatus.CONFIRMED ||
+          booking.status === BookingStatus.PENDING_PAYMENT);
+      if (canKeepPaymentAsSuccess) {
+        return { paymentId: payment.id, status: payment.status, skipped: true };
+      }
+
+      const provider = this.providers[payment.providerCode as PaymentProviderCode];
+      const refund = await provider.refund({
+        providerOrderId: payment.providerOrderId,
+        providerTxnId: payment.providerTxnId,
+        metadata: payment.providerRaw,
+      });
+
+      await manager.save(
+        PaymentEventEntity,
+        manager.create(PaymentEventEntity, {
+          paymentId: payment.id,
+          eventType: 'REFUND_ORPHAN_OUT',
+          direction: PaymentEventDirection.OUT,
+          payload: refund.raw,
+        }),
+      );
+
+      if (refund.status === 'FAILED') {
+        const cooldownCutoff = new Date(
+          Date.now() - this.paymentCfg.manualReviewCooldownMinutes * 60_000,
+        );
+        const duplicatedManualReview = await manager
+          .createQueryBuilder(PaymentEventEntity, 'evt')
+          .where('evt.paymentId = :paymentId', { paymentId: payment.id })
+          .andWhere("evt.eventType = 'MANUAL_REVIEW_REQUIRED'")
+          .andWhere("evt.payload->>'reason' = :reason", { reason: 'orphan_refund_failed' })
+          .andWhere('evt.createdAt >= :cutoff', { cutoff: cooldownCutoff })
+          .getOne();
+
+        if (!duplicatedManualReview) {
+          await manager.save(
+            PaymentEventEntity,
+            manager.create(PaymentEventEntity, {
+              paymentId: payment.id,
+              eventType: 'MANUAL_REVIEW_REQUIRED',
+              direction: PaymentEventDirection.OUT,
+              payload: {
+                reason: 'orphan_refund_failed',
+                note: 'Auto-refund failed for orphan successful payment',
+                cooldownMinutes: this.paymentCfg.manualReviewCooldownMinutes,
+              },
+            }),
+          );
+        }
+        return { paymentId: payment.id, status: payment.status, refundFailed: true };
+      }
+
+      payment.status =
+        refund.status === 'PARTIAL_REFUND' ? PaymentStatus.PARTIAL_REFUND : PaymentStatus.REFUNDED;
+      payment.refundedAt = new Date();
+      payment.refundAmount = refund.status === 'PARTIAL_REFUND' ? null : Number(payment.amount);
+      await manager.save(payment);
+
+      this.logger.warn(
+        `Payment compensation applied: orphan successful payment refunded paymentId=${payment.id}`,
+      );
+      this.logPaymentSignal('payment_compensation_orphan_refunded', {
+        paymentId: payment.id,
+        providerCode: payment.providerCode,
+      });
+      return { paymentId: payment.id, status: payment.status };
+    });
+
+    return result;
+  }
+
   private async convergeBookingForSuccessfulPayment(
     manager: EntityManager,
     payment: PaymentEntity,
@@ -763,14 +890,16 @@ export class PaymentsService {
     return attemptCount >= this.paymentCfg.reconcileMaxAttempts;
   }
 
-  private async markManualReviewRequired(paymentId: string): Promise<void> {
-    const exists = await this.paymentEventRepository.findOne({
-      where: {
-        paymentId,
-        eventType: 'MANUAL_REVIEW_REQUIRED',
-      },
-      order: { createdAt: 'DESC' },
-    });
+  private async markManualReviewRequired(paymentId: string, reason: string): Promise<void> {
+    const cutoff = new Date(Date.now() - this.paymentCfg.manualReviewCooldownMinutes * 60_000);
+    const exists = await this.paymentEventRepository
+      .createQueryBuilder('evt')
+      .where('evt.paymentId = :paymentId', { paymentId })
+      .andWhere("evt.eventType = 'MANUAL_REVIEW_REQUIRED'")
+      .andWhere("evt.payload->>'reason' = :reason", { reason })
+      .andWhere('evt.createdAt >= :cutoff', { cutoff })
+      .orderBy('evt.createdAt', 'DESC')
+      .getOne();
     if (exists) return;
 
     await this.paymentEventRepository.save(
@@ -779,10 +908,16 @@ export class PaymentsService {
         eventType: 'MANUAL_REVIEW_REQUIRED',
         direction: PaymentEventDirection.OUT,
         payload: {
-          reason: 'reconcile_max_attempts_exceeded',
+          reason,
           maxAttempts: this.paymentCfg.reconcileMaxAttempts,
+          cooldownMinutes: this.paymentCfg.manualReviewCooldownMinutes,
         },
       }),
     );
+    this.logPaymentSignal('payment_manual_review_required', { paymentId, reason });
+  }
+
+  private logPaymentSignal(event: string, data: Record<string, unknown>) {
+    this.logger.log(JSON.stringify({ event, ...data }));
   }
 }

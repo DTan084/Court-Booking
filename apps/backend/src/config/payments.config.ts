@@ -14,6 +14,15 @@ export default registerAs('payments', () => ({
   reconcileIntervalMinutes: parseInt(process.env.PAYMENT_RECONCILE_INTERVAL_MINUTES || '5', 10),
   reconcileStaleMinutes: parseInt(process.env.PAYMENT_RECONCILE_STALE_MINUTES || '10', 10),
   reconcileMaxAttempts: parseInt(process.env.PAYMENT_RECONCILE_MAX_ATTEMPTS || '10', 10),
+  compensationAutoRefundEnabled: parseBoolean(
+    process.env.PAYMENT_COMPENSATION_AUTO_REFUND_ENABLED,
+    false,
+  ),
+  compensationOrphanMinutes: parseInt(process.env.PAYMENT_COMPENSATION_ORPHAN_MINUTES || '30', 10),
+  manualReviewCooldownMinutes: parseInt(
+    process.env.PAYMENT_MANUAL_REVIEW_COOLDOWN_MINUTES || '15',
+    10,
+  ),
   schedulerEnabled: parseBoolean(process.env.PAYMENT_JOB_SCHEDULER_ENABLED, true),
   schedulerInitLockTtlMs: parseInt(process.env.PAYMENT_JOB_SCHEDULER_LOCK_TTL_MS || '30000', 10),
 

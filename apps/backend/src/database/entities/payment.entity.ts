@@ -29,6 +29,10 @@ export enum PaymentStatus {
 @Index(['bookingId'])
 @Index(['providerCode', 'status'])
 @Index(['providerTxnId'], { where: '"provider_txn_id" IS NOT NULL' })
+@Index(['providerCode', 'providerTxnId'], {
+  where: '"provider_txn_id" IS NOT NULL',
+  unique: true,
+})
 @Index(['providerCode', 'providerOrderId'], { unique: true })
 export class PaymentEntity {
   @PrimaryGeneratedColumn('uuid')

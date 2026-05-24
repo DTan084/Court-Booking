@@ -1,4 +1,5 @@
 import {
+  Get,
   BadRequestException,
   Body,
   Controller,
@@ -7,7 +8,9 @@ import {
   Ip,
   NotFoundException,
   Post,
+  Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { PaymentsService } from '../payments.service';
 
 type VnpIpnResponse = { RspCode: '00' | '01' | '02' | '04' | '97' | '99'; Message: string };
@@ -18,6 +21,7 @@ export class VNPayWebhookController {
 
   @Post('ipn')
   @HttpCode(200)
+  @Throttle({ default: { limit: 300, ttl: 60000 } })
   async receive(
     @Body() body: Record<string, unknown>,
     @Headers() headers: Record<string, string>,
@@ -25,6 +29,22 @@ export class VNPayWebhookController {
   ) {
     try {
       await this.paymentsService.handleWebhook('VNPAY', body, headers, ip ?? null);
+      return { RspCode: '00', Message: 'Confirm Success' };
+    } catch (error) {
+      return this.mapToVnpIpnResponse(error);
+    }
+  }
+
+  @Get('ipn')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 300, ttl: 60000 } })
+  async receiveGet(
+    @Query() query: Record<string, unknown>,
+    @Headers() headers: Record<string, string>,
+    @Ip() ip: string,
+  ) {
+    try {
+      await this.paymentsService.handleWebhook('VNPAY', query, headers, ip ?? null);
       return { RspCode: '00', Message: 'Confirm Success' };
     } catch (error) {
       return this.mapToVnpIpnResponse(error);
