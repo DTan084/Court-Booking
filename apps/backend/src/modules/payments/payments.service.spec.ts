@@ -10,8 +10,6 @@ import { PaymentEventEntity } from '../../database/entities/payment-event.entity
 import { BookingEntity } from '../../database/entities/booking.entity';
 import paymentsConfig from '../../config/payments.config';
 import { VNPayProvider } from './providers/vnpay.provider';
-import { MoMoProvider } from './providers/momo.provider';
-import { PayPalProvider } from './providers/paypal.provider';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -40,7 +38,7 @@ describe('PaymentsService', () => {
   });
 
   const mockProvider = () => ({
-    code: 'MOMO',
+    code: 'VNPAY',
     createPayment: jest.fn(),
     verifyWebhook: jest.fn(),
     queryPayment: jest.fn(),
@@ -57,13 +55,11 @@ describe('PaymentsService', () => {
         { provide: getRepositoryToken(BookingEntity), useFactory: mockGenericRepo },
         {
           provide: paymentsConfig.KEY,
-          useValue: { providersEnabled: ['MOMO'], reconcileStaleMinutes: 10 },
+          useValue: { providersEnabled: ['VNPAY'], reconcileStaleMinutes: 10 },
         },
         { provide: getQueueToken('payment-jobs'), useFactory: mockQueue },
         { provide: DataSource, useFactory: mockDataSource },
         { provide: VNPayProvider, useFactory: mockProvider },
-        { provide: MoMoProvider, useFactory: mockProvider },
-        { provide: PayPalProvider, useFactory: mockProvider },
       ],
     }).compile();
 
@@ -81,8 +77,8 @@ describe('PaymentsService', () => {
       const payment = {
         id: 'payment-1',
         bookingId: 'booking-1',
-        providerCode: 'MOMO',
-        providerOrderId: 'MOMO-payment-1',
+        providerCode: 'VNPAY',
+        providerOrderId: 'VNPAY-payment-1',
         providerTxnId: null,
         status: PaymentStatus.PENDING,
         completedAt: null,
@@ -95,7 +91,7 @@ describe('PaymentsService', () => {
       } as BookingEntity;
 
       paymentRepository.findOne.mockResolvedValue(payment);
-      (service as any).providers.MOMO.queryPayment.mockResolvedValue({
+      (service as any).providers.VNPAY.queryPayment.mockResolvedValue({
         paymentStatus: 'SUCCESS',
         providerTxnId: 'txn-1',
         raw: { ok: true },
@@ -125,8 +121,8 @@ describe('PaymentsService', () => {
       const payment = {
         id: 'payment-2',
         bookingId: 'booking-2',
-        providerCode: 'MOMO',
-        providerOrderId: 'MOMO-payment-2',
+        providerCode: 'VNPAY',
+        providerOrderId: 'VNPAY-payment-2',
         status: PaymentStatus.PROCESSING,
         completedAt: null,
       } as PaymentEntity;
@@ -137,7 +133,7 @@ describe('PaymentsService', () => {
       } as BookingEntity;
 
       paymentRepository.findOne.mockResolvedValue(payment);
-      (service as any).providers.MOMO.queryPayment.mockResolvedValue({
+      (service as any).providers.VNPAY.queryPayment.mockResolvedValue({
         paymentStatus: 'SUCCESS',
         raw: { ok: true },
       });

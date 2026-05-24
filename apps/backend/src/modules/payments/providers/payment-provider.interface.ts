@@ -43,9 +43,14 @@ export interface PaymentProviderAdapter {
   queryPayment(paymentRef: {
     providerOrderId?: string | null;
     providerTxnId?: string | null;
+    metadata?: Record<string, unknown> | null;
   }): Promise<QueryPaymentResult>;
   refund(
-    paymentRef: { providerOrderId?: string | null; providerTxnId?: string | null },
+    paymentRef: {
+      providerOrderId?: string | null;
+      providerTxnId?: string | null;
+      metadata?: Record<string, unknown> | null;
+    },
     amount?: number,
   ): Promise<RefundResult>;
 }

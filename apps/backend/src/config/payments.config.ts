@@ -19,7 +19,11 @@ export default registerAs('payments', () => ({
     tmnCode: process.env.VNPAY_TMN_CODE || '',
     hashSecret: process.env.VNPAY_HASH_SECRET || '',
     payUrl: process.env.VNPAY_PAY_URL || '',
+    queryUrl: process.env.VNPAY_QUERY_URL || '',
+    refundUrl: process.env.VNPAY_REFUND_URL || '',
     returnUrl: process.env.VNPAY_RETURN_URL || '',
+    locale: process.env.VNPAY_LOCALE || 'vn',
+    orderType: process.env.VNPAY_ORDER_TYPE || 'other',
   },
   momo: {
     partnerCode: process.env.MOMO_PARTNER_CODE || '',

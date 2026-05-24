@@ -135,6 +135,7 @@ export class PaymentsService {
       {
         providerOrderId: payment.providerOrderId,
         providerTxnId: payment.providerTxnId,
+        metadata: payment.providerRaw,
       },
       payload.amount,
     );
@@ -283,6 +284,7 @@ export class PaymentsService {
     const query = await provider.queryPayment({
       providerOrderId: payment.providerOrderId,
       providerTxnId: payment.providerTxnId,
+      metadata: payment.providerRaw,
     });
 
     await this.paymentEventRepository.save(
