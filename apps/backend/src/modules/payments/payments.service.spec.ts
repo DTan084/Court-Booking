@@ -26,6 +26,7 @@ describe('PaymentsService', () => {
 
   const mockGenericRepo = () => ({
     findOne: jest.fn(),
+    find: jest.fn(),
     save: jest.fn(),
     create: jest.fn((v) => v),
   });
@@ -185,7 +186,11 @@ describe('PaymentsService', () => {
 
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const manager = {
-          findOne: jest.fn().mockResolvedValue(payment),
+          findOne: jest
+            .fn()
+            .mockImplementation((entity: unknown) =>
+              entity === PaymentEntity ? Promise.resolve(payment) : Promise.resolve(null),
+            ),
           save: jest.fn().mockImplementation((entity: any) => Promise.resolve(entity)),
           create: jest.fn().mockImplementation((_e: any, data: any) => data),
         };
@@ -230,7 +235,11 @@ describe('PaymentsService', () => {
 
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const manager = {
-          findOne: jest.fn().mockResolvedValue(payment),
+          findOne: jest
+            .fn()
+            .mockImplementation((entity: unknown) =>
+              entity === PaymentEntity ? Promise.resolve(payment) : Promise.resolve(null),
+            ),
           save: jest.fn().mockImplementation((entity: any) => Promise.resolve(entity)),
           create: jest.fn().mockImplementation((_e: any, data: any) => data),
         };
@@ -275,7 +284,11 @@ describe('PaymentsService', () => {
 
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const manager = {
-          findOne: jest.fn().mockResolvedValue(payment),
+          findOne: jest
+            .fn()
+            .mockImplementation((entity: unknown) =>
+              entity === PaymentEntity ? Promise.resolve(payment) : Promise.resolve(null),
+            ),
           save: jest.fn().mockImplementation((entity: any) => Promise.resolve(entity)),
           create: jest.fn().mockImplementation((_e: any, data: any) => data),
         };
@@ -296,6 +309,98 @@ describe('PaymentsService', () => {
           '127.0.0.1',
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('acknowledges duplicate terminal webhook without storing duplicate event', async () => {
+      const payment = {
+        id: 'payment-6',
+        bookingId: 'booking-6',
+        providerCode: 'VNPAY',
+        providerOrderId: 'VNPAY-payment-6',
+        providerTxnId: 'txn-6',
+        amount: 100000,
+        currency: 'VND',
+        status: PaymentStatus.SUCCESS,
+      } as PaymentEntity;
+
+      const duplicatePayload = {
+        vnp_TxnRef: 'VNPAY-payment-6',
+        vnp_TmnCode: 'TESTCODE',
+        vnp_Amount: '10000000',
+        vnp_TransactionNo: 'txn-6',
+        vnp_ResponseCode: '00',
+      };
+      const lastEvent = {
+        payload: duplicatePayload,
+        isVerified: true,
+      } as unknown as PaymentEventEntity;
+
+      (service as any).providers.VNPAY.verifyWebhook.mockResolvedValue({
+        verified: true,
+        paymentStatus: 'SUCCESS',
+        providerOrderId: 'VNPAY-payment-6',
+        providerTxnId: 'txn-6',
+        raw: {},
+      });
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockImplementation((entity: unknown) => {
+            if (entity === PaymentEntity) return Promise.resolve(payment);
+            if (entity === PaymentEventEntity) return Promise.resolve(lastEvent);
+            return Promise.resolve(null);
+          }),
+          save: jest.fn().mockImplementation((entity: any) => Promise.resolve(entity)),
+          create: jest.fn().mockImplementation((_e: any, data: any) => data),
+        };
+        return cb(manager);
+      });
+
+      const result = await service.handleWebhook('VNPAY', duplicatePayload, {}, '127.0.0.1');
+      expect(result.status).toBe(PaymentStatus.SUCCESS);
+    });
+  });
+
+  describe('lookupPayment', () => {
+    it('returns lookup details by providerOrderId', async () => {
+      const payment = {
+        id: 'payment-lookup-1',
+        providerCode: 'VNPAY',
+        providerOrderId: 'VNPAY-ORDER-1',
+        providerTxnId: 'TXN-1',
+        bookingId: 'booking-lookup-1',
+        amount: 100000,
+        currency: 'VND',
+        status: PaymentStatus.SUCCESS,
+        completedAt: new Date(),
+      } as PaymentEntity;
+      const booking = { id: 'booking-lookup-1', status: BookingStatus.CONFIRMED } as BookingEntity;
+
+      paymentRepository.findOne.mockResolvedValue(payment);
+      const bookingRepository = (service as any).bookingRepository;
+      bookingRepository.findOne.mockResolvedValue(booking);
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.find.mockResolvedValue([
+        {
+          id: 'evt-1',
+          eventType: 'WEBHOOK_IN',
+          direction: 'IN',
+          isVerified: true,
+          createdAt: new Date(),
+        },
+      ]);
+
+      const result = await service.lookupPayment({ providerOrderId: 'VNPAY-ORDER-1' });
+      expect(result.paymentId).toBe('payment-lookup-1');
+      expect(result.bookingStatus).toBe(BookingStatus.CONFIRMED);
+      expect(result.lastEvents.length).toBe(1);
+    });
+
+    it('throws NotFoundException when lookup target does not exist', async () => {
+      paymentRepository.findOne.mockResolvedValue(null);
+      await expect(service.lookupPayment({ providerTxnId: 'NOT_FOUND' })).rejects.toThrow(
+        'Payment not found',
+      );
     });
   });
 });

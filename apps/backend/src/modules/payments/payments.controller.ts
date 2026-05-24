@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { initiatePaymentSchema } from './dto/initiate-payment.dto';
+import { paymentLookupSchema } from './dto/payment-lookup.dto';
 import { refundPaymentSchema } from './dto/refund-payment.dto';
 import { PaymentsService } from './payments.service';
 
@@ -38,6 +40,19 @@ export class PaymentsController {
   @Get(':id/status')
   getStatus(@Param('id') id: string) {
     return this.paymentsService.getPaymentStatus(id);
+  }
+
+  @Get('admin/lookup')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  lookup(
+    @Query(new ZodValidationPipe(paymentLookupSchema))
+    query: {
+      providerOrderId?: string;
+      providerTxnId?: string;
+    },
+  ) {
+    return this.paymentsService.lookupPayment(query);
   }
 
   @Patch(':id/refund')
