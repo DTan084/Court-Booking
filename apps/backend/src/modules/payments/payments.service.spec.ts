@@ -424,13 +424,34 @@ describe('PaymentsService', () => {
   describe('reconcileStalePayments', () => {
     it('enqueues reconcile job when attempts are below max', async () => {
       paymentRepository.find.mockResolvedValue([{ id: 'payment-a' }]);
+      paymentRepository.findOne.mockResolvedValue({ status: PaymentStatus.PENDING });
       const eventRepository = (service as any).paymentEventRepository;
       eventRepository.count.mockResolvedValue(1);
 
       await service.reconcileStalePayments();
 
       const queue = (service as any).paymentQueue;
-      expect(queue.add).toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        'reconcile-payment',
+        { paymentId: 'payment-a' },
+        expect.any(Object),
+      );
+    });
+
+    it('enqueues apply-successful-payment for stale reconciling payment', async () => {
+      paymentRepository.find.mockResolvedValue([{ id: 'payment-r' }]);
+      paymentRepository.findOne.mockResolvedValue({ status: PaymentStatus.RECONCILING });
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.count.mockResolvedValue(0);
+
+      await service.reconcileStalePayments();
+
+      const queue = (service as any).paymentQueue;
+      expect(queue.add).toHaveBeenCalledWith(
+        'apply-successful-payment',
+        { paymentId: 'payment-r' },
+        expect.any(Object),
+      );
     });
 
     it('marks manual review and skips enqueue when attempts exceed max', async () => {
@@ -667,7 +688,10 @@ describe('PaymentsService', () => {
 
   describe('handleManualReviewAction', () => {
     it('requeues payment and writes MANUAL_REVIEW_REQUEUED event', async () => {
-      paymentRepository.findOne.mockResolvedValue({ id: 'payment-rq-1' });
+      paymentRepository.findOne.mockResolvedValue({
+        id: 'payment-rq-1',
+        status: PaymentStatus.RECONCILING,
+      });
       const eventRepository = (service as any).paymentEventRepository;
       eventRepository.findOne.mockResolvedValue({ id: 'evt-manual' });
       eventRepository.create.mockImplementation((v: any) => v);
@@ -680,7 +704,11 @@ describe('PaymentsService', () => {
       );
 
       const queue = (service as any).paymentQueue;
-      expect(queue.add).toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        'apply-successful-payment',
+        { paymentId: 'payment-rq-1' },
+        expect.any(Object),
+      );
       expect(result.queued).toBe(true);
     });
 

@@ -4,6 +4,7 @@ import { Job } from 'bull';
 import { PaymentsService } from './payments.service';
 
 type ReconcilePaymentJob = { paymentId: string };
+type ApplySuccessfulPaymentJob = { paymentId: string };
 
 @Injectable()
 @Processor('payment-jobs')
@@ -25,6 +26,19 @@ export class PaymentJobsProcessor {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
         `Reconcile payment job failed for paymentId=${job.data.paymentId}: ${message}`,
+      );
+      throw error;
+    }
+  }
+
+  @Process({ name: 'apply-successful-payment', concurrency: 5 })
+  async applySuccessfulPayment(job: Job<ApplySuccessfulPaymentJob>): Promise<void> {
+    try {
+      await this.paymentsService.applySuccessfulPayment(job.data.paymentId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Apply successful payment job failed for paymentId=${job.data.paymentId}: ${message}`,
       );
       throw error;
     }

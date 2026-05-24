@@ -333,7 +333,11 @@ export class PaymentsService {
     }
 
     if (action.action === 'REQUEUE') {
-      await this.enqueueReconcile(paymentId);
+      if (payment.status === PaymentStatus.RECONCILING) {
+        await this.enqueueApplySuccessfulPayment(paymentId);
+      } else {
+        await this.enqueueReconcile(paymentId);
+      }
       await this.paymentEventRepository.save(
         this.paymentEventRepository.create({
           paymentId,
@@ -524,7 +528,7 @@ export class PaymentsService {
     });
 
     if (txResult.status === PaymentStatus.RECONCILING) {
-      await this.enqueueReconcile(txResult.paymentId);
+      await this.enqueueApplySuccessfulPayment(txResult.paymentId);
     }
     return txResult;
   }
@@ -532,6 +536,19 @@ export class PaymentsService {
   async enqueueReconcile(paymentId: string) {
     await this.paymentQueue.add(
       'reconcile-payment',
+      { paymentId },
+      {
+        removeOnComplete: true,
+        removeOnFail: 20,
+        attempts: 10,
+        backoff: { type: 'exponential', delay: 30000 },
+      },
+    );
+  }
+
+  async enqueueApplySuccessfulPayment(paymentId: string) {
+    await this.paymentQueue.add(
+      'apply-successful-payment',
       { paymentId },
       {
         removeOnComplete: true,
@@ -559,7 +576,15 @@ export class PaymentsService {
         await this.markManualReviewRequired(item.id);
         continue;
       }
-      await this.enqueueReconcile(item.id);
+      const payment = await this.paymentRepository.findOne({
+        where: { id: item.id },
+        select: { status: true },
+      });
+      if (payment?.status === PaymentStatus.RECONCILING) {
+        await this.enqueueApplySuccessfulPayment(item.id);
+      } else {
+        await this.enqueueReconcile(item.id);
+      }
     }
     if (pending.length > 0) {
       this.logger.log(`Queued ${pending.length} payment(s) for reconciliation`);
@@ -617,6 +642,36 @@ export class PaymentsService {
       }
 
       return lockedPayment;
+    });
+
+    return { paymentId: updated.id, status: updated.status };
+  }
+
+  async applySuccessfulPayment(paymentId: string) {
+    this.ensurePaymentsEnabled();
+
+    const updated = await this.dataSource.transaction(async (manager) => {
+      const payment = await manager.findOne(PaymentEntity, {
+        where: { id: paymentId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!payment) throw new NotFoundException('Payment not found');
+
+      if (
+        payment.status !== PaymentStatus.SUCCESS &&
+        payment.status !== PaymentStatus.RECONCILING
+      ) {
+        return payment;
+      }
+
+      if (payment.status === PaymentStatus.RECONCILING) {
+        payment.status = PaymentStatus.SUCCESS;
+        payment.completedAt = payment.completedAt ?? new Date();
+        await manager.save(payment);
+      }
+
+      await this.convergeBookingForSuccessfulPayment(manager, payment);
+      return payment;
     });
 
     return { paymentId: updated.id, status: updated.status };
