@@ -229,15 +229,16 @@ Swagger:
 
 ### Payments
 
-| Method  | Path                            | Description                                                 |
-| ------- | ------------------------------- | ----------------------------------------------------------- |
-| `POST`  | `/payments/initiate`            | Initiate VNPay payment (authenticated)                      |
-| `GET`   | `/payments/:id/status`          | Read payment and booking status snapshot                    |
-| `PATCH` | `/payments/:id/refund`          | Refund payment (admin only)                                 |
-| `POST`  | `/payments/:id/reconcile`       | Trigger reconcile by payment id (admin)                     |
-| `GET`   | `/payments/admin/lookup`        | Lookup by `providerOrderId`/`providerTxnId` (admin)         |
-| `GET`   | `/payments/admin/manual-review` | List manual-review queue with attempt/error context (admin) |
-| `POST`  | `/payments/vnpay/ipn`           | VNPay webhook callback (public, signature-verified)         |
+| Method  | Path                                       | Description                                                 |
+| ------- | ------------------------------------------ | ----------------------------------------------------------- |
+| `POST`  | `/payments/initiate`                       | Initiate VNPay payment (authenticated)                      |
+| `GET`   | `/payments/:id/status`                     | Read payment and booking status snapshot                    |
+| `PATCH` | `/payments/:id/refund`                     | Refund payment (admin only)                                 |
+| `POST`  | `/payments/:id/reconcile`                  | Trigger reconcile by payment id (admin)                     |
+| `GET`   | `/payments/admin/lookup`                   | Lookup by `providerOrderId`/`providerTxnId` (admin)         |
+| `GET`   | `/payments/admin/manual-review`            | List manual-review queue with attempt/error context (admin) |
+| `POST`  | `/payments/admin/manual-review/:id/action` | Resolve or requeue manual-review item (admin)               |
+| `POST`  | `/payments/vnpay/ipn`                      | VNPay webhook callback (public, signature-verified)         |
 
 ### Admin Bookings
 

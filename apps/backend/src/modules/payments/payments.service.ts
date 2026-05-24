@@ -10,6 +10,7 @@ import {
 } from '../../database/entities/payment-event.entity';
 import { PaymentProviderEntity } from '../../database/entities/payment-provider.entity';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
+import { ManualReviewActionDto } from './dto/manual-review-action.dto';
 import { ManualReviewListDto } from './dto/manual-review-list.dto';
 import { PaymentLookupDto } from './dto/payment-lookup.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
@@ -302,6 +303,52 @@ export class PaymentsService {
         totalPages: Math.max(1, Math.ceil(total / limit)),
       },
     };
+  }
+
+  async handleManualReviewAction(
+    paymentId: string,
+    action: ManualReviewActionDto,
+    actedBy: string,
+  ) {
+    const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
+    if (!payment) throw new NotFoundException('Payment not found');
+
+    const manualReview = await this.paymentEventRepository.findOne({
+      where: { paymentId, eventType: 'MANUAL_REVIEW_REQUIRED' },
+      order: { createdAt: 'DESC' },
+    });
+    if (!manualReview) {
+      throw new BadRequestException('Payment is not in manual review queue');
+    }
+
+    if (action.action === 'REQUEUE') {
+      await this.enqueueReconcile(paymentId);
+      await this.paymentEventRepository.save(
+        this.paymentEventRepository.create({
+          paymentId,
+          eventType: 'MANUAL_REVIEW_REQUEUED',
+          direction: PaymentEventDirection.OUT,
+          payload: {
+            actedBy,
+            note: action.note ?? null,
+          },
+        }),
+      );
+      return { paymentId, action: 'REQUEUE', queued: true };
+    }
+
+    await this.paymentEventRepository.save(
+      this.paymentEventRepository.create({
+        paymentId,
+        eventType: 'MANUAL_REVIEW_RESOLVED',
+        direction: PaymentEventDirection.OUT,
+        payload: {
+          actedBy,
+          note: action.note ?? null,
+        },
+      }),
+    );
+    return { paymentId, action: 'RESOLVE', resolved: true };
   }
 
   async refund(paymentId: string, payload: RefundPaymentDto) {

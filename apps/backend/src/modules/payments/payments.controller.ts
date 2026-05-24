@@ -17,6 +17,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { initiatePaymentSchema } from './dto/initiate-payment.dto';
+import { manualReviewActionSchema } from './dto/manual-review-action.dto';
 import { manualReviewListSchema } from './dto/manual-review-list.dto';
 import { paymentLookupSchema } from './dto/payment-lookup.dto';
 import { refundPaymentSchema } from './dto/refund-payment.dto';
@@ -86,5 +87,18 @@ export class PaymentsController {
   @Roles(Role.ADMIN)
   reconcile(@Param('id') id: string) {
     return this.paymentsService.reconcilePayment(id);
+  }
+
+  @Post('admin/manual-review/:id/action')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  manualReviewAction(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(manualReviewActionSchema))
+    body: { action: 'RESOLVE' | 'REQUEUE'; note?: string },
+    @CurrentUser() user: { id?: string } | undefined,
+  ) {
+    if (!user?.id) throw new UnauthorizedException();
+    return this.paymentsService.handleManualReviewAction(id, body, user.id);
   }
 }

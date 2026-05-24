@@ -612,4 +612,51 @@ describe('PaymentsService', () => {
       expect(result.data[0].lastReconcileError).toBe('query timeout');
     });
   });
+
+  describe('handleManualReviewAction', () => {
+    it('requeues payment and writes MANUAL_REVIEW_REQUEUED event', async () => {
+      paymentRepository.findOne.mockResolvedValue({ id: 'payment-rq-1' });
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.findOne.mockResolvedValue({ id: 'evt-manual' });
+      eventRepository.create.mockImplementation((v: any) => v);
+      eventRepository.save.mockResolvedValue({});
+
+      const result = await service.handleManualReviewAction(
+        'payment-rq-1',
+        { action: 'REQUEUE', note: 'retry now' },
+        'admin-1',
+      );
+
+      const queue = (service as any).paymentQueue;
+      expect(queue.add).toHaveBeenCalled();
+      expect(result.queued).toBe(true);
+    });
+
+    it('resolves payment and writes MANUAL_REVIEW_RESOLVED event', async () => {
+      paymentRepository.findOne.mockResolvedValue({ id: 'payment-rs-1' });
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.findOne.mockResolvedValue({ id: 'evt-manual' });
+      eventRepository.create.mockImplementation((v: any) => v);
+      eventRepository.save.mockResolvedValue({});
+
+      const result = await service.handleManualReviewAction(
+        'payment-rs-1',
+        { action: 'RESOLVE', note: 'verified externally' },
+        'admin-2',
+      );
+
+      expect(result.resolved).toBe(true);
+      expect(eventRepository.save).toHaveBeenCalled();
+    });
+
+    it('throws when payment is not in manual review queue', async () => {
+      paymentRepository.findOne.mockResolvedValue({ id: 'payment-x' });
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.handleManualReviewAction('payment-x', { action: 'RESOLVE' }, 'admin-3'),
+      ).rejects.toThrow('Payment is not in manual review queue');
+    });
+  });
 });
