@@ -416,4 +416,70 @@ describe('PaymentsService', () => {
       ).rejects.toThrow('Payments are disabled by configuration');
     });
   });
+
+  describe('initiatePayment', () => {
+    it('rejects when booking does not belong to current user', async () => {
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockImplementation((entity: unknown) => {
+            if (entity === PaymentProviderEntity)
+              return Promise.resolve({ code: 'VNPAY', isActive: true });
+            if (entity === BookingEntity) {
+              return Promise.resolve({
+                id: 'booking-1',
+                userId: 'owner-user',
+                status: BookingStatus.PENDING_PAYMENT,
+                paymentDeadline: null,
+                successfulPaymentId: null,
+              });
+            }
+            if (entity === PaymentEntity) return Promise.resolve(null);
+            return Promise.resolve(null);
+          }),
+          save: jest.fn(),
+          create: jest.fn((_e: any, v: any) => v),
+        };
+        return cb(manager);
+      });
+
+      await expect(
+        service.initiatePayment(
+          { bookingId: '00000000-0000-0000-0000-000000000001', provider: 'VNPAY' },
+          'other-user',
+        ),
+      ).rejects.toThrow('Booking does not belong to current user');
+    });
+
+    it('rejects when booking payment deadline is expired', async () => {
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockImplementation((entity: unknown) => {
+            if (entity === PaymentProviderEntity)
+              return Promise.resolve({ code: 'VNPAY', isActive: true });
+            if (entity === BookingEntity) {
+              return Promise.resolve({
+                id: 'booking-2',
+                userId: 'user-2',
+                status: BookingStatus.PENDING_PAYMENT,
+                paymentDeadline: new Date(Date.now() - 60_000),
+                successfulPaymentId: null,
+              });
+            }
+            if (entity === PaymentEntity) return Promise.resolve(null);
+            return Promise.resolve(null);
+          }),
+          save: jest.fn(),
+          create: jest.fn((_e: any, v: any) => v),
+        };
+        return cb(manager);
+      });
+
+      await expect(
+        service.initiatePayment(
+          { bookingId: '00000000-0000-0000-0000-000000000002', provider: 'VNPAY' },
+          'user-2',
+        ),
+      ).rejects.toThrow('Booking payment deadline has expired');
+    });
+  });
 });

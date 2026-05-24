@@ -51,63 +51,108 @@ export class PaymentsService {
   async initiatePayment(payload: InitiatePaymentDto, initiatedBy: string, clientIp?: string) {
     this.ensurePaymentsEnabled();
 
-    const booking = await this.bookingRepository.findOne({ where: { id: payload.bookingId } });
-    if (!booking) throw new NotFoundException('Booking not found');
-    if (![BookingStatus.PENDING_PAYMENT].includes(booking.status)) {
-      throw new BadRequestException(`Booking is not payable in state ${booking.status}`);
-    }
-
     const enabledProviders = new Set(this.paymentCfg.providersEnabled);
     if (!enabledProviders.has(payload.provider)) {
       throw new BadRequestException(`Payment provider ${payload.provider} is disabled by config`);
     }
 
-    const provider = await this.paymentProviderRepository.findOne({
-      where: { code: payload.provider },
+    const { payment, booking } = await this.dataSource.transaction(async (manager) => {
+      const provider = await manager.findOne(PaymentProviderEntity, {
+        where: { code: payload.provider },
+      });
+      if (!provider || !provider.isActive) {
+        throw new BadRequestException(`Payment provider ${payload.provider} is not active`);
+      }
+
+      const booking = await manager.findOne(BookingEntity, {
+        where: { id: payload.bookingId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!booking) throw new NotFoundException('Booking not found');
+      if (booking.userId && booking.userId !== initiatedBy) {
+        throw new BadRequestException('Booking does not belong to current user');
+      }
+      if (![BookingStatus.PENDING_PAYMENT].includes(booking.status)) {
+        throw new BadRequestException(`Booking is not payable in state ${booking.status}`);
+      }
+      if (booking.paymentDeadline && booking.paymentDeadline < new Date()) {
+        throw new BadRequestException('Booking payment deadline has expired');
+      }
+      if (booking.successfulPaymentId) {
+        throw new BadRequestException('Booking already has successful payment');
+      }
+
+      const existingPending = await manager.findOne(PaymentEntity, {
+        where: {
+          bookingId: booking.id,
+          providerCode: payload.provider,
+          status: PaymentStatus.PENDING,
+        },
+        order: { createdAt: 'DESC' },
+      });
+      if (existingPending) {
+        throw new BadRequestException('An active payment attempt already exists for this booking');
+      }
+
+      const payment = await manager.save(
+        PaymentEntity,
+        manager.create(PaymentEntity, {
+          bookingId: booking.id,
+          providerCode: payload.provider,
+          amount: Number(booking.totalPrice),
+          currency: 'VND',
+          status: PaymentStatus.PENDING,
+          initiatedBy,
+        }),
+      );
+      return { payment, booking };
     });
-    if (!provider || !provider.isActive) {
-      throw new BadRequestException(`Payment provider ${payload.provider} is not active`);
-    }
 
-    const payment = await this.paymentRepository.save(
-      this.paymentRepository.create({
-        bookingId: booking.id,
-        providerCode: payload.provider,
-        amount: Number(booking.totalPrice),
-        currency: 'VND',
-        status: PaymentStatus.PENDING,
-        initiatedBy,
-      }),
-    );
-
-    const createResult = await this.providers[payload.provider].createPayment({
-      paymentId: payment.id,
-      bookingId: booking.id,
-      amount: Number(payment.amount),
-      currency: payment.currency,
-      clientIp,
-    });
-
-    payment.providerOrderId = createResult.providerOrderId;
-    payment.providerRaw = createResult.raw;
-    await this.paymentRepository.save(payment);
-
-    await this.paymentEventRepository.save(
-      this.paymentEventRepository.create({
+    try {
+      const createResult = await this.providers[payload.provider].createPayment({
         paymentId: payment.id,
-        eventType: 'INITIATE_OUT',
-        direction: PaymentEventDirection.OUT,
-        payload: createResult.raw,
-      }),
-    );
+        bookingId: booking.id,
+        amount: Number(payment.amount),
+        currency: payment.currency,
+        clientIp,
+      });
 
-    return {
-      paymentId: payment.id,
-      provider: payment.providerCode,
-      status: payment.status,
-      paymentUrl: createResult.paymentUrl,
-      providerOrderId: payment.providerOrderId,
-    };
+      payment.providerOrderId = createResult.providerOrderId;
+      payment.providerRaw = createResult.raw;
+      await this.paymentRepository.save(payment);
+
+      await this.paymentEventRepository.save(
+        this.paymentEventRepository.create({
+          paymentId: payment.id,
+          eventType: 'INITIATE_OUT',
+          direction: PaymentEventDirection.OUT,
+          payload: createResult.raw,
+        }),
+      );
+
+      return {
+        paymentId: payment.id,
+        provider: payment.providerCode,
+        status: payment.status,
+        paymentUrl: createResult.paymentUrl,
+        providerOrderId: payment.providerOrderId,
+      };
+    } catch (error) {
+      payment.status = PaymentStatus.FAILED;
+      payment.completedAt = payment.completedAt ?? new Date();
+      await this.paymentRepository.save(payment);
+      await this.paymentEventRepository.save(
+        this.paymentEventRepository.create({
+          paymentId: payment.id,
+          eventType: 'INITIATE_PROVIDER_FAIL',
+          direction: PaymentEventDirection.OUT,
+          payload: {
+            message: error instanceof Error ? error.message : String(error),
+          },
+        }),
+      );
+      throw error;
+    }
   }
 
   async getPaymentStatus(paymentId: string) {
