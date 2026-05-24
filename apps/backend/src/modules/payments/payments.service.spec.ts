@@ -22,6 +22,7 @@ describe('PaymentsService', () => {
     find: jest.fn(),
     save: jest.fn(),
     create: jest.fn((v) => v),
+    createQueryBuilder: jest.fn(),
   });
 
   const mockGenericRepo = () => ({
@@ -547,6 +548,41 @@ describe('PaymentsService', () => {
           'user-3',
         ),
       ).rejects.toThrow('An active payment attempt already exists for this booking');
+    });
+  });
+
+  describe('listManualReviewPayments', () => {
+    it('returns paginated manual review items', async () => {
+      const qb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          {
+            id: 'payment-m1',
+            providerCode: 'VNPAY',
+            providerOrderId: 'VNPAY-order-1',
+            providerTxnId: 'txn-1',
+            paymentStatus: 'RECONCILING',
+            amount: '100000.00',
+            currency: 'VND',
+            bookingId: 'booking-1',
+            bookingStatus: 'PENDING_PAYMENT',
+            manualReviewAt: new Date().toISOString(),
+          },
+        ]),
+        getCount: jest.fn().mockResolvedValue(1),
+      };
+      paymentRepository.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.listManualReviewPayments({ page: 1, limit: 20 });
+      expect(result.data.length).toBe(1);
+      expect(result.meta.total).toBe(1);
+      expect(result.data[0].paymentStatus).toBe('RECONCILING');
     });
   });
 });

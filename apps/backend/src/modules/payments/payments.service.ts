@@ -10,6 +10,7 @@ import {
 } from '../../database/entities/payment-event.entity';
 import { PaymentProviderEntity } from '../../database/entities/payment-provider.entity';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
+import { ManualReviewListDto } from './dto/manual-review-list.dto';
 import { PaymentLookupDto } from './dto/payment-lookup.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import {
@@ -205,6 +206,63 @@ export class PaymentsService {
         isVerified: e.isVerified,
         createdAt: e.createdAt,
       })),
+    };
+  }
+
+  async listManualReviewPayments(query: ManualReviewListDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const qb = this.paymentRepository
+      .createQueryBuilder('payment')
+      .innerJoin(
+        PaymentEventEntity,
+        'event',
+        "event.paymentId = payment.id AND event.eventType = 'MANUAL_REVIEW_REQUIRED'",
+      )
+      .leftJoin(BookingEntity, 'booking', 'booking.id = payment.bookingId')
+      .select([
+        'payment.id as id',
+        'payment.providerCode as providerCode',
+        'payment.providerOrderId as providerOrderId',
+        'payment.providerTxnId as providerTxnId',
+        'payment.status as paymentStatus',
+        'payment.amount as amount',
+        'payment.currency as currency',
+        'payment.bookingId as bookingId',
+        'booking.status as bookingStatus',
+        'event.createdAt as manualReviewAt',
+      ])
+      .orderBy('event.createdAt', 'DESC')
+      .offset(skip)
+      .limit(limit);
+
+    if (query.status) {
+      qb.andWhere('payment.status = :status', { status: query.status });
+    }
+
+    const [rows, total] = await Promise.all([qb.getRawMany(), qb.getCount()]);
+
+    return {
+      data: rows.map((row) => ({
+        id: row.id,
+        provider: row.providerCode,
+        providerOrderId: row.providerOrderId,
+        providerTxnId: row.providerTxnId,
+        paymentStatus: row.paymentStatus,
+        amount: Number(row.amount),
+        currency: row.currency,
+        bookingId: row.bookingId,
+        bookingStatus: row.bookingStatus ?? null,
+        manualReviewAt: row.manualReviewAt,
+      })),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
     };
   }
 

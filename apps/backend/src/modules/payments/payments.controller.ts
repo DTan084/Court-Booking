@@ -17,6 +17,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { initiatePaymentSchema } from './dto/initiate-payment.dto';
+import { manualReviewListSchema } from './dto/manual-review-list.dto';
 import { paymentLookupSchema } from './dto/payment-lookup.dto';
 import { refundPaymentSchema } from './dto/refund-payment.dto';
 import { PaymentsService } from './payments.service';
@@ -53,6 +54,20 @@ export class PaymentsController {
     },
   ) {
     return this.paymentsService.lookupPayment(query);
+  }
+
+  @Get('admin/manual-review')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  listManualReview(
+    @Query(new ZodValidationPipe(manualReviewListSchema))
+    query: {
+      page: number;
+      limit: number;
+      status?: 'RECONCILING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+    },
+  ) {
+    return this.paymentsService.listManualReviewPayments(query);
   }
 
   @Patch(':id/refund')
