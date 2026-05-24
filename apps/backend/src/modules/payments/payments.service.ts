@@ -49,6 +49,8 @@ export class PaymentsService {
   }
 
   async initiatePayment(payload: InitiatePaymentDto, initiatedBy: string, clientIp?: string) {
+    this.ensurePaymentsEnabled();
+
     const booking = await this.bookingRepository.findOne({ where: { id: payload.bookingId } });
     if (!booking) throw new NotFoundException('Booking not found');
     if (![BookingStatus.PENDING_PAYMENT].includes(booking.status)) {
@@ -160,6 +162,8 @@ export class PaymentsService {
   }
 
   async refund(paymentId: string, payload: RefundPaymentDto) {
+    this.ensurePaymentsEnabled();
+
     const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
     if (!payment) throw new NotFoundException('Payment not found');
 
@@ -207,6 +211,8 @@ export class PaymentsService {
     headers: Record<string, string>,
     ipAddress: string | null,
   ) {
+    this.ensurePaymentsEnabled();
+
     const verification = await this.providers[providerCode].verifyWebhook(payload, headers);
     const providerOrderId = verification.providerOrderId;
     if (!providerOrderId) {
@@ -355,6 +361,8 @@ export class PaymentsService {
   }
 
   async reconcilePayment(paymentId: string) {
+    this.ensurePaymentsEnabled();
+
     const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
     if (!payment) throw new NotFoundException('Payment not found');
     const provider = this.providers[payment.providerCode as PaymentProviderCode];
@@ -452,6 +460,12 @@ export class PaymentsService {
     if (status === 'FAILED') return PaymentStatus.FAILED;
     if (status === 'CANCELLED') return PaymentStatus.CANCELLED;
     return PaymentStatus.PROCESSING;
+  }
+
+  private ensurePaymentsEnabled() {
+    if (!this.paymentCfg.enabled) {
+      throw new BadRequestException('Payments are disabled by configuration');
+    }
   }
 
   private isDuplicateWebhookEvent(

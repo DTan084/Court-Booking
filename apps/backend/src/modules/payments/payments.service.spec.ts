@@ -58,6 +58,7 @@ describe('PaymentsService', () => {
         {
           provide: paymentsConfig.KEY,
           useValue: {
+            enabled: true,
             providersEnabled: ['VNPAY'],
             reconcileStaleMinutes: 10,
             vnpay: { tmnCode: 'TESTCODE' },
@@ -401,6 +402,18 @@ describe('PaymentsService', () => {
       await expect(service.lookupPayment({ providerTxnId: 'NOT_FOUND' })).rejects.toThrow(
         'Payment not found',
       );
+    });
+  });
+
+  describe('feature flag', () => {
+    it('rejects initiate when payments are disabled', async () => {
+      (service as any).paymentCfg.enabled = false;
+      await expect(
+        service.initiatePayment(
+          { bookingId: '00000000-0000-0000-0000-000000000000', provider: 'VNPAY' },
+          'user-1',
+        ),
+      ).rejects.toThrow('Payments are disabled by configuration');
     });
   });
 });

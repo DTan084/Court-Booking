@@ -38,6 +38,9 @@ export class VNPayWebhookController {
       if (message.includes('Invalid signature')) {
         return { RspCode: '97', Message: 'Invalid signature' };
       }
+      if (message.includes('Payments are disabled by configuration')) {
+        return { RspCode: '99', Message: 'Payment disabled' };
+      }
       if (message.includes('Missing provider order id')) {
         return { RspCode: '01', Message: 'Order not found' };
       }

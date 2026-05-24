@@ -6,6 +6,7 @@ const parseBoolean = (value: string | undefined, fallback: boolean) => {
 };
 
 export default registerAs('payments', () => ({
+  enabled: parseBoolean(process.env.PAYMENT_ENABLED, true),
   providersEnabled: (process.env.PAYMENT_PROVIDERS_ENABLED || 'VNPAY')
     .split(',')
     .map((s) => s.trim().toUpperCase())
