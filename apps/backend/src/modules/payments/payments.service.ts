@@ -200,10 +200,17 @@ export class PaymentsService {
       }
 
       if (verification.providerTxnId) {
+        if (payment.providerTxnId && payment.providerTxnId !== verification.providerTxnId) {
+          throw new BadRequestException('Provider transaction id mismatch');
+        }
         payment.providerTxnId = verification.providerTxnId;
       }
 
       if (providerCode === 'VNPAY') {
+        const payloadTmnCode = String(payload.vnp_TmnCode ?? '');
+        if (!payloadTmnCode || payloadTmnCode !== this.paymentCfg.vnpay.tmnCode) {
+          throw new BadRequestException('Invalid VNPay tmn code');
+        }
         const payloadAmount = Number(payload.vnp_Amount ?? 0);
         const expectedAmount = Math.round(Number(payment.amount) * 100);
         if (!Number.isFinite(payloadAmount) || payloadAmount <= 0) {
@@ -217,22 +224,28 @@ export class PaymentsService {
         }
       }
 
+      const incomingStatus = this.mapIncomingPaymentStatus(verification.paymentStatus);
+
       // Idempotent terminal handling: if already terminal and incoming status is same, acknowledge.
       if (
         [PaymentStatus.SUCCESS, PaymentStatus.FAILED, PaymentStatus.CANCELLED].includes(
           payment.status,
         )
       ) {
+        if (incomingStatus !== payment.status && incomingStatus !== PaymentStatus.PROCESSING) {
+          payment.status = PaymentStatus.RECONCILING;
+          await manager.save(payment);
+        }
         return { ok: true, paymentId: payment.id, status: payment.status };
       }
 
-      if (verification.paymentStatus === 'SUCCESS') {
+      if (incomingStatus === PaymentStatus.SUCCESS) {
         payment.status = PaymentStatus.SUCCESS;
         payment.completedAt = new Date();
-      } else if (verification.paymentStatus === 'FAILED') {
+      } else if (incomingStatus === PaymentStatus.FAILED) {
         payment.status = PaymentStatus.FAILED;
         payment.completedAt = new Date();
-      } else if (verification.paymentStatus === 'CANCELLED') {
+      } else if (incomingStatus === PaymentStatus.CANCELLED) {
         payment.status = PaymentStatus.CANCELLED;
         payment.completedAt = new Date();
       } else {
@@ -375,5 +388,14 @@ export class PaymentsService {
     // Financially successful payment but booking is not in convergable state.
     payment.status = PaymentStatus.RECONCILING;
     await manager.save(payment);
+  }
+
+  private mapIncomingPaymentStatus(
+    status: 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'PROCESSING',
+  ): PaymentStatus {
+    if (status === 'SUCCESS') return PaymentStatus.SUCCESS;
+    if (status === 'FAILED') return PaymentStatus.FAILED;
+    if (status === 'CANCELLED') return PaymentStatus.CANCELLED;
+    return PaymentStatus.PROCESSING;
   }
 }

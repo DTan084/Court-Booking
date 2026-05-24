@@ -56,7 +56,11 @@ describe('PaymentsService', () => {
         { provide: getRepositoryToken(BookingEntity), useFactory: mockGenericRepo },
         {
           provide: paymentsConfig.KEY,
-          useValue: { providersEnabled: ['VNPAY'], reconcileStaleMinutes: 10 },
+          useValue: {
+            providersEnabled: ['VNPAY'],
+            reconcileStaleMinutes: 10,
+            vnpay: { tmnCode: 'TESTCODE' },
+          },
         },
         { provide: getQueueToken('payment-jobs'), useFactory: mockQueue },
         { provide: DataSource, useFactory: mockDataSource },
@@ -193,8 +197,99 @@ describe('PaymentsService', () => {
           'VNPAY',
           {
             vnp_TxnRef: 'VNPAY-payment-3',
+            vnp_TmnCode: 'TESTCODE',
             vnp_Amount: '1000',
             vnp_TransactionNo: 'txn-3',
+            vnp_ResponseCode: '00',
+          },
+          {},
+          '127.0.0.1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects VNPay webhook when tmn code mismatches', async () => {
+      const payment = {
+        id: 'payment-4',
+        bookingId: 'booking-4',
+        providerCode: 'VNPAY',
+        providerOrderId: 'VNPAY-payment-4',
+        providerTxnId: null,
+        amount: 100000,
+        currency: 'VND',
+        status: PaymentStatus.PENDING,
+      } as PaymentEntity;
+
+      (service as any).providers.VNPAY.verifyWebhook.mockResolvedValue({
+        verified: true,
+        paymentStatus: 'SUCCESS',
+        providerOrderId: 'VNPAY-payment-4',
+        providerTxnId: 'txn-4',
+        raw: {},
+      });
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockResolvedValue(payment),
+          save: jest.fn().mockImplementation((entity: any) => Promise.resolve(entity)),
+          create: jest.fn().mockImplementation((_e: any, data: any) => data),
+        };
+        return cb(manager);
+      });
+
+      await expect(
+        service.handleWebhook(
+          'VNPAY',
+          {
+            vnp_TxnRef: 'VNPAY-payment-4',
+            vnp_TmnCode: 'WRONG',
+            vnp_Amount: '10000000',
+            vnp_TransactionNo: 'txn-4',
+            vnp_ResponseCode: '00',
+          },
+          {},
+          '127.0.0.1',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects webhook when provider transaction id mismatches existing payment txn id', async () => {
+      const payment = {
+        id: 'payment-5',
+        bookingId: 'booking-5',
+        providerCode: 'VNPAY',
+        providerOrderId: 'VNPAY-payment-5',
+        providerTxnId: 'txn-old',
+        amount: 100000,
+        currency: 'VND',
+        status: PaymentStatus.PENDING,
+      } as PaymentEntity;
+
+      (service as any).providers.VNPAY.verifyWebhook.mockResolvedValue({
+        verified: true,
+        paymentStatus: 'SUCCESS',
+        providerOrderId: 'VNPAY-payment-5',
+        providerTxnId: 'txn-new',
+        raw: {},
+      });
+
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockResolvedValue(payment),
+          save: jest.fn().mockImplementation((entity: any) => Promise.resolve(entity)),
+          create: jest.fn().mockImplementation((_e: any, data: any) => data),
+        };
+        return cb(manager);
+      });
+
+      await expect(
+        service.handleWebhook(
+          'VNPAY',
+          {
+            vnp_TxnRef: 'VNPAY-payment-5',
+            vnp_TmnCode: 'TESTCODE',
+            vnp_Amount: '10000000',
+            vnp_TransactionNo: 'txn-new',
             vnp_ResponseCode: '00',
           },
           {},
