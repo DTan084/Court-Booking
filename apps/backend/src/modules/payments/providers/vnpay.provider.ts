@@ -85,13 +85,22 @@ export class VNPayProvider implements PaymentProviderAdapter {
       .join('&');
     const expected = createHmac('sha512', secret).update(rawData).digest('hex');
     const responseCode = String(payload.vnp_ResponseCode || '');
+    const transactionStatus = String(payload.vnp_TransactionStatus || '');
+    const paymentStatus = this.mapIpnStatus(responseCode, transactionStatus);
 
     return {
       verified: expected.toLowerCase() === secureHash.toLowerCase(),
-      paymentStatus: this.mapIpnStatus(responseCode),
+      paymentStatus,
       providerTxnId: payload.vnp_TransactionNo ? String(payload.vnp_TransactionNo) : undefined,
       providerOrderId: payload.vnp_TxnRef ? String(payload.vnp_TxnRef) : undefined,
-      raw: payload,
+      raw: {
+        ...payload,
+        normalized: {
+          responseCode,
+          transactionStatus,
+          mappedPaymentStatus: paymentStatus,
+        },
+      },
     };
   }
 
@@ -148,11 +157,19 @@ export class VNPayProvider implements PaymentProviderAdapter {
     const response = await this.postJson(this.paymentCfg.vnpay.queryUrl, payload);
     const responseCode = String(response.vnp_ResponseCode || '');
     const transactionStatus = String(response.vnp_TransactionStatus || '');
+    const paymentStatus = this.mapQueryStatus(responseCode, transactionStatus);
 
     return {
-      paymentStatus: this.mapVnpStatus(responseCode, transactionStatus),
+      paymentStatus,
       providerTxnId: response.vnp_TransactionNo ? String(response.vnp_TransactionNo) : undefined,
-      raw: response,
+      raw: {
+        ...response,
+        normalized: {
+          responseCode,
+          transactionStatus,
+          mappedPaymentStatus: paymentStatus,
+        },
+      },
     };
   }
 
@@ -227,7 +244,14 @@ export class VNPayProvider implements PaymentProviderAdapter {
 
     return {
       status: success ? (amount ? 'PARTIAL_REFUND' : 'REFUNDED') : 'FAILED',
-      raw: response,
+      raw: {
+        ...response,
+        normalized: {
+          responseCode,
+          transactionStatus: txStatus,
+          mappedRefundStatus: success ? (amount ? 'PARTIAL_REFUND' : 'REFUNDED') : 'FAILED',
+        },
+      },
     };
   }
 
@@ -275,17 +299,30 @@ export class VNPayProvider implements PaymentProviderAdapter {
     return raw;
   }
 
-  private mapVnpStatus(responseCode: string, transactionStatus: string) {
-    if (responseCode !== '00') return 'PROCESSING' as const;
-    if (transactionStatus === '00') return 'SUCCESS' as const;
-    if (transactionStatus === '24') return 'CANCELLED' as const;
-    if (transactionStatus) return 'FAILED' as const;
+  private mapQueryStatus(responseCode: string, transactionStatus: string) {
+    if (responseCode === '00') {
+      if (transactionStatus === '00') return 'SUCCESS' as const;
+      if (transactionStatus === '24') return 'CANCELLED' as const;
+      if (transactionStatus === '02') return 'FAILED' as const;
+      return 'PROCESSING' as const;
+    }
+
+    // Query API transport/business errors should not force FAILED immediately.
+    // Keep PROCESSING and let reconcile retry.
     return 'PROCESSING' as const;
   }
 
-  private mapIpnStatus(responseCode: string) {
-    if (responseCode === '00') return 'SUCCESS' as const;
+  private mapIpnStatus(responseCode: string, transactionStatus: string) {
+    if (responseCode === '00') {
+      if (transactionStatus === '00' || !transactionStatus) return 'SUCCESS' as const;
+      if (transactionStatus === '24') return 'CANCELLED' as const;
+      if (transactionStatus === '02') return 'FAILED' as const;
+      return 'PROCESSING' as const;
+    }
     if (responseCode === '24') return 'CANCELLED' as const;
+    if (responseCode === '07' || responseCode === '09' || responseCode === '10') {
+      return 'PROCESSING' as const;
+    }
     if (!responseCode) return 'PROCESSING' as const;
     return 'FAILED' as const;
   }

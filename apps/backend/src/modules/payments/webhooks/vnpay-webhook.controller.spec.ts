@@ -35,4 +35,22 @@ describe('VNPayWebhookController', () => {
     const result = await controller.receive({}, {}, '127.0.0.1');
     expect(result).toEqual({ RspCode: '97', Message: 'Invalid signature' });
   });
+
+  it('maps VNPay amount/tmn/currency validation errors to RspCode 04', async () => {
+    (paymentsService.handleWebhook as jest.Mock).mockRejectedValue(
+      new BadRequestException('Invalid VNPay tmn code'),
+    );
+
+    const result = await controller.receive({}, {}, '127.0.0.1');
+    expect(result).toEqual({ RspCode: '04', Message: 'Invalid amount' });
+  });
+
+  it('maps disabled payment config to RspCode 99', async () => {
+    (paymentsService.handleWebhook as jest.Mock).mockRejectedValue(
+      new BadRequestException('Payments are disabled by configuration'),
+    );
+
+    const result = await controller.receive({}, {}, '127.0.0.1');
+    expect(result).toEqual({ RspCode: '99', Message: 'Payment disabled' });
+  });
 });
