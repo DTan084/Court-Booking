@@ -13,6 +13,7 @@ export default registerAs('payments', () => ({
     .filter(Boolean),
   reconcileIntervalMinutes: parseInt(process.env.PAYMENT_RECONCILE_INTERVAL_MINUTES || '5', 10),
   reconcileStaleMinutes: parseInt(process.env.PAYMENT_RECONCILE_STALE_MINUTES || '10', 10),
+  reconcileMaxAttempts: parseInt(process.env.PAYMENT_RECONCILE_MAX_ATTEMPTS || '10', 10),
   schedulerEnabled: parseBoolean(process.env.PAYMENT_JOB_SCHEDULER_ENABLED, true),
   schedulerInitLockTtlMs: parseInt(process.env.PAYMENT_JOB_SCHEDULER_LOCK_TTL_MS || '30000', 10),
 

@@ -90,47 +90,48 @@ The local runtime stack is defined in:
 
 The backend reads values from the repository root environment files.
 
-| Variable                             | Required | Purpose                                  |
-| ------------------------------------ | -------- | ---------------------------------------- |
-| `NODE_ENV`                           | Yes      | Runtime environment                      |
-| `PORT`                               | Yes      | Backend listen port                      |
-| `FE_URL`                             | Yes      | Frontend origin used for CORS            |
-| `DB_HOST`                            | Yes      | PostgreSQL host                          |
-| `DB_PORT`                            | Yes      | PostgreSQL port                          |
-| `DB_NAME`                            | Yes      | PostgreSQL database                      |
-| `DB_USER`                            | Yes      | PostgreSQL user                          |
-| `DB_PASSWORD`                        | Yes      | PostgreSQL password                      |
-| `JWT_SECRET`                         | Yes      | JWT signing secret                       |
-| `JWT_EXPIRES_IN`                     | Yes      | Access token TTL                         |
-| `JWT_REFRESH_EXPIRES_IN`             | Yes      | Refresh token TTL                        |
-| `REDIS_HOST`                         | Yes      | Redis host                               |
-| `REDIS_PORT`                         | Yes      | Redis port                               |
-| `REDIS_USERNAME`                     | No       | Redis ACL username                       |
-| `REDIS_PASSWORD`                     | No       | Redis password                           |
-| `REDIS_DB`                           | No       | App Redis DB index                       |
-| `REDIS_QUEUE_DB`                     | No       | Bull queue Redis DB index                |
-| `REDIS_APP_PREFIX`                   | No       | App Redis key prefix                     |
-| `REDIS_TLS_ENABLED`                  | No       | Toggle Redis TLS                         |
-| `REDIS_CONNECT_TIMEOUT_MS`           | No       | Redis connect timeout                    |
-| `REDIS_COMMAND_TIMEOUT_MS`           | No       | Redis command timeout                    |
-| `REDIS_ENABLE_OFFLINE_QUEUE`         | No       | App Redis offline queue behavior         |
-| `REDIS_QUEUE_ENABLE_OFFLINE_QUEUE`   | No       | Bull Redis offline queue behavior        |
-| `BOOKING_MIN_CANCEL_HOURS`           | Yes      | Cancellation policy threshold            |
-| `BOOKING_MAX_DURATION_HOURS`         | Yes      | Maximum booking duration                 |
-| `BOOKING_JOB_SCHEDULER_ENABLED`      | No       | Enables repeatable job registration      |
-| `BOOKING_JOB_SCHEDULER_LOCK_TTL_MS`  | No       | Startup lock TTL for scheduler bootstrap |
-| `PAYMENT_ENABLED`                    | No       | Global payment feature flag              |
-| `PAYMENT_PROVIDERS_ENABLED`          | No       | Enabled providers list (CSV)             |
-| `PAYMENT_RECONCILE_INTERVAL_MINUTES` | No       | Reconcile scan cron step in minutes      |
-| `PAYMENT_RECONCILE_STALE_MINUTES`    | No       | Stale threshold before reconcile enqueue |
-| `PAYMENT_JOB_SCHEDULER_ENABLED`      | No       | Enables payment reconcile scheduler      |
-| `PAYMENT_JOB_SCHEDULER_LOCK_TTL_MS`  | No       | Startup lock TTL for payment scheduler   |
-| `VNPAY_TMN_CODE`                     | Yes\*    | VNPay terminal code                      |
-| `VNPAY_HASH_SECRET`                  | Yes\*    | VNPay HMAC secret                        |
-| `VNPAY_PAY_URL`                      | Yes\*    | VNPay payment endpoint                   |
-| `VNPAY_QUERY_URL`                    | No       | VNPay query transaction API URL          |
-| `VNPAY_REFUND_URL`                   | No       | VNPay refund API URL                     |
-| `VNPAY_RETURN_URL`                   | Yes\*    | Frontend return URL after VNPay redirect |
+| Variable                             | Required | Purpose                                     |
+| ------------------------------------ | -------- | ------------------------------------------- |
+| `NODE_ENV`                           | Yes      | Runtime environment                         |
+| `PORT`                               | Yes      | Backend listen port                         |
+| `FE_URL`                             | Yes      | Frontend origin used for CORS               |
+| `DB_HOST`                            | Yes      | PostgreSQL host                             |
+| `DB_PORT`                            | Yes      | PostgreSQL port                             |
+| `DB_NAME`                            | Yes      | PostgreSQL database                         |
+| `DB_USER`                            | Yes      | PostgreSQL user                             |
+| `DB_PASSWORD`                        | Yes      | PostgreSQL password                         |
+| `JWT_SECRET`                         | Yes      | JWT signing secret                          |
+| `JWT_EXPIRES_IN`                     | Yes      | Access token TTL                            |
+| `JWT_REFRESH_EXPIRES_IN`             | Yes      | Refresh token TTL                           |
+| `REDIS_HOST`                         | Yes      | Redis host                                  |
+| `REDIS_PORT`                         | Yes      | Redis port                                  |
+| `REDIS_USERNAME`                     | No       | Redis ACL username                          |
+| `REDIS_PASSWORD`                     | No       | Redis password                              |
+| `REDIS_DB`                           | No       | App Redis DB index                          |
+| `REDIS_QUEUE_DB`                     | No       | Bull queue Redis DB index                   |
+| `REDIS_APP_PREFIX`                   | No       | App Redis key prefix                        |
+| `REDIS_TLS_ENABLED`                  | No       | Toggle Redis TLS                            |
+| `REDIS_CONNECT_TIMEOUT_MS`           | No       | Redis connect timeout                       |
+| `REDIS_COMMAND_TIMEOUT_MS`           | No       | Redis command timeout                       |
+| `REDIS_ENABLE_OFFLINE_QUEUE`         | No       | App Redis offline queue behavior            |
+| `REDIS_QUEUE_ENABLE_OFFLINE_QUEUE`   | No       | Bull Redis offline queue behavior           |
+| `BOOKING_MIN_CANCEL_HOURS`           | Yes      | Cancellation policy threshold               |
+| `BOOKING_MAX_DURATION_HOURS`         | Yes      | Maximum booking duration                    |
+| `BOOKING_JOB_SCHEDULER_ENABLED`      | No       | Enables repeatable job registration         |
+| `BOOKING_JOB_SCHEDULER_LOCK_TTL_MS`  | No       | Startup lock TTL for scheduler bootstrap    |
+| `PAYMENT_ENABLED`                    | No       | Global payment feature flag                 |
+| `PAYMENT_PROVIDERS_ENABLED`          | No       | Enabled providers list (CSV)                |
+| `PAYMENT_RECONCILE_INTERVAL_MINUTES` | No       | Reconcile scan cron step in minutes         |
+| `PAYMENT_RECONCILE_STALE_MINUTES`    | No       | Stale threshold before reconcile enqueue    |
+| `PAYMENT_RECONCILE_MAX_ATTEMPTS`     | No       | Max reconcile attempts before manual review |
+| `PAYMENT_JOB_SCHEDULER_ENABLED`      | No       | Enables payment reconcile scheduler         |
+| `PAYMENT_JOB_SCHEDULER_LOCK_TTL_MS`  | No       | Startup lock TTL for payment scheduler      |
+| `VNPAY_TMN_CODE`                     | Yes\*    | VNPay terminal code                         |
+| `VNPAY_HASH_SECRET`                  | Yes\*    | VNPay HMAC secret                           |
+| `VNPAY_PAY_URL`                      | Yes\*    | VNPay payment endpoint                      |
+| `VNPAY_QUERY_URL`                    | No       | VNPay query transaction API URL             |
+| `VNPAY_REFUND_URL`                   | No       | VNPay refund API URL                        |
+| `VNPAY_RETURN_URL`                   | Yes\*    | Frontend return URL after VNPay redirect    |
 
 Reference template:
 

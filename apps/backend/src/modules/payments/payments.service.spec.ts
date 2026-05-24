@@ -27,6 +27,7 @@ describe('PaymentsService', () => {
   const mockGenericRepo = () => ({
     findOne: jest.fn(),
     find: jest.fn(),
+    count: jest.fn(),
     save: jest.fn(),
     create: jest.fn((v) => v),
   });
@@ -61,6 +62,7 @@ describe('PaymentsService', () => {
             enabled: true,
             providersEnabled: ['VNPAY'],
             reconcileStaleMinutes: 10,
+            reconcileMaxAttempts: 2,
             vnpay: { tmnCode: 'TESTCODE' },
           },
         },
@@ -414,6 +416,34 @@ describe('PaymentsService', () => {
           'user-1',
         ),
       ).rejects.toThrow('Payments are disabled by configuration');
+    });
+  });
+
+  describe('reconcileStalePayments', () => {
+    it('enqueues reconcile job when attempts are below max', async () => {
+      paymentRepository.find.mockResolvedValue([{ id: 'payment-a' }]);
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.count.mockResolvedValue(1);
+
+      await service.reconcileStalePayments();
+
+      const queue = (service as any).paymentQueue;
+      expect(queue.add).toHaveBeenCalled();
+    });
+
+    it('marks manual review and skips enqueue when attempts exceed max', async () => {
+      paymentRepository.find.mockResolvedValue([{ id: 'payment-b' }]);
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.count.mockResolvedValue(2);
+      eventRepository.findOne.mockResolvedValue(null);
+      eventRepository.create.mockImplementation((v: any) => v);
+      eventRepository.save.mockResolvedValue({});
+
+      await service.reconcileStalePayments();
+
+      const queue = (service as any).paymentQueue;
+      expect(queue.add).not.toHaveBeenCalled();
+      expect(eventRepository.save).toHaveBeenCalled();
     });
   });
 

@@ -400,6 +400,11 @@ export class PaymentsService {
       take: 200,
     });
     for (const item of pending) {
+      const exceeded = await this.hasExceededReconcileAttempts(item.id);
+      if (exceeded) {
+        await this.markManualReviewRequired(item.id);
+        continue;
+      }
       await this.enqueueReconcile(item.id);
     }
     if (pending.length > 0) {
@@ -526,5 +531,38 @@ export class PaymentsService {
     const lastPayload = lastEvent.payload || {};
     const fields = ['vnp_TxnRef', 'vnp_TransactionNo', 'vnp_ResponseCode', 'vnp_Amount'];
     return fields.every((f) => String(lastPayload[f] ?? '') === String(payload[f] ?? ''));
+  }
+
+  private async hasExceededReconcileAttempts(paymentId: string): Promise<boolean> {
+    const attemptCount = await this.paymentEventRepository.count({
+      where: {
+        paymentId,
+        eventType: 'RECONCILE_OUT',
+      },
+    });
+    return attemptCount >= this.paymentCfg.reconcileMaxAttempts;
+  }
+
+  private async markManualReviewRequired(paymentId: string): Promise<void> {
+    const exists = await this.paymentEventRepository.findOne({
+      where: {
+        paymentId,
+        eventType: 'MANUAL_REVIEW_REQUIRED',
+      },
+      order: { createdAt: 'DESC' },
+    });
+    if (exists) return;
+
+    await this.paymentEventRepository.save(
+      this.paymentEventRepository.create({
+        paymentId,
+        eventType: 'MANUAL_REVIEW_REQUIRED',
+        direction: PaymentEventDirection.OUT,
+        payload: {
+          reason: 'reconcile_max_attempts_exceeded',
+          maxAttempts: this.paymentCfg.reconcileMaxAttempts,
+        },
+      }),
+    );
   }
 }
