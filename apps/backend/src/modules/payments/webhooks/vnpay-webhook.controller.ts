@@ -10,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { PaymentsService } from '../payments.service';
 
+type VnpIpnResponse = { RspCode: '00' | '01' | '02' | '04' | '97' | '99'; Message: string };
+
 @Controller('payments/vnpay')
 export class VNPayWebhookController {
   constructor(private readonly paymentsService: PaymentsService) {}
@@ -29,26 +31,28 @@ export class VNPayWebhookController {
     }
   }
 
-  private mapToVnpIpnResponse(error: unknown) {
+  private mapToVnpIpnResponse(error: unknown): VnpIpnResponse {
     if (error instanceof NotFoundException) {
       return { RspCode: '01', Message: 'Order not found' };
     }
     if (error instanceof BadRequestException) {
-      const message = this.extractMessage(error);
-      if (message.includes('Invalid signature')) {
+      const message = this.extractMessage(error).toLowerCase();
+      if (message.includes('invalid signature')) {
         return { RspCode: '97', Message: 'Invalid signature' };
       }
-      if (message.includes('Payments are disabled by configuration')) {
+      if (message.includes('payments are disabled by configuration')) {
         return { RspCode: '99', Message: 'Payment disabled' };
       }
-      if (message.includes('Missing provider order id')) {
+      if (message.includes('missing provider order id')) {
         return { RspCode: '01', Message: 'Order not found' };
       }
-      if (message.includes('amount mismatch') || message.includes('invalid VNPay amount')) {
+      if (
+        message.includes('amount mismatch') ||
+        message.includes('invalid vnpay amount') ||
+        message.includes('invalid vnpay tmn code') ||
+        message.includes('invalid payment currency')
+      ) {
         return { RspCode: '04', Message: 'Invalid amount' };
-      }
-      if (message.includes('currency')) {
-        return { RspCode: '04', Message: 'Invalid currency' };
       }
       return { RspCode: '99', Message: 'Input invalid' };
     }
