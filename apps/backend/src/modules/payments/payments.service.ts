@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, LessThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, LessThan, Repository } from 'typeorm';
 import { BookingStatus } from '@court-booking/shared';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { PaymentEntity, PaymentStatus } from '../../database/entities/payment.entity';
@@ -232,20 +232,7 @@ export class PaymentsService {
       await manager.save(payment);
 
       if (payment.status === PaymentStatus.SUCCESS) {
-        const booking = await manager.findOne(BookingEntity, {
-          where: { id: payment.bookingId },
-          lock: { mode: 'pessimistic_write' },
-        });
-        if (booking && booking.status === BookingStatus.PENDING_PAYMENT) {
-          booking.status = BookingStatus.CONFIRMED;
-          booking.paidAt = booking.paidAt ?? new Date();
-          booking.successfulPaymentId = payment.id;
-          await manager.save(booking);
-        } else {
-          // Financially successful payment but booking not yet converged -> reconcile.
-          payment.status = PaymentStatus.RECONCILING;
-          await manager.save(payment);
-        }
+        await this.convergeBookingForSuccessfulPayment(manager, payment);
       }
 
       return { ok: true, paymentId: payment.id, status: payment.status };
@@ -307,22 +294,75 @@ export class PaymentsService {
       }),
     );
 
-    if (query.providerTxnId) {
-      payment.providerTxnId = query.providerTxnId;
-    }
-    if (query.paymentStatus === 'SUCCESS') {
-      payment.status = PaymentStatus.SUCCESS;
-      payment.completedAt = payment.completedAt ?? new Date();
-    } else if (query.paymentStatus === 'FAILED') {
-      payment.status = PaymentStatus.FAILED;
-      payment.completedAt = payment.completedAt ?? new Date();
-    } else if (query.paymentStatus === 'CANCELLED') {
-      payment.status = PaymentStatus.CANCELLED;
-      payment.completedAt = payment.completedAt ?? new Date();
-    } else {
+    const updated = await this.dataSource.transaction(async (manager) => {
+      const lockedPayment = await manager.findOne(PaymentEntity, {
+        where: { id: payment.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lockedPayment) throw new NotFoundException('Payment not found');
+
+      if (query.providerTxnId) {
+        lockedPayment.providerTxnId = query.providerTxnId;
+      }
+      if (query.paymentStatus === 'SUCCESS') {
+        lockedPayment.status = PaymentStatus.SUCCESS;
+        lockedPayment.completedAt = lockedPayment.completedAt ?? new Date();
+      } else if (query.paymentStatus === 'FAILED') {
+        lockedPayment.status = PaymentStatus.FAILED;
+        lockedPayment.completedAt = lockedPayment.completedAt ?? new Date();
+      } else if (query.paymentStatus === 'CANCELLED') {
+        lockedPayment.status = PaymentStatus.CANCELLED;
+        lockedPayment.completedAt = lockedPayment.completedAt ?? new Date();
+      } else {
+        lockedPayment.status = PaymentStatus.RECONCILING;
+      }
+
+      await manager.save(lockedPayment);
+
+      if (lockedPayment.status === PaymentStatus.SUCCESS) {
+        await this.convergeBookingForSuccessfulPayment(manager, lockedPayment);
+      }
+
+      return lockedPayment;
+    });
+
+    return { paymentId: updated.id, status: updated.status };
+  }
+
+  private async convergeBookingForSuccessfulPayment(
+    manager: EntityManager,
+    payment: PaymentEntity,
+  ) {
+    const booking = await manager.findOne(BookingEntity, {
+      where: { id: payment.bookingId },
+      lock: { mode: 'pessimistic_write' },
+    });
+
+    if (!booking) {
       payment.status = PaymentStatus.RECONCILING;
+      await manager.save(payment);
+      return;
     }
-    await this.paymentRepository.save(payment);
-    return { paymentId: payment.id, status: payment.status };
+
+    if (booking.status === BookingStatus.PENDING_PAYMENT) {
+      booking.status = BookingStatus.CONFIRMED;
+      booking.paidAt = booking.paidAt ?? new Date();
+      booking.successfulPaymentId = payment.id;
+      await manager.save(booking);
+      return;
+    }
+
+    if (booking.status === BookingStatus.CONFIRMED) {
+      if (!booking.successfulPaymentId) {
+        booking.successfulPaymentId = payment.id;
+        booking.paidAt = booking.paidAt ?? new Date();
+        await manager.save(booking);
+      }
+      return;
+    }
+
+    // Financially successful payment but booking is not in convergable state.
+    payment.status = PaymentStatus.RECONCILING;
+    await manager.save(payment);
   }
 }
