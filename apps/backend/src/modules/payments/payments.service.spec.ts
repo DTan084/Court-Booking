@@ -611,6 +611,58 @@ describe('PaymentsService', () => {
       expect(result.data[0].attemptCount).toBe(3);
       expect(result.data[0].lastReconcileError).toBe('query timeout');
     });
+
+    it('applies providerOrderId and date range filters', async () => {
+      const qb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        offset: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+        getCount: jest.fn().mockResolvedValue(0),
+      };
+      paymentRepository.createQueryBuilder.mockReturnValue(qb);
+
+      const eventRepository = (service as any).paymentEventRepository;
+      const attemptQb = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      };
+      const latestQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      eventRepository.createQueryBuilder
+        .mockReturnValueOnce(attemptQb)
+        .mockReturnValueOnce(latestQb);
+
+      await service.listManualReviewPayments({
+        page: 1,
+        limit: 20,
+        providerOrderId: 'VNPAY-ORDER',
+        dateFrom: '2026-05-20T00:00:00.000Z',
+        dateTo: '2026-05-25T00:00:00.000Z',
+      });
+
+      expect(qb.andWhere).toHaveBeenCalledWith('payment.providerOrderId ILIKE :providerOrderId', {
+        providerOrderId: '%VNPAY-ORDER%',
+      });
+      expect(qb.andWhere).toHaveBeenCalledWith('event.createdAt >= :dateFrom', {
+        dateFrom: new Date('2026-05-20T00:00:00.000Z'),
+      });
+      expect(qb.andWhere).toHaveBeenCalledWith('event.createdAt <= :dateTo', {
+        dateTo: new Date('2026-05-25T00:00:00.000Z'),
+      });
+    });
   });
 
   describe('handleManualReviewAction', () => {

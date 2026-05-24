@@ -66,6 +66,9 @@ export class PaymentsController {
       page: number;
       limit: number;
       status?: 'RECONCILING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
+      providerOrderId?: string;
+      dateFrom?: string;
+      dateTo?: string;
     },
   ) {
     return this.paymentsService.listManualReviewPayments(query);

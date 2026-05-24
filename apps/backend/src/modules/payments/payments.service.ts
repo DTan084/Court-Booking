@@ -243,6 +243,17 @@ export class PaymentsService {
     if (query.status) {
       qb.andWhere('payment.status = :status', { status: query.status });
     }
+    if (query.providerOrderId) {
+      qb.andWhere('payment.providerOrderId ILIKE :providerOrderId', {
+        providerOrderId: `%${query.providerOrderId}%`,
+      });
+    }
+    if (query.dateFrom) {
+      qb.andWhere('event.createdAt >= :dateFrom', { dateFrom: new Date(query.dateFrom) });
+    }
+    if (query.dateTo) {
+      qb.andWhere('event.createdAt <= :dateTo', { dateTo: new Date(query.dateTo) });
+    }
 
     const [rows, total] = await Promise.all([qb.getRawMany(), qb.getCount()]);
     const paymentIds = rows.map((row) => String(row.id));
