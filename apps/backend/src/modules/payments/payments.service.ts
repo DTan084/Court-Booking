@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, LessThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, LessThan, Repository } from 'typeorm';
 import { BookingStatus } from '@court-booking/shared';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { PaymentEntity, PaymentStatus } from '../../database/entities/payment.entity';
@@ -86,12 +86,14 @@ export class PaymentsService {
         where: {
           bookingId: booking.id,
           providerCode: payload.provider,
-          status: PaymentStatus.PENDING,
+          status: In([PaymentStatus.PENDING, PaymentStatus.PROCESSING, PaymentStatus.RECONCILING]),
         },
         order: { createdAt: 'DESC' },
       });
       if (existingPending) {
-        throw new BadRequestException('An active payment attempt already exists for this booking');
+        throw new BadRequestException(
+          `An active payment attempt already exists for this booking (${existingPending.status})`,
+        );
       }
 
       const payment = await manager.save(
