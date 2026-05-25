@@ -262,16 +262,13 @@ export class VNPayProvider implements PaymentProviderAdapter {
         acc[key] = params[key];
         return acc;
       }, {});
-    const signData = Object.keys(sortedParams)
+    const queryString = Object.keys(sortedParams)
       .map((k) => `${k}=${encodeURIComponent(sortedParams[k]).replace(/%20/g, '+')}`)
       .join('&');
     const secureHash = createHmac('sha512', this.paymentCfg.vnpay.hashSecret)
-      .update(signData)
+      .update(queryString)
       .digest('hex');
-    const url = new URL(this.paymentCfg.vnpay.payUrl);
-    Object.entries(sortedParams).forEach(([k, v]) => url.searchParams.set(k, v));
-    url.searchParams.set('vnp_SecureHash', secureHash);
-    return url.toString();
+    return `${this.paymentCfg.vnpay.payUrl}?${queryString}&vnp_SecureHash=${secureHash}`;
   }
 
   private toVnpDate(d: Date): string {

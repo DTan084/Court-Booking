@@ -170,12 +170,15 @@ describe('VNPay Payment Flow (e2e)', () => {
     paymentId = initiateRes.body.paymentId;
     const txnRef = initiateRes.body.providerOrderId;
     expect(txnRef).toContain('VNPAY-');
+    const expectedVnpAmount = Math.round(
+      Number(initiateRes.body.amount ?? bookingRes.body.totalPrice) * 100,
+    );
 
     const ipnPayload: Record<string, string> = {
       vnp_TmnCode: process.env.VNPAY_TMN_CODE || 'E2ETMN',
       vnp_TxnRef: txnRef,
       vnp_TransactionNo: `TXN${Date.now()}`,
-      vnp_Amount: '20000000',
+      vnp_Amount: String(expectedVnpAmount),
       vnp_ResponseCode: '00',
     };
     ipnPayload.vnp_SecureHash = signVnpPayload(ipnPayload);

@@ -61,66 +61,83 @@ export class PaymentsService {
       throw new BadRequestException(`Payment provider ${payload.provider} is disabled by config`);
     }
 
-    const { payment, booking } = await this.dataSource.transaction(async (manager) => {
-      const provider = await manager.findOne(PaymentProviderEntity, {
-        where: { code: payload.provider },
-      });
-      if (!provider || !provider.isActive) {
-        throw new BadRequestException(`Payment provider ${payload.provider} is not active`);
-      }
+    const { payment, booking, reusedAttempt } = await this.dataSource.transaction(
+      async (manager) => {
+        const provider = await manager.findOne(PaymentProviderEntity, {
+          where: { code: payload.provider },
+        });
+        if (!provider || !provider.isActive) {
+          throw new BadRequestException(`Payment provider ${payload.provider} is not active`);
+        }
 
-      const booking = await manager.findOne(BookingEntity, {
-        where: { id: payload.bookingId },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!booking) throw new NotFoundException('Booking not found');
-      if (booking.userId && booking.userId !== initiatedBy) {
-        throw new BadRequestException('Booking does not belong to current user');
-      }
-      if (![BookingStatus.PENDING_PAYMENT].includes(booking.status)) {
-        throw new BadRequestException(`Booking is not payable in state ${booking.status}`);
-      }
-      if (booking.paymentDeadline && booking.paymentDeadline < new Date()) {
-        throw new BadRequestException('Booking payment deadline has expired');
-      }
-      if (booking.successfulPaymentId) {
-        throw new BadRequestException('Booking already has successful payment');
-      }
+        const booking = await manager.findOne(BookingEntity, {
+          where: { id: payload.bookingId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!booking) throw new NotFoundException('Booking not found');
+        if (booking.userId && booking.userId !== initiatedBy) {
+          throw new BadRequestException('Booking does not belong to current user');
+        }
+        if (![BookingStatus.PENDING_PAYMENT].includes(booking.status)) {
+          throw new BadRequestException(`Booking is not payable in state ${booking.status}`);
+        }
+        if (booking.paymentDeadline && booking.paymentDeadline < new Date()) {
+          throw new BadRequestException('Booking payment deadline has expired');
+        }
+        if (booking.successfulPaymentId) {
+          throw new BadRequestException('Booking already has successful payment');
+        }
 
-      const existingPending = await manager.findOne(PaymentEntity, {
-        where: {
-          bookingId: booking.id,
-          providerCode: payload.provider,
-          status: In([PaymentStatus.PENDING, PaymentStatus.PROCESSING, PaymentStatus.RECONCILING]),
-        },
-        order: { createdAt: 'DESC' },
-      });
-      if (existingPending) {
-        throw new BadRequestException(
-          `An active payment attempt already exists for this booking (${existingPending.status})`,
+        const existingPending = await manager.findOne(PaymentEntity, {
+          where: {
+            bookingId: booking.id,
+            providerCode: payload.provider,
+            status: In([
+              PaymentStatus.PENDING,
+              PaymentStatus.PROCESSING,
+              PaymentStatus.RECONCILING,
+            ]),
+          },
+          order: { createdAt: 'DESC' },
+        });
+        if (existingPending) {
+          if (existingPending.status === PaymentStatus.RECONCILING) {
+            throw new BadRequestException(
+              `An active payment attempt already exists for this booking (${existingPending.status})`,
+            );
+          }
+          return { payment: existingPending, booking, reusedAttempt: true };
+        }
+
+        const payment = await manager.save(
+          PaymentEntity,
+          manager.create(PaymentEntity, {
+            bookingId: booking.id,
+            providerCode: payload.provider,
+            amount: Number(booking.totalPrice),
+            currency: 'VND',
+            status: PaymentStatus.PENDING,
+            initiatedBy,
+          }),
         );
-      }
-
-      const payment = await manager.save(
-        PaymentEntity,
-        manager.create(PaymentEntity, {
-          bookingId: booking.id,
-          providerCode: payload.provider,
-          amount: Number(booking.totalPrice),
-          currency: 'VND',
-          status: PaymentStatus.PENDING,
-          initiatedBy,
-        }),
-      );
-      return { payment, booking };
-    });
+        return { payment, booking, reusedAttempt: false };
+      },
+    );
 
     try {
+      const configuredReturnUrl = this.paymentCfg.vnpay.returnUrl;
+      const returnUrl = configuredReturnUrl
+        ? this.appendQueryParams(configuredReturnUrl, {
+            bookingId: booking.id,
+            paymentId: payment.id,
+          })
+        : undefined;
       const createResult = await this.providers[payload.provider].createPayment({
         paymentId: payment.id,
         bookingId: booking.id,
         amount: Number(payment.amount),
         currency: payment.currency,
+        returnUrl,
         clientIp,
       });
 
@@ -131,7 +148,7 @@ export class PaymentsService {
       await this.paymentEventRepository.save(
         this.paymentEventRepository.create({
           paymentId: payment.id,
-          eventType: 'INITIATE_OUT',
+          eventType: reusedAttempt ? 'INITIATE_RETRY_OUT' : 'INITIATE_OUT',
           direction: PaymentEventDirection.OUT,
           payload: createResult.raw,
         }),
@@ -166,6 +183,24 @@ export class PaymentsService {
     const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
     if (!payment) throw new NotFoundException('Payment not found');
     const booking = await this.bookingRepository.findOne({ where: { id: payment.bookingId } });
+    if (booking?.status === BookingStatus.CONFIRMED && !booking.successfulPaymentId) {
+      this.logPaymentSignal('payment_data_mismatch_confirmed_booking_missing_successful_payment', {
+        paymentId: payment.id,
+        bookingId: booking.id,
+      });
+    }
+    if (
+      booking?.status === BookingStatus.CONFIRMED &&
+      booking.successfulPaymentId &&
+      booking.successfulPaymentId !== payment.id &&
+      payment.status === PaymentStatus.SUCCESS
+    ) {
+      this.logPaymentSignal('payment_data_mismatch_confirmed_booking_successful_payment_mismatch', {
+        paymentId: payment.id,
+        bookingId: booking.id,
+        successfulPaymentId: booking.successfulPaymentId,
+      });
+    }
     return {
       paymentId: payment.id,
       paymentStatus: payment.status,
@@ -476,6 +511,10 @@ export class PaymentsService {
         }
         payment.providerTxnId = verification.providerTxnId;
       }
+      payment.providerRaw = {
+        ...(payment.providerRaw ?? {}),
+        ...(verification.raw ?? {}),
+      };
 
       if (providerCode === 'VNPAY') {
         const payloadTmnCode = String(payload.vnp_TmnCode ?? '');
@@ -867,6 +906,10 @@ export class PaymentsService {
 
     if (booking.status === BookingStatus.CONFIRMED) {
       if (!booking.successfulPaymentId) {
+        this.logPaymentSignal('payment_guardrail_backfill_successful_payment_id', {
+          bookingId: booking.id,
+          paymentId: payment.id,
+        });
         booking.successfulPaymentId = payment.id;
         booking.paidAt = booking.paidAt ?? new Date();
         await manager.save(booking);
@@ -992,5 +1035,15 @@ export class PaymentsService {
 
   private logPaymentSignal(event: string, data: Record<string, unknown>) {
     this.logger.log(JSON.stringify({ event, ...data }));
+  }
+
+  private appendQueryParams(baseUrl: string, params: Record<string, string>): string {
+    const url = new URL(baseUrl);
+    for (const [key, value] of Object.entries(params)) {
+      if (!url.searchParams.has(key)) {
+        url.searchParams.set(key, value);
+      }
+    }
+    return url.toString();
   }
 }

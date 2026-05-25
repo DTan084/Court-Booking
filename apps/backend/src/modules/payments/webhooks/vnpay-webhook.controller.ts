@@ -30,11 +30,41 @@ export class VNPayWebhookController {
     @Headers() headers: Record<string, string>,
     @Ip() ip: string,
   ) {
+    this.logger.log(
+      JSON.stringify({
+        event: 'vnpay_ipn_received',
+        method: 'POST',
+        ip,
+        txnRef: body.vnp_TxnRef ?? null,
+        responseCode: body.vnp_ResponseCode ?? null,
+        transactionStatus: body.vnp_TransactionStatus ?? null,
+      }),
+    );
     try {
       await this.paymentsService.handleWebhook('VNPAY', body, headers, ip ?? null);
+      this.logger.log(
+        JSON.stringify({
+          event: 'vnpay_ipn_ack',
+          method: 'POST',
+          ip,
+          txnRef: body.vnp_TxnRef ?? null,
+          rspCode: '00',
+        }),
+      );
       return { RspCode: '00', Message: 'Confirm Success' };
     } catch (error) {
-      return this.mapToVnpIpnResponse(error);
+      const mapped = this.mapToVnpIpnResponse(error);
+      this.logger.warn(
+        JSON.stringify({
+          event: 'vnpay_ipn_rejected',
+          method: 'POST',
+          ip,
+          txnRef: body.vnp_TxnRef ?? null,
+          rspCode: mapped.RspCode,
+          message: mapped.Message,
+        }),
+      );
+      return mapped;
     }
   }
 
@@ -46,11 +76,41 @@ export class VNPayWebhookController {
     @Headers() headers: Record<string, string>,
     @Ip() ip: string,
   ) {
+    this.logger.log(
+      JSON.stringify({
+        event: 'vnpay_ipn_received',
+        method: 'GET',
+        ip,
+        txnRef: query.vnp_TxnRef ?? null,
+        responseCode: query.vnp_ResponseCode ?? null,
+        transactionStatus: query.vnp_TransactionStatus ?? null,
+      }),
+    );
     try {
       await this.paymentsService.handleWebhook('VNPAY', query, headers, ip ?? null);
+      this.logger.log(
+        JSON.stringify({
+          event: 'vnpay_ipn_ack',
+          method: 'GET',
+          ip,
+          txnRef: query.vnp_TxnRef ?? null,
+          rspCode: '00',
+        }),
+      );
       return { RspCode: '00', Message: 'Confirm Success' };
     } catch (error) {
-      return this.mapToVnpIpnResponse(error);
+      const mapped = this.mapToVnpIpnResponse(error);
+      this.logger.warn(
+        JSON.stringify({
+          event: 'vnpay_ipn_rejected',
+          method: 'GET',
+          ip,
+          txnRef: query.vnp_TxnRef ?? null,
+          rspCode: mapped.RspCode,
+          message: mapped.Message,
+        }),
+      );
+      return mapped;
     }
   }
 

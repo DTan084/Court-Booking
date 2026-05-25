@@ -575,7 +575,13 @@ describe('PaymentsService', () => {
       ).rejects.toThrow('Booking payment deadline has expired');
     });
 
-    it('rejects when there is already an active payment attempt', async () => {
+    it('reuses active pending attempt instead of creating new payment', async () => {
+      (service as any).providers.VNPAY.createPayment.mockResolvedValue({
+        providerOrderId: 'VNPAY-payment-existing-1',
+        paymentUrl: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?mock=1',
+        raw: { reused: true },
+      });
+
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const manager = {
           findOne: jest.fn().mockImplementation((entity: unknown) => {
@@ -604,12 +610,51 @@ describe('PaymentsService', () => {
         return cb(manager);
       });
 
+      const result = await service.initiatePayment(
+        { bookingId: '00000000-0000-0000-0000-000000000003', provider: 'VNPAY' },
+        'user-3',
+      );
+
+      expect(result.paymentId).toBe('payment-existing-1');
+      expect(result.providerOrderId).toBe('VNPAY-payment-existing-1');
+      expect(result.paymentUrl).toContain('vnpayment.vn/paymentv2');
+    });
+
+    it('rejects when existing active attempt is reconciling', async () => {
+      dataSource.transaction.mockImplementation(async (cb: any) => {
+        const manager = {
+          findOne: jest.fn().mockImplementation((entity: unknown) => {
+            if (entity === PaymentProviderEntity)
+              return Promise.resolve({ code: 'VNPAY', isActive: true });
+            if (entity === BookingEntity) {
+              return Promise.resolve({
+                id: 'booking-3b',
+                userId: 'user-3',
+                status: BookingStatus.PENDING_PAYMENT,
+                paymentDeadline: new Date(Date.now() + 60_000),
+                successfulPaymentId: null,
+              });
+            }
+            if (entity === PaymentEntity) {
+              return Promise.resolve({
+                id: 'payment-existing-2',
+                status: PaymentStatus.RECONCILING,
+              });
+            }
+            return Promise.resolve(null);
+          }),
+          save: jest.fn(),
+          create: jest.fn((_e: any, v: any) => v),
+        };
+        return cb(manager);
+      });
+
       await expect(
         service.initiatePayment(
           { bookingId: '00000000-0000-0000-0000-000000000003', provider: 'VNPAY' },
           'user-3',
         ),
-      ).rejects.toThrow('An active payment attempt already exists for this booking');
+      ).rejects.toThrow('An active payment attempt already exists for this booking (RECONCILING)');
     });
   });
 
