@@ -142,8 +142,6 @@ export const queryKeys = {
     all: ['payments'] as const,
     detail: (id: string) => ['payments', id] as const,
     lookup: (params: Record<string, unknown>) => ['payments', 'lookup', params] as const,
-    manualReviewList: (params: Record<string, unknown>) =>
-      ['payments', 'manual-review', params] as const,
   },
   auth: {
     me: ['auth', 'me'] as const,

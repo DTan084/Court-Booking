@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import Image from 'next/image';
+import { toast } from 'sonner';
 import {
   AlertTriangle,
   Calendar,
@@ -15,7 +16,12 @@ import {
   MapPin,
 } from 'lucide-react';
 import { useBooking } from '@/hooks/useBookings';
-import { useInitiatePayment, usePaymentStatus } from '@/hooks/usePayments';
+import {
+  useInitiatePayment,
+  usePaymentLookup,
+  usePaymentStatus,
+  useReconcilePayment,
+} from '@/hooks/usePayments';
 import { useTimeSlots } from '@/hooks/useTimeSlots';
 import { BookingStatus } from '@/types';
 import { CountdownTimer } from '@/components/bookings/countdown-timer';
@@ -101,6 +107,7 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const [step, setStep] = React.useState<Step>('review');
   const [paymentCompleted, setPaymentCompleted] = React.useState(false);
   const paymentSectionRef = React.useRef<HTMLElement | null>(null);
+  const returnReconcileTriggeredRef = React.useRef(false);
   const [currentPaymentId, setCurrentPaymentId] = React.useState<string | null>(null);
   const [currentProviderOrderId, setCurrentProviderOrderId] = React.useState<string | null>(null);
   const [paymentStateBanner, setPaymentStateBanner] = React.useState<
@@ -123,6 +130,11 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
     enabled: Boolean(currentPaymentId) && paymentStateBanner !== 'SUCCESS',
     refetchMs: 8000,
   });
+  const paymentLookupQuery = usePaymentLookup(
+    { providerOrderId: currentProviderOrderId || undefined },
+    Boolean(currentProviderOrderId) && !currentPaymentId,
+  );
+  const reconcilePayment = useReconcilePayment();
 
   React.useEffect(() => {
     const paymentIdFromQuery = searchParams.get('paymentId');
@@ -162,6 +174,30 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
       setPaymentStateBanner('RECONCILING');
     }
   }, [bookingId, searchParams]);
+
+  React.useEffect(() => {
+    if (returnReconcileTriggeredRef.current) return;
+
+    const responseCode = searchParams.get('vnp_ResponseCode');
+    const transactionStatus = searchParams.get('vnp_TransactionStatus');
+    if (!currentPaymentId) return;
+
+    if (responseCode === '00' && (transactionStatus === '00' || !transactionStatus)) {
+      returnReconcileTriggeredRef.current = true;
+      reconcilePayment.mutate(currentPaymentId);
+    }
+  }, [currentPaymentId, reconcilePayment, searchParams]);
+
+  React.useEffect(() => {
+    if (!paymentLookupQuery.data || currentPaymentId) return;
+    setCurrentPaymentId(paymentLookupQuery.data.paymentId);
+    setPaymentStateBanner('PROCESSING');
+    console.info('[payment] recovered_payment_id_from_provider_order', {
+      bookingId,
+      paymentId: paymentLookupQuery.data.paymentId,
+      providerOrderId: currentProviderOrderId,
+    });
+  }, [bookingId, currentPaymentId, currentProviderOrderId, paymentLookupQuery.data]);
 
   React.useEffect(() => {
     const status = paymentStatusQuery.data?.paymentStatus;
@@ -263,6 +299,10 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const bypassPrimaryCourtImageOptimizer = shouldBypassImageOptimizer(primaryCourtImage);
 
   const handleStartPayment = async () => {
+    if (booking.status !== BookingStatus.PENDING_PAYMENT || isExpired) {
+      toast.error('Booking is no longer payable. Please refresh booking status.');
+      return;
+    }
     try {
       const initiated = await initiatePayment.mutateAsync({ bookingId, provider: 'VNPAY' });
       setCurrentPaymentId(initiated.paymentId);
@@ -676,6 +716,13 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                         {paymentStateBanner === 'CANCELLED' &&
                           'Payment was cancelled. You can retry if your booking is still payable.'}
                       </div>
+                      {paymentLookupQuery.isFetching &&
+                        !currentPaymentId &&
+                        currentProviderOrderId && (
+                          <p className="mt-3 text-xs text-slate-500">
+                            Recovering payment session from provider order...
+                          </p>
+                        )}
                       {currentPaymentId && (
                         <div className="mt-4 grid gap-2 text-xs text-slate-500">
                           <p>

@@ -60,40 +60,6 @@ export interface PaymentLookupResponse extends PaymentStatusResponse {
   }>;
 }
 
-export interface ManualReviewItem {
-  id: string;
-  provider: PaymentProvider;
-  providerOrderId: string | null;
-  providerTxnId: string | null;
-  paymentStatus: PaymentStatus;
-  amount: number;
-  currency: string;
-  bookingId: string;
-  bookingStatus: string | null;
-  manualReviewAt: string;
-  reason: string;
-  attemptCount: number;
-  lastReconcileAt: string | null;
-  lastReconcileError: string | null;
-}
-
-export interface ManualReviewListResponse {
-  data: ManualReviewItem[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-export interface ManualReviewActionResponse {
-  paymentId: string;
-  action: 'RESOLVE' | 'REQUEUE';
-  queued?: boolean;
-  resolved?: boolean;
-}
-
 const getErrorMessage = (error: AxiosError<ApiErrorPayload>, fallback: string) =>
   error.response?.data?.error?.message || error.response?.data?.message || fallback;
 
@@ -152,48 +118,6 @@ export function usePaymentLookup(
   });
 }
 
-export function useManualReviewList(params: {
-  page: number;
-  limit: number;
-  status?: PaymentStatus;
-  providerOrderId?: string;
-  dateFrom?: string;
-  dateTo?: string;
-}) {
-  return useQuery<ManualReviewListResponse>({
-    queryKey: queryKeys.payments.manualReviewList(params),
-    queryFn: async () => {
-      const response = await api.get('/payments/admin/manual-review', { params });
-      return unwrapResponse<ManualReviewListResponse>(response.data);
-    },
-    placeholderData: (previous) => previous,
-  });
-}
-
-export function useManualReviewAction() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: {
-      paymentId: string;
-      action: 'RESOLVE' | 'REQUEUE';
-      note?: string;
-    }) => {
-      const response = await api.post(`/payments/admin/manual-review/${payload.paymentId}/action`, {
-        action: payload.action,
-        note: payload.note,
-      });
-      return unwrapResponse<ManualReviewActionResponse>(response.data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
-      toast.success('Manual review action completed');
-    },
-    onError: (error: AxiosError<ApiErrorPayload>) => {
-      toast.error(getErrorMessage(error, 'Failed to apply manual review action'));
-    },
-  });
-}
-
 export function useReconcilePayment() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -207,31 +131,6 @@ export function useReconcilePayment() {
     },
     onError: (error: AxiosError<ApiErrorPayload>) => {
       toast.error(getErrorMessage(error, 'Failed to request reconcile'));
-    },
-  });
-}
-
-export function useRefundPayment() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (payload: { paymentId: string; amount?: number; reason?: string }) => {
-      const response = await api.patch(`/payments/${payload.paymentId}/refund`, {
-        amount: payload.amount,
-        reason: payload.reason,
-      });
-      return unwrapResponse<{
-        paymentId: string;
-        status: PaymentStatus;
-        refundedAt: string | null;
-        refundAmount: number | null;
-      }>(response.data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
-      toast.success('Refund processed');
-    },
-    onError: (error: AxiosError<ApiErrorPayload>) => {
-      toast.error(getErrorMessage(error, 'Failed to process refund'));
     },
   });
 }
