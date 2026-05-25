@@ -1,4 +1,4 @@
-const path = require('node:path');
+const path = require('path');
 const { defineConfig } = require('vitest/config');
 
 module.exports = defineConfig({

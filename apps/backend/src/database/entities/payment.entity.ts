@@ -59,6 +59,7 @@ export class PaymentEntity {
   currency: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 4, name: 'amount_in_usd', nullable: true })
+  // Optional FX snapshot for non-VND providers; currently unused in VNPay-only scope.
   amountInUsd: number | null;
 
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
@@ -71,6 +72,7 @@ export class PaymentEntity {
   providerOrderId: string | null;
 
   @Column({ type: 'varchar', length: 200, name: 'provider_ref_code', nullable: true })
+  // Optional provider-side reference code; not required for VNPay core flow.
   providerRefCode: string | null;
 
   @Column({ type: 'jsonb', name: 'provider_raw', nullable: true })

@@ -154,6 +154,15 @@ Current payment module already includes:
   - `apply-successful-payment`
   - `refund-orphan-success` (optional by env)
 
+### Payment Data Ownership
+
+- Financial source of truth is `payments` + `payment_events`.
+- `bookings.paid_at` is retained as a business snapshot marker for booking lifecycle/reporting.
+- Legacy booking payment columns (`payment_method`, `refunded_at`, `refund_amount`) are removed by migration `1800000000005`.
+- Guardrails emit structured logs for data mismatch cases:
+  - confirmed booking without `successful_payment_id`
+  - confirmed booking mapped to a different successful payment id
+
 ### Compensation Policy (VNPay-only)
 
 Recommended production policy:

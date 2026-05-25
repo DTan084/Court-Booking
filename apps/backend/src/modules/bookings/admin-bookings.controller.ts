@@ -15,7 +15,6 @@ const adminCreateBookingSchema = z.object({
   guestName: z.string().max(100).optional(),
   guestPhone: z.string().max(20).optional(),
   note: z.string().max(500).optional(),
-  paymentMethod: z.string().max(50).optional(),
   bookingSource: z.nativeEnum(BookingSource).optional(),
 });
 
@@ -23,7 +22,6 @@ const adminUpdateBookingSchema = z.object({
   guestName: z.string().max(100).optional().nullable(),
   guestPhone: z.string().max(20).optional().nullable(),
   note: z.string().max(500).optional().nullable(),
-  paymentMethod: z.string().max(50).optional().nullable(),
   cancelledReason: z.string().max(100).optional().nullable(),
   cancellationNote: z.string().max(500).optional().nullable(),
   cancelledBy: z.nativeEnum(CancelledBy).optional().nullable(),

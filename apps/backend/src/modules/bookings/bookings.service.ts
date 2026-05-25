@@ -8,13 +8,18 @@ import {
 } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, Brackets, QueryFailedError, EntityManager } from 'typeorm';
+import { Repository, DataSource, Brackets, QueryFailedError, EntityManager, In } from 'typeorm';
 import { differenceInHours } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 
 import bookingConfig from '../../config/booking.config';
 const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || 'Asia/Ho_Chi_Minh';
 import { BookingEntity } from '../../database/entities/booking.entity';
+import { PaymentEntity, PaymentStatus } from '../../database/entities/payment.entity';
+import {
+  PaymentEventDirection,
+  PaymentEventEntity,
+} from '../../database/entities/payment-event.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { UserEntity } from '../../database/entities/user.entity';
@@ -123,13 +128,13 @@ export class BookingsService {
     });
   }
 
-  private createRefundNotification(booking: BookingEntity): Promise<unknown> {
+  private createRefundNotification(booking: BookingEntity, refundAmount: number): Promise<unknown> {
     const { courtName } = this.getBookingScheduleLabels(booking);
     return this.notificationsService.create({
       userId: booking.userId!,
       type: NotificationType.REFUND_PROCESSED,
       title: 'Refund processed',
-      message: `A refund of ${Number(booking.refundAmount || 0).toLocaleString('vi-VN')} VND for your booking at ${courtName} has been processed.`,
+      message: `A refund of ${Number(refundAmount || 0).toLocaleString('vi-VN')} VND for your booking at ${courtName} has been processed.`,
       bookingId: booking.id,
     });
   }
@@ -362,7 +367,6 @@ export class BookingsService {
       // REQ-17.3: PENDING_PAYMENT → CONFIRMED
       booking.status = BookingStatus.CONFIRMED;
       booking.paidAt = new Date();
-      booking.paymentMethod = booking.paymentMethod ?? 'AUTO';
       return manager.save(booking);
     });
 
@@ -591,20 +595,10 @@ export class BookingsService {
     guestName?: string;
     guestPhone?: string;
     note?: string;
-    paymentMethod?: string;
     bookingSource?: BookingSource;
   }): Promise<BookingEntity> {
-    const {
-      courtId,
-      startTime,
-      endTime,
-      userId,
-      guestName,
-      guestPhone,
-      note,
-      paymentMethod,
-      bookingSource,
-    } = payload;
+    const { courtId, startTime, endTime, userId, guestName, guestPhone, note, bookingSource } =
+      payload;
     if (!userId && !guestName?.trim()) {
       throw new BadRequestException('Must provide user_id or guest_name');
     }
@@ -682,7 +676,6 @@ export class BookingsService {
         status: BookingStatus.CONFIRMED,
         paidAt: new Date(),
         paymentDeadline: null,
-        paymentMethod: paymentMethod ?? null,
         bookingSource: bookingSource ?? BookingSource.ADMIN,
         guestName: guestName ?? null,
         guestPhone: guestPhone ?? null,
@@ -777,8 +770,11 @@ export class BookingsService {
       qb.andWhere('booking.status IN (:...cancelledLike)', {
         cancelledLike: [BookingStatus.CANCELLED, BookingStatus.EXPIRED],
       })
-        .andWhere('(booking.paidAt IS NOT NULL OR booking.refundAmount IS NOT NULL)')
-        .andWhere('booking.refundedAt IS NULL');
+        .andWhere('booking.successfulPaymentId IS NOT NULL')
+        .leftJoin(PaymentEntity, 'payment', 'payment.id = booking.successfulPaymentId')
+        .andWhere('payment.status IN (:...paidStatuses)', {
+          paidStatuses: [PaymentStatus.SUCCESS, PaymentStatus.RECONCILING],
+        });
     }
     const [data, total] = await qb.getManyAndCount();
     const enriched = data.map((item: BookingEntity & { user?: { name?: string } }) => ({
@@ -963,29 +959,81 @@ export class BookingsService {
   }
 
   async refundBooking(bookingId: string, refundAmount: number): Promise<BookingEntity> {
-    const booking = await this.bookingRepository.findOne({
-      where: { id: bookingId },
-      relations: ['court'],
-    });
-    if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.refundedAt) throw new ConflictException('Booking has already been refunded');
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const booking = await manager.findOne(BookingEntity, {
+        where: { id: bookingId },
+        relations: ['court'],
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!booking) throw new NotFoundException('Booking not found');
+      if (![BookingStatus.CANCELLED, BookingStatus.EXPIRED].includes(booking.status)) {
+        throw new BadRequestException(
+          'Refunds can only be processed for cancelled or expired bookings',
+        );
+      }
+      if (!booking.successfulPaymentId) {
+        const fallbackPayment = await manager.findOne(PaymentEntity, {
+          where: {
+            bookingId: booking.id,
+            status: In([
+              PaymentStatus.SUCCESS,
+              PaymentStatus.RECONCILING,
+              PaymentStatus.PARTIAL_REFUND,
+              PaymentStatus.REFUNDED,
+            ]),
+          },
+          order: { createdAt: 'DESC' },
+        });
+        if (fallbackPayment) {
+          booking.successfulPaymentId = fallbackPayment.id;
+          booking.paidAt = booking.paidAt ?? fallbackPayment.completedAt ?? new Date();
+          await manager.save(booking);
+        }
+      }
+      if (!booking.successfulPaymentId) {
+        throw new BadRequestException(
+          'Cannot refund booking without linked successful payment. Run payment backfill or verify payment webhook.',
+        );
+      }
 
-    if (![BookingStatus.CANCELLED, BookingStatus.EXPIRED].includes(booking.status)) {
-      throw new BadRequestException(
-        'Refunds can only be processed for cancelled or expired bookings',
+      const payment = await manager.findOne(PaymentEntity, {
+        where: { id: booking.successfulPaymentId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!payment) throw new BadRequestException('Successful payment not found for booking');
+      if ([PaymentStatus.REFUNDED, PaymentStatus.PARTIAL_REFUND].includes(payment.status)) {
+        throw new ConflictException('Booking has already been refunded');
+      }
+      if (refundAmount > Number(payment.amount)) {
+        throw new BadRequestException('Refund amount cannot exceed the total booking price');
+      }
+
+      payment.refundedAt = new Date();
+      payment.refundAmount = refundAmount;
+      payment.status =
+        refundAmount < Number(payment.amount)
+          ? PaymentStatus.PARTIAL_REFUND
+          : PaymentStatus.REFUNDED;
+      await manager.save(payment);
+
+      await manager.save(
+        PaymentEventEntity,
+        manager.create(PaymentEventEntity, {
+          paymentId: payment.id,
+          eventType: 'ADMIN_REFUND_MARKED',
+          direction: PaymentEventDirection.OUT,
+          payload: {
+            source: 'admin_bookings_refund',
+            refundAmount,
+          },
+        }),
       );
-    }
-    if (!booking.paidAt) {
-      throw new BadRequestException('Cannot refund an unpaid booking');
-    }
-    if (refundAmount > Number(booking.totalPrice)) {
-      throw new BadRequestException('Refund amount cannot exceed the total booking price');
-    }
-    booking.refundedAt = new Date();
-    booking.refundAmount = refundAmount;
-    const saved = await this.bookingRepository.save(booking);
+
+      return booking;
+    });
+
     if (saved.userId) {
-      this.createRefundNotification(saved).catch(console.error);
+      this.createRefundNotification(saved, refundAmount).catch(console.error);
     }
     return saved;
   }
@@ -996,7 +1044,6 @@ export class BookingsService {
       guestName?: string | null;
       guestPhone?: string | null;
       note?: string | null;
-      paymentMethod?: string | null;
       cancelledReason?: string | null;
       cancellationNote?: string | null;
       cancelledBy?: CancelledBy | null;
@@ -1008,7 +1055,6 @@ export class BookingsService {
     if (payload.guestName !== undefined) booking.guestName = payload.guestName;
     if (payload.guestPhone !== undefined) booking.guestPhone = payload.guestPhone;
     if (payload.note !== undefined) booking.note = payload.note;
-    if (payload.paymentMethod !== undefined) booking.paymentMethod = payload.paymentMethod;
     if (payload.cancelledReason !== undefined) booking.cancelledReason = payload.cancelledReason;
     if (payload.cancellationNote !== undefined) booking.cancellationNote = payload.cancellationNote;
     if (payload.cancelledBy !== undefined) booking.cancelledBy = payload.cancelledBy;

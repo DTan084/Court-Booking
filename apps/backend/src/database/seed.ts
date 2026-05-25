@@ -17,6 +17,7 @@ import { CourtImageEntity } from './entities/court-image.entity';
 import { CourtTimeSlotEntity } from './entities/court-time-slot.entity';
 import { FeatureEntity } from './entities/feature.entity';
 import { NotificationEntity } from './entities/notification.entity';
+import { PaymentProviderEntity } from './entities/payment-provider.entity';
 import { RefreshTokenEntity } from './entities/refresh-token.entity';
 import { SlotTemplateEntity } from './entities/slot-template.entity';
 import { SlotTemplateItemEntity } from './entities/slot-template-item.entity';
@@ -55,8 +56,18 @@ async function runSeedFull() {
   const slotTemplateItemRepo = dataSource.getRepository(SlotTemplateItemEntity);
   const bookingRepo = dataSource.getRepository(BookingEntity);
   const notificationRepo = dataSource.getRepository(NotificationEntity);
+  const paymentProviderRepo = dataSource.getRepository(PaymentProviderEntity);
   const refreshTokenRepo = dataSource.getRepository(RefreshTokenEntity);
   const settingRepo = dataSource.getRepository(SystemSettingEntity);
+  // 2.5 Seed payment providers
+  await paymentProviderRepo.save([
+    paymentProviderRepo.create({
+      code: 'VNPAY',
+      name: 'VNPay',
+      isActive: true,
+    }),
+  ]);
+  logger.log('[ok] Seeded payment providers');
   // 2. Seed users
   const adminPwd = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
   const userPwd = process.env.SEED_USER_PASSWORD || 'User@123';
@@ -332,7 +343,6 @@ async function runSeedFull() {
         d.setHours(d.getHours() - 1);
         return d;
       })(),
-      paymentMethod: 'CARD',
       checkedInAt: (() => {
         const d = new Date();
         d.setMinutes(d.getMinutes() - 10);
@@ -353,7 +363,6 @@ async function runSeedFull() {
       totalPrice: 240000,
       paymentDeadline: null,
       paidAt: new Date(),
-      paymentMethod: 'CASH',
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: false,
@@ -382,7 +391,6 @@ async function runSeedFull() {
       status: BookingStatus.COMPLETED,
       totalPrice: 500000,
       paidAt: dateAt(-3, 7),
-      paymentMethod: 'TRANSFER',
       completedAt: dateAt(-3, 10),
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: true,
@@ -400,8 +408,6 @@ async function runSeedFull() {
       cancelledBy: CancelledBy.USER,
       cancelledReason: 'Unexpected schedule conflict',
       cancellationNote: 'Please process the refund',
-      refundedAt: new Date(),
-      refundAmount: 360000,
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: false,
@@ -430,13 +436,10 @@ async function runSeedFull() {
       status: BookingStatus.CANCELLED,
       totalPrice: 288000,
       paidAt: dateAt(-2, 9),
-      paymentMethod: 'CARD',
       cancelledAt: dateAt(-2, 10),
       cancelledBy: CancelledBy.ADMIN,
       cancelledReason: 'Court closed unexpectedly',
       cancellationNote: 'Waiting for refund processing',
-      refundedAt: null,
-      refundAmount: null,
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: false,
@@ -468,7 +471,6 @@ async function runSeedFull() {
       status: BookingStatus.CONFIRMED,
       totalPrice: 500000,
       paidAt: new Date(),
-      paymentMethod: 'CASH',
       bookingSource: BookingSource.WALK_IN,
       bookingReminderSent: false,
       paymentReminderSent: false,
@@ -483,7 +485,6 @@ async function runSeedFull() {
       status: BookingStatus.CONFIRMED,
       totalPrice: 360000,
       paidAt: new Date(),
-      paymentMethod: 'CASH',
       checkedInAt: new Date(),
       bookingSource: BookingSource.ADMIN,
       bookingReminderSent: true,
@@ -499,7 +500,6 @@ async function runSeedFull() {
       status: BookingStatus.COMPLETED,
       totalPrice: 360000,
       paidAt: dateAt(-7, 15),
-      paymentMethod: 'CARD',
       completedAt: dateAt(-7, 18),
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: true,
@@ -514,7 +514,6 @@ async function runSeedFull() {
       status: BookingStatus.CONFIRMED,
       totalPrice: 288000,
       paidAt: new Date(),
-      paymentMethod: 'TRANSFER',
       bookingSource: BookingSource.ONLINE,
       bookingReminderSent: false,
       paymentReminderSent: false,
@@ -540,7 +539,6 @@ async function runSeedFull() {
         d.setHours(d.getHours() - 2);
         return d;
       })(),
-      paymentMethod: 'CASH',
       checkedInAt: (() => {
         const d = new Date();
         d.setMinutes(d.getMinutes() - 25);
@@ -589,7 +587,6 @@ async function runSeedFull() {
         status: BookingStatus.COMPLETED,
         totalPrice: price,
         paidAt: dateAt(day, 7),
-        paymentMethod: ['CASH', 'TRANSFER', 'CARD'][i % 3],
         completedAt: dateAt(day, 10 + (i % 4) * 2),
         bookingSource: BookingSource.ONLINE,
         bookingReminderSent: true,
@@ -624,7 +621,7 @@ async function runSeedFull() {
       booking.userId === user1.id &&
       booking.status === BookingStatus.CONFIRMED &&
       booking.bookingReminderSent === false &&
-      booking.paymentMethod === 'CASH',
+      booking.note === 'Confirmed booking for reminder-flow testing',
   );
   const userCompleted = findBooking(
     (booking) =>
