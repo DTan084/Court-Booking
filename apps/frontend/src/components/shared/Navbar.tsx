@@ -123,11 +123,6 @@ export function Navbar() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/admin/payments" className="cursor-pointer">
-                    Payments
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
                   <Link href="/admin/revenue" className="cursor-pointer">
                     Revenue
                   </Link>
