@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import {
@@ -14,7 +14,8 @@ import {
   Lock,
   MapPin,
 } from 'lucide-react';
-import { useBooking, useConfirmPayment } from '@/hooks/useBookings';
+import { useBooking } from '@/hooks/useBookings';
+import { useInitiatePayment, usePaymentStatus } from '@/hooks/usePayments';
 import { useTimeSlots } from '@/hooks/useTimeSlots';
 import { BookingStatus } from '@/types';
 import { CountdownTimer } from '@/components/bookings/countdown-timer';
@@ -94,16 +95,17 @@ function CheckoutSidebar({ step }: { step: Step }) {
 
 export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const [localExpired, setLocalExpired] = React.useState(false);
   const [step, setStep] = React.useState<Step>('review');
   const [paymentCompleted, setPaymentCompleted] = React.useState(false);
   const paymentSectionRef = React.useRef<HTMLElement | null>(null);
-
-  const [cardName, setCardName] = React.useState('');
-  const [cardNumber, setCardNumber] = React.useState('');
-  const [expiry, setExpiry] = React.useState('');
-  const [cvv, setCvv] = React.useState('');
+  const [currentPaymentId, setCurrentPaymentId] = React.useState<string | null>(null);
+  const [currentProviderOrderId, setCurrentProviderOrderId] = React.useState<string | null>(null);
+  const [paymentStateBanner, setPaymentStateBanner] = React.useState<
+    'IDLE' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'RECONCILING'
+  >('IDLE');
   const timezone = 'Asia/Ho_Chi_Minh';
   const locale = 'vi-VN';
 
@@ -116,7 +118,95 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   });
   const { data: timeSlots } = useTimeSlots(booking?.courtId || '');
 
-  const confirmPayment = useConfirmPayment();
+  const initiatePayment = useInitiatePayment();
+  const paymentStatusQuery = usePaymentStatus(currentPaymentId || '', {
+    enabled: Boolean(currentPaymentId) && paymentStateBanner !== 'SUCCESS',
+    refetchMs: 8000,
+  });
+
+  React.useEffect(() => {
+    const paymentIdFromQuery = searchParams.get('paymentId');
+    const providerOrderIdFromQuery = searchParams.get('vnp_TxnRef');
+    if (paymentIdFromQuery) {
+      setCurrentPaymentId(paymentIdFromQuery);
+      setStep('payment');
+      setPaymentStateBanner('PROCESSING');
+      return;
+    }
+
+    const persistedRaw =
+      typeof window !== 'undefined'
+        ? window.localStorage.getItem(`checkout-payment:${bookingId}`)
+        : null;
+    if (persistedRaw) {
+      try {
+        const persisted = JSON.parse(persistedRaw) as {
+          paymentId?: string;
+          providerOrderId?: string;
+        };
+        if (persisted.paymentId) {
+          setCurrentPaymentId(persisted.paymentId);
+          setCurrentProviderOrderId(persisted.providerOrderId ?? null);
+          setStep('payment');
+          setPaymentStateBanner('PROCESSING');
+          return;
+        }
+      } catch {
+        // ignore invalid local storage payload
+      }
+    }
+
+    if (providerOrderIdFromQuery) {
+      setCurrentProviderOrderId(providerOrderIdFromQuery);
+      setStep('payment');
+      setPaymentStateBanner('RECONCILING');
+    }
+  }, [bookingId, searchParams]);
+
+  React.useEffect(() => {
+    const status = paymentStatusQuery.data?.paymentStatus;
+    const bookingStatus = paymentStatusQuery.data?.bookingStatus;
+    if (!status) return;
+
+    if (status === 'SUCCESS' && bookingStatus === BookingStatus.CONFIRMED) {
+      console.info('[payment] status_success', {
+        bookingId,
+        paymentId: currentPaymentId,
+        providerOrderId: currentProviderOrderId,
+      });
+      setPaymentCompleted(true);
+      setStep('confirmation');
+      setPaymentStateBanner('SUCCESS');
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(`checkout-payment:${bookingId}`);
+      }
+      return;
+    }
+
+    if (status === 'FAILED') {
+      console.warn('[payment] status_failed', {
+        bookingId,
+        paymentId: currentPaymentId,
+        providerOrderId: currentProviderOrderId,
+      });
+      setPaymentStateBanner('FAILED');
+      return;
+    }
+    if (status === 'CANCELLED') {
+      console.warn('[payment] status_cancelled', {
+        bookingId,
+        paymentId: currentPaymentId,
+        providerOrderId: currentProviderOrderId,
+      });
+      setPaymentStateBanner('CANCELLED');
+      return;
+    }
+    if (status === 'RECONCILING') {
+      setPaymentStateBanner('RECONCILING');
+      return;
+    }
+    setPaymentStateBanner('PROCESSING');
+  }, [bookingId, currentPaymentId, currentProviderOrderId, paymentStatusQuery.data]);
 
   const bookingDaySlots = React.useMemo(() => {
     if (!booking || !timeSlots?.length) return [];
@@ -172,12 +262,33 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const normalizedPrimaryCourtImage = normalizeImageUrl(primaryCourtImage);
   const bypassPrimaryCourtImageOptimizer = shouldBypassImageOptimizer(primaryCourtImage);
 
-  const handleCompletePayment = async () => {
+  const handleStartPayment = async () => {
     try {
-      await confirmPayment.mutateAsync(bookingId);
-      setPaymentCompleted(true);
-      setStep('confirmation');
+      const initiated = await initiatePayment.mutateAsync({ bookingId, provider: 'VNPAY' });
+      setCurrentPaymentId(initiated.paymentId);
+      setCurrentProviderOrderId(initiated.providerOrderId);
+      setPaymentStateBanner('PROCESSING');
+      console.info('[payment] initiate_success', {
+        bookingId,
+        paymentId: initiated.paymentId,
+        providerOrderId: initiated.providerOrderId,
+      });
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          `checkout-payment:${bookingId}`,
+          JSON.stringify({
+            paymentId: initiated.paymentId,
+            providerOrderId: initiated.providerOrderId,
+          }),
+        );
+      }
+      if (initiated.paymentUrl) {
+        window.location.href = initiated.paymentUrl;
+        return;
+      }
+      setStep('payment');
     } catch {
+      console.warn('[payment] initiate_failed', { bookingId });
       // handled by hook
     }
   };
@@ -365,8 +476,8 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     <Lock className="h-3.5 w-3.5" />
                     SSL secured checkout
                   </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-amber-700">
-                    Simulation Mode
+                  <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-blue-700">
+                    VNPay Redirect
                   </div>
                 </div>
               </div>
@@ -541,74 +652,60 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                   <section ref={paymentSectionRef} className="space-y-6">
                     <div className="bg-white border border-slate-200 rounded-2xl p-8">
                       <h3 className="mb-4 text-xl font-semibold text-slate-900">Payment Method</h3>
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-1">
                         <button className="rounded-xl border-2 border-orange-300 bg-orange-50 p-4 text-left">
-                          <p className="text-sm font-semibold text-orange-700">Card</p>
-                          <p className="text-xs text-orange-600">Credit / Debit</p>
-                        </button>
-                        <button className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-500">
-                          Apple Pay
-                        </button>
-                        <button className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left text-slate-500">
-                          Google Pay
+                          <p className="text-sm font-semibold text-orange-700">VNPay</p>
+                          <p className="text-xs text-orange-600">
+                            Redirect to VNPay and return to this page automatically
+                          </p>
                         </button>
                       </div>
                     </div>
 
                     <div className="bg-white border border-slate-200 rounded-2xl p-8">
-                      <h3 className="text-xl font-semibold text-slate-900 mb-6">Card Details</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
-                          <label className="block text-sm text-slate-700 mb-2">
-                            Cardholder Name
-                          </label>
-                          <input
-                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
-                            value={cardName}
-                            onChange={(e) => setCardName(e.target.value)}
-                            placeholder="JANE DOE"
-                            type="text"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="block text-sm text-slate-700 mb-2">Card Number</label>
-                          <input
-                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
-                            value={cardNumber}
-                            onChange={(e) => setCardNumber(e.target.value)}
-                            placeholder="0000 0000 0000 0000"
-                            type="text"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-slate-700 mb-2">Expiry Date</label>
-                          <input
-                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
-                            value={expiry}
-                            onChange={(e) => setExpiry(e.target.value)}
-                            placeholder="MM/YY"
-                            type="text"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-slate-700 mb-2">CVV</label>
-                          <input
-                            className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3"
-                            value={cvv}
-                            onChange={(e) => setCvv(e.target.value)}
-                            placeholder="123"
-                            type="text"
-                          />
-                        </div>
+                      <h3 className="text-xl font-semibold text-slate-900 mb-6">Payment Status</h3>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                        {paymentStateBanner === 'IDLE' &&
+                          'Click "Proceed to Payment" to initiate your VNPay transaction.'}
+                        {paymentStateBanner === 'PROCESSING' &&
+                          'Waiting for provider confirmation. This page polls payment status automatically.'}
+                        {paymentStateBanner === 'RECONCILING' &&
+                          'Provider callback is being reconciled. Please keep this page open and check again shortly.'}
+                        {paymentStateBanner === 'FAILED' &&
+                          'Payment failed. You can retry from the action below.'}
+                        {paymentStateBanner === 'CANCELLED' &&
+                          'Payment was cancelled. You can retry if your booking is still payable.'}
                       </div>
+                      {currentPaymentId && (
+                        <div className="mt-4 grid gap-2 text-xs text-slate-500">
+                          <p>
+                            Payment ID:{' '}
+                            <span className="font-mono text-slate-700">{currentPaymentId}</span>
+                          </p>
+                          {currentProviderOrderId && (
+                            <p>
+                              Provider Order:{' '}
+                              <span className="font-mono text-slate-700">
+                                {currentProviderOrderId}
+                              </span>
+                            </p>
+                          )}
+                          <p>If issue persists, provide Payment ID to support.</p>
+                        </div>
+                      )}
 
                       <button
                         className="w-full mt-8 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-4 rounded-lg transition-colors flex justify-center items-center gap-2"
-                        disabled={isExpired || confirmPayment.isPending}
-                        onClick={handleCompletePayment}
+                        disabled={
+                          isExpired ||
+                          initiatePayment.isPending ||
+                          paymentStateBanner === 'PROCESSING' ||
+                          paymentStateBanner === 'RECONCILING'
+                        }
+                        onClick={handleStartPayment}
                       >
                         <Lock className="h-4 w-4" />
-                        {confirmPayment.isPending ? 'Processing...' : 'Complete Payment'}
+                        {initiatePayment.isPending ? 'Redirecting...' : 'Retry Payment'}
                       </button>
                     </div>
                   </section>
@@ -667,11 +764,11 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
                     {step === 'payment' && (
                       <button
                         className="w-full bg-orange-600 text-white py-4 px-6 rounded-lg font-semibold flex items-center justify-center gap-3 hover:bg-orange-500 transition-all"
-                        disabled={isExpired || confirmPayment.isPending}
-                        onClick={handleCompletePayment}
+                        disabled={isExpired || initiatePayment.isPending}
+                        onClick={handleStartPayment}
                       >
                         <Lock className="h-4 w-4" />
-                        {confirmPayment.isPending ? 'Processing...' : 'Complete Payment'}
+                        {initiatePayment.isPending ? 'Redirecting...' : 'Pay with VNPay'}
                       </button>
                     )}
 
