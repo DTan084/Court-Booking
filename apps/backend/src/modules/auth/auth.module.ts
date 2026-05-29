@@ -10,8 +10,11 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthCleanupService } from './auth.cleanup.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { RedisModule } from '../../common/redis/redis.module';
 import type { StringValue } from 'ms';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { GoogleCallbackGuard } from './guards/google-callback.guard';
 
 @Module({
   imports: [
@@ -34,7 +37,14 @@ import type { StringValue } from 'ms';
     RedisModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthCleanupService, JwtStrategy],
+  providers: [
+    AuthService,
+    AuthCleanupService,
+    JwtStrategy,
+    GoogleStrategy,
+    GoogleAuthGuard,
+    GoogleCallbackGuard,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

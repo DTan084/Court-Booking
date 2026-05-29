@@ -16,6 +16,8 @@ import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { randomUUID, createHash } from 'crypto';
 import Redis from 'ioredis';
+import type { Role } from '@court-booking/shared';
+import { GoogleAuthProfile } from './strategies/google.strategy';
 
 @Injectable()
 export class AuthService {
@@ -100,6 +102,70 @@ export class AuthService {
     const tokens = await this.generateTokens(user);
 
     return tokens;
+  }
+
+  async loginWithGoogle(profile: GoogleAuthProfile) {
+    const email = profile.email?.toLowerCase().trim();
+    if (!email) {
+      throw new UnauthorizedException('Google account has no email');
+    }
+    if (!profile.emailVerified) {
+      throw new UnauthorizedException('Google email is not verified');
+    }
+
+    let user = await this.userRepository.findOne({ where: { email } });
+
+    if (user) {
+      if (user.authProvider && user.authProvider !== profile.provider) {
+        throw new UnauthorizedException('Email is already linked to a different auth provider');
+      }
+      if (user.authProviderUserId && user.authProviderUserId !== profile.providerUserId) {
+        throw new UnauthorizedException('Provider account mismatch');
+      }
+      user.authProvider = profile.provider;
+      user.authProviderUserId = profile.providerUserId;
+      if (!user.avatarUrl && profile.avatarUrl) {
+        user.avatarUrl = profile.avatarUrl;
+      }
+      await this.userRepository.save(user);
+      this.logger.log(
+        JSON.stringify({
+          event: 'oauth_linked_existing',
+          provider: profile.provider,
+          userId: user.id,
+        }),
+      );
+    } else {
+      const randomPasswordHash = await bcrypt.hash(randomUUID(), 10);
+      user = this.userRepository.create({
+        name: profile.name || 'Google User',
+        email,
+        role: 'USER' as Role,
+        passwordHash: randomPasswordHash,
+        avatarUrl: profile.avatarUrl ?? null,
+        authProvider: profile.provider,
+        authProviderUserId: profile.providerUserId,
+        phone: null,
+      });
+      user = await this.userRepository.save(user);
+      this.logger.log(
+        JSON.stringify({
+          event: 'oauth_user_created',
+          provider: profile.provider,
+          userId: user.id,
+        }),
+      );
+    }
+
+    const tokens = await this.generateTokens(user);
+    this.logger.log(
+      JSON.stringify({
+        event: 'oauth_callback_success',
+        provider: profile.provider,
+        userId: user.id,
+      }),
+    );
+    return { user, tokens };
   }
 
   private async safeRedisGet(key: string): Promise<string | null> {

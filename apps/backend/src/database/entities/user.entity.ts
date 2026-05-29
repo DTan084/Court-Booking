@@ -35,6 +35,12 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 500, name: 'avatar_url', nullable: true })
   avatarUrl: string | null;
 
+  @Column({ type: 'varchar', length: 30, name: 'auth_provider', nullable: true })
+  authProvider: string | null;
+
+  @Column({ type: 'varchar', length: 255, name: 'auth_provider_user_id', nullable: true })
+  authProviderUserId: string | null;
+
   @Column({ type: 'date', nullable: true })
   dob: string | null;
 

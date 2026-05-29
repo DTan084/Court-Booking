@@ -9,6 +9,8 @@ import {
   UseGuards,
   Res,
   Req,
+  Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -30,10 +32,15 @@ import {
   UserProfileResponse,
 } from './swagger/auth.swagger';
 import { Response, Request } from 'express';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { GoogleCallbackGuard } from './guards/google-callback.guard';
+import { GoogleAuthProfile } from './strategies/google.strategy';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
@@ -107,6 +114,50 @@ export class AuthController {
     return { message: 'Welcome Admin!' };
   }
 
+  @Get('oauth/google')
+  @UseGuards(GoogleAuthGuard)
+  @ApiOperation({ summary: 'Start Google OAuth flow' })
+  async googleOAuthStart() {
+    return;
+  }
+
+  @Get('oauth/google/callback')
+  @UseGuards(GoogleCallbackGuard)
+  @ApiOperation({ summary: 'Google OAuth callback' })
+  async googleOAuthCallback(@Req() req: Request, @Res() res: Response) {
+    const redirectState = this.resolveRedirectState(req.query?.state);
+    try {
+      const profile = req.user as GoogleAuthProfile | undefined;
+      if (!profile) {
+        throw new UnauthorizedException('Google profile not found');
+      }
+
+      const { tokens, user } = await this.authService.loginWithGoogle(profile);
+      this.setAuthCookies(res, tokens.access_token, tokens.refresh_token);
+
+      this.logger.log(
+        JSON.stringify({
+          event: 'oauth_callback_redirect_success',
+          provider: 'google',
+          userId: user.id,
+          redirectPath: redirectState,
+        }),
+      );
+
+      return res.redirect(this.buildSuccessRedirectUrl(redirectState));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown_error';
+      this.logger.warn(
+        JSON.stringify({
+          event: 'oauth_callback_reject',
+          provider: 'google',
+          reason,
+        }),
+      );
+      return res.redirect(this.buildFailureRedirectUrl('google_oauth_failed'));
+    }
+  }
+
   private setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
     const isProduction = this.configService.get<string>('app.nodeEnv') === 'production';
     const accessExpiresIn = this.configService.get<string>('jwt.expiresIn') || '15m';
@@ -146,5 +197,27 @@ export class AuthController {
       d: 24 * 60 * 60 * 1000,
     };
     return value * (multipliers[unit] ?? 1);
+  }
+
+  private resolveRedirectState(state: unknown): string {
+    if (typeof state === 'string' && state.startsWith('/')) {
+      return state;
+    }
+    return '/courts';
+  }
+
+  private buildSuccessRedirectUrl(path: string): string {
+    const frontendUrl =
+      this.configService.get<string>('app.frontendUrl') || 'http://localhost:3000';
+    return `${frontendUrl}${path}`;
+  }
+
+  private buildFailureRedirectUrl(errorCode: string): string {
+    const frontendUrl =
+      this.configService.get<string>('app.frontendUrl') || 'http://localhost:3000';
+    const failureBase =
+      this.configService.get<string>('FRONTEND_OAUTH_FAILURE_URL') || `${frontendUrl}/login`;
+    const separator = failureBase.includes('?') ? '&' : '?';
+    return `${failureBase}${separator}error=${encodeURIComponent(errorCode)}`;
   }
 }
