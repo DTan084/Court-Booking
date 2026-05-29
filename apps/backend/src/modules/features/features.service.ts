@@ -170,15 +170,22 @@ export class FeaturesService {
     const court = await this.courtRepo.findOne({ where: { id: courtId } });
     if (!court) throw new NotFoundException('Court not found');
 
+    const current = await this.courtFeatureRepo.find({ where: { courtId } });
+    const currentSet = new Set(current.map((item) => item.featureId));
+
     if (featureIds.length > 0) {
-      const features = await this.featureRepo.findBy({ id: In(featureIds), isActive: true });
-      const foundSet = new Set(features.map((f) => f.id));
-      const missing = featureIds.find((id) => !foundSet.has(id));
+      const features = await this.featureRepo.findBy({ id: In(featureIds) });
+      const featureMap = new Map(features.map((f) => [f.id, f]));
+      const missing = featureIds.find((id) => {
+        const feature = featureMap.get(id);
+        if (!feature) return true;
+        if (feature.isActive) return false;
+        // Allow keeping inactive features already assigned to this court.
+        return !currentSet.has(id);
+      });
       if (missing) throw new BadRequestException(`Invalid or inactive feature ID: ${missing}`);
     }
 
-    const current = await this.courtFeatureRepo.find({ where: { courtId } });
-    const currentSet = new Set(current.map((item) => item.featureId));
     const nextSet = new Set(featureIds);
 
     const toDelete = current.filter((item) => !nextSet.has(item.featureId));
