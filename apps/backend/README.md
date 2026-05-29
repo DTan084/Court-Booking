@@ -103,6 +103,10 @@ The backend reads values from the repository root environment files.
 | `JWT_SECRET`                               | Yes      | JWT signing secret                              |
 | `JWT_EXPIRES_IN`                           | Yes      | Access token TTL                                |
 | `JWT_REFRESH_EXPIRES_IN`                   | Yes      | Refresh token TTL                               |
+| `GOOGLE_CLIENT_ID`                         | No       | Google OAuth client id                          |
+| `GOOGLE_CLIENT_SECRET`                     | No       | Google OAuth client secret                      |
+| `GOOGLE_CALLBACK_URL`                      | No       | Google OAuth callback URL on backend            |
+| `FRONTEND_OAUTH_FAILURE_URL`               | No       | Frontend login URL to receive OAuth error query |
 | `REDIS_HOST`                               | Yes      | Redis host                                      |
 | `REDIS_PORT`                               | Yes      | Redis port                                      |
 | `REDIS_USERNAME`                           | No       | Redis ACL username                              |
@@ -141,6 +145,17 @@ Reference template:
 - [`../../.env.example`](../../.env.example)
 
 `*`: Required when that provider is enabled in `PAYMENT_PROVIDERS_ENABLED`.
+
+## OAuth Endpoints (Google)
+
+- `GET /api/v1/auth/oauth/google`
+- `GET /api/v1/auth/oauth/google/callback`
+
+Notes:
+
+- callback issues the same auth cookies as password login
+- existing users are linked by verified email
+- new users are auto-created with role `USER`
 
 ## Payment Setup (Production)
 
