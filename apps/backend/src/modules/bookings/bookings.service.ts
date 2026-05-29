@@ -1,4 +1,4 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -15,11 +15,7 @@ import { toZonedTime } from 'date-fns-tz';
 import bookingConfig from '../../config/booking.config';
 const BUSINESS_TIMEZONE = process.env.BUSINESS_TIMEZONE || 'Asia/Ho_Chi_Minh';
 import { BookingEntity } from '../../database/entities/booking.entity';
-import { PaymentEntity, PaymentStatus } from '../../database/entities/payment.entity';
-import {
-  PaymentEventDirection,
-  PaymentEventEntity,
-} from '../../database/entities/payment-event.entity';
+import { PaymentStatus } from '../../database/entities/payment.entity';
 import { CourtEntity, CourtStatus } from '../../database/entities/court.entity';
 import { CourtTimeSlotEntity } from '../../database/entities/court-time-slot.entity';
 import { UserEntity } from '../../database/entities/user.entity';
@@ -268,7 +264,7 @@ export class BookingsService {
         );
       }
 
-      // 3. Overlap Check — REQ-16.7: only CONFIRMED blocks slot
+      // 3. Overlap Check â€” REQ-16.7: only CONFIRMED blocks slot
       const overlapCheckTime = new Date();
       const overlappingBookings = await manager
         .createQueryBuilder(BookingEntity, 'booking')
@@ -297,7 +293,7 @@ export class BookingsService {
       // 4. Calculate price
       const totalPrice = coveredSlots.reduce((sum, slot) => sum + Number(slot.price), 0);
 
-      // 5. Create Booking — REQ-16.2: default PENDING_PAYMENT + paymentDeadline
+      // 5. Create Booking â€” REQ-16.2: default PENDING_PAYMENT + paymentDeadline
       const now = new Date();
       const paymentDeadline = new Date(now.getTime() + paymentDeadlineMinutes * 60 * 1000);
 
@@ -364,7 +360,7 @@ export class BookingsService {
         throw new BadRequestException('Booking payment window has expired');
       }
 
-      // REQ-17.3: PENDING_PAYMENT → CONFIRMED
+      // REQ-17.3: PENDING_PAYMENT â†’ CONFIRMED
       booking.status = BookingStatus.CONFIRMED;
       booking.paidAt = new Date();
       return manager.save(booking);
@@ -398,7 +394,7 @@ export class BookingsService {
   }
 
   /**
-   * REQ-19: Cancel policy — 24h creation window + 12h before start
+   * REQ-19: Cancel policy â€” 24h creation window + 12h before start
    */
   async cancelBooking(id: string, userId: string): Promise<BookingEntity> {
     const cancelWithinHours = await this.settingsService.getNumber('cancel_within_hours', 24);
@@ -434,7 +430,7 @@ export class BookingsService {
         );
       }
 
-      // REQ-19.3: Rule A — must cancel within 24h of creation
+      // REQ-19.3: Rule A â€” must cancel within 24h of creation
       const hoursSinceCreated = differenceInHours(now, booking.createdAt);
       if (hoursSinceCreated >= cancelWithinHours) {
         throw new BadRequestException(
@@ -442,7 +438,7 @@ export class BookingsService {
         );
       }
 
-      // REQ-19.2: Rule B — must be > 12h before start
+      // REQ-19.2: Rule B â€” must be > 12h before start
       const hoursUntilStart = differenceInHours(booking.startTime, now);
       if (hoursUntilStart <= noCancelBeforeHours) {
         throw new BadRequestException(
@@ -476,6 +472,7 @@ export class BookingsService {
       .withDeleted()
       .leftJoinAndSelect('booking.court', 'court')
       .leftJoinAndSelect('court.images', 'courtImages')
+      .leftJoinAndSelect('booking.successfulPayment', 'successfulPayment')
       .where('booking.userId = :userId', { userId })
       .orderBy('booking.startTime', 'DESC')
       .skip(skip)
@@ -509,6 +506,12 @@ export class BookingsService {
 
       return {
         ...b,
+        paymentStatus: b.successfulPayment?.status ?? null,
+        paymentRefundedAt: b.successfulPayment?.refundedAt ?? null,
+        paymentRefundAmount: b.successfulPayment?.refundAmount ?? null,
+        paymentRefundProcessing:
+          (b.successfulPayment?.providerRaw as { refund?: { status?: string } } | null)?.refund
+            ?.status === 'PROCESSING',
         cancellationDeadline: cancellationDeadline.toISOString(),
         latestCancellableTime: latestCancellableTime.toISOString(),
       };
@@ -605,6 +608,9 @@ export class BookingsService {
 
     const start = new Date(startTime);
     const end = new Date(endTime);
+    if (start < new Date()) {
+      throw new BadRequestException('Cannot create manual booking in the past');
+    }
     const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
     if (durationHours <= 0) throw new BadRequestException('Invalid booking duration');
 
@@ -637,7 +643,9 @@ export class BookingsService {
         .andWhere('booking.endTime > :startTime', { startTime: start })
         .andWhere(
           new Brackets((qb) => {
-            qb.where('booking.status = :confirmed', { confirmed: BookingStatus.CONFIRMED }).orWhere(
+            qb.where('booking.status IN (:...blockingStatuses)', {
+              blockingStatuses: [BookingStatus.CONFIRMED, BookingStatus.COMPLETED],
+            }).orWhere(
               'booking.status = :pending AND booking.paymentDeadline IS NOT NULL AND booking.paymentDeadline > :now',
               { pending: BookingStatus.PENDING_PAYMENT, now: new Date() },
             );
@@ -727,6 +735,7 @@ export class BookingsService {
       .withDeleted()
       .leftJoinAndSelect('booking.court', 'court')
       .leftJoinAndSelect('booking.user', 'user')
+      .leftJoinAndSelect('booking.successfulPayment', 'successfulPayment')
       .orderBy('booking.startTime', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -769,17 +778,53 @@ export class BookingsService {
     if (query.statusView === 'REFUND_PENDING') {
       qb.andWhere('booking.status IN (:...cancelledLike)', {
         cancelledLike: [BookingStatus.CANCELLED, BookingStatus.EXPIRED],
-      })
-        .andWhere('booking.successfulPaymentId IS NOT NULL')
-        .leftJoin(PaymentEntity, 'payment', 'payment.id = booking.successfulPaymentId')
-        .andWhere('payment.status IN (:...paidStatuses)', {
-          paidStatuses: [PaymentStatus.SUCCESS, PaymentStatus.RECONCILING],
-        });
+      }).andWhere(
+        new Brackets((sub) => {
+          sub
+            .where(
+              'booking.successfulPaymentId IS NOT NULL AND successfulPayment.status IN (:...paidStatuses)',
+              {
+                paidStatuses: [PaymentStatus.SUCCESS, PaymentStatus.RECONCILING],
+              },
+            )
+            .orWhere(
+              'booking.successfulPaymentId IS NULL AND (booking.cancellationNote IS NULL OR booking.cancellationNote NOT ILIKE :manualRefundMarker)',
+              {
+                manualRefundMarker: '%[MANUAL_REFUND]%',
+              },
+            );
+        }),
+      );
     }
     const [data, total] = await qb.getManyAndCount();
     const enriched = data.map((item: BookingEntity & { user?: { name?: string } }) => ({
+      ...(() => {
+        const manualRefundMatch = (item.cancellationNote ?? '').match(/\[MANUAL_REFUND\]/);
+        return {
+          manualRefundRecorded: Boolean(manualRefundMatch),
+        };
+      })(),
       ...item,
       customerName: item.guestName || item.user?.name || 'Member',
+      paymentStatus: item.successfulPayment?.status ?? null,
+      paymentProvider: item.successfulPayment?.providerCode ?? null,
+      paymentId: item.successfulPayment?.id ?? null,
+      paymentRefundedAt: item.successfulPayment?.refundedAt ?? null,
+      paymentRefundAmount: item.successfulPayment?.refundAmount ?? null,
+      paymentRefundProcessing:
+        (item.successfulPayment?.providerRaw as { refund?: { status?: string } } | null)?.refund
+          ?.status === 'PROCESSING',
+      refundableViaProvider: Boolean(
+        item.successfulPayment?.id &&
+        item.successfulPayment?.providerCode === 'VNPAY' &&
+        item.successfulPayment?.providerOrderId &&
+        item.successfulPayment?.providerTxnId,
+      ),
+      refundDisabledReason: !item.successfulPayment?.id
+        ? 'Booking has no online payment transaction to refund via VNPay.'
+        : !item.successfulPayment?.providerTxnId
+          ? 'Missing provider transaction id, cannot submit VNPay refund yet.'
+          : null,
     }));
     const now = new Date();
     const liveSessions = await this.bookingRepository
@@ -958,82 +1003,43 @@ export class BookingsService {
     return saved;
   }
 
-  async refundBooking(bookingId: string, refundAmount: number): Promise<BookingEntity> {
-    const saved = await this.dataSource.transaction(async (manager) => {
-      const booking = await manager.findOne(BookingEntity, {
-        where: { id: bookingId },
-        relations: ['court'],
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!booking) throw new NotFoundException('Booking not found');
-      if (![BookingStatus.CANCELLED, BookingStatus.EXPIRED].includes(booking.status)) {
-        throw new BadRequestException(
-          'Refunds can only be processed for cancelled or expired bookings',
-        );
-      }
-      if (!booking.successfulPaymentId) {
-        const fallbackPayment = await manager.findOne(PaymentEntity, {
-          where: {
-            bookingId: booking.id,
-            status: In([
-              PaymentStatus.SUCCESS,
-              PaymentStatus.RECONCILING,
-              PaymentStatus.PARTIAL_REFUND,
-              PaymentStatus.REFUNDED,
-            ]),
-          },
-          order: { createdAt: 'DESC' },
-        });
-        if (fallbackPayment) {
-          booking.successfulPaymentId = fallbackPayment.id;
-          booking.paidAt = booking.paidAt ?? fallbackPayment.completedAt ?? new Date();
-          await manager.save(booking);
-        }
-      }
-      if (!booking.successfulPaymentId) {
-        throw new BadRequestException(
-          'Cannot refund booking without linked successful payment. Run payment backfill or verify payment webhook.',
-        );
-      }
-
-      const payment = await manager.findOne(PaymentEntity, {
-        where: { id: booking.successfulPaymentId },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!payment) throw new BadRequestException('Successful payment not found for booking');
-      if ([PaymentStatus.REFUNDED, PaymentStatus.PARTIAL_REFUND].includes(payment.status)) {
-        throw new ConflictException('Booking has already been refunded');
-      }
-      if (refundAmount > Number(payment.amount)) {
-        throw new BadRequestException('Refund amount cannot exceed the total booking price');
-      }
-
-      payment.refundedAt = new Date();
-      payment.refundAmount = refundAmount;
-      payment.status =
-        refundAmount < Number(payment.amount)
-          ? PaymentStatus.PARTIAL_REFUND
-          : PaymentStatus.REFUNDED;
-      await manager.save(payment);
-
-      await manager.save(
-        PaymentEventEntity,
-        manager.create(PaymentEventEntity, {
-          paymentId: payment.id,
-          eventType: 'ADMIN_REFUND_MARKED',
-          direction: PaymentEventDirection.OUT,
-          payload: {
-            source: 'admin_bookings_refund',
-            refundAmount,
-          },
-        }),
+  async manualRefundBooking(
+    bookingId: string,
+    payload: { amount?: number; percent?: number; reason: string; note?: string },
+  ): Promise<BookingEntity> {
+    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (
+      ![BookingStatus.CANCELLED, BookingStatus.EXPIRED, BookingStatus.COMPLETED].includes(
+        booking.status,
+      )
+    ) {
+      throw new BadRequestException(
+        `Booking must be CANCELLED/EXPIRED/COMPLETED before manual refund (current: ${booking.status})`,
       );
+    }
 
-      return booking;
-    });
+    const totalAmount = Number(booking.totalPrice);
+    const resolvedAmount = Number(
+      (payload.amount ?? (totalAmount * Number(payload.percent ?? 100)) / 100).toFixed(2),
+    );
+    if (!Number.isFinite(resolvedAmount) || resolvedAmount <= 0) {
+      throw new BadRequestException('Manual refund amount must be greater than 0');
+    }
+    if (resolvedAmount > totalAmount) {
+      throw new BadRequestException(
+        `Manual refund amount exceeds booking total (${totalAmount.toLocaleString('vi-VN')} VND)`,
+      );
+    }
+
+    const manualRefundMarker = `[MANUAL_REFUND] amount=${resolvedAmount};percent=${payload.percent ?? null};reason=${payload.reason};note=${payload.note ?? ''};at=${new Date().toISOString()}`;
+    booking.cancellationNote = booking.cancellationNote
+      ? `${booking.cancellationNote}\n${manualRefundMarker}`
+      : manualRefundMarker;
+    const saved = await this.bookingRepository.save(booking);
 
     if (saved.userId) {
-      this.createRefundNotification(saved, refundAmount).catch(console.error);
+      this.createRefundNotification(saved, resolvedAmount).catch(console.error);
     }
     return saved;
   }

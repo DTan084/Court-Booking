@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { Role, BookingStatus, BookingSource, CancelledBy } from '@court-booking/shared';
 import { JwtAuthGuard } from '../auth/guards/jwt.guard';
@@ -55,15 +65,23 @@ const adminAnalyticsQuerySchema = z.object({
   courtId: z.string().uuid().optional(),
 });
 
-const adminRefundSchema = z.object({
-  refundAmount: z.number().positive(),
-});
-
 const adminCancelSchema = z.object({
   cancelledReason: z.string().max(100).optional(),
   cancellationNote: z.string().max(500).optional(),
   cancelledBy: z.nativeEnum(CancelledBy).optional(),
 });
+
+const adminManualRefundSchema = z
+  .object({
+    amount: z.number().positive().optional(),
+    percent: z.number().positive().max(100).optional(),
+    reason: z.string().max(255),
+    note: z.string().max(500).optional(),
+  })
+  .refine((data) => !(data.amount && data.percent), {
+    message: 'Provide either amount or percent, not both',
+    path: ['percent'],
+  });
 
 @Controller('admin/bookings')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -134,11 +152,19 @@ export class AdminBookingsController {
   }
 
   @Patch(':id/refund')
-  refund(
+  refundLegacy() {
+    throw new BadRequestException(
+      'Deprecated endpoint. Use PATCH /api/v1/payments/admin/bookings/:bookingId/refund',
+    );
+  }
+
+  @Patch(':id/manual-refund')
+  manualRefund(
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(adminRefundSchema)) body: z.infer<typeof adminRefundSchema>,
+    @Body(new ZodValidationPipe(adminManualRefundSchema))
+    body: z.infer<typeof adminManualRefundSchema>,
   ) {
-    return this.bookingsService.refundBooking(id, body.refundAmount);
+    return this.bookingsService.manualRefundBooking(id, body);
   }
 
   @Patch(':id')

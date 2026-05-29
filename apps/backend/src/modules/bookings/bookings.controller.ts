@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   Body,
@@ -87,8 +88,10 @@ export class BookingsController {
   @ApiResponse({ status: 403, description: 'Forbidden', type: ApiErrorResponse })
   @ApiResponse({ status: 404, description: 'Booking not found', type: ApiErrorResponse })
   @ApiResponse({ status: 409, description: 'Already confirmed', type: ApiErrorResponse })
-  async confirmPayment(@Param('id') id: string, @CurrentUser() user: UserEntity) {
-    return this.bookingsService.confirmPayment(id, user.id);
+  confirmPayment() {
+    throw new BadRequestException(
+      'Deprecated endpoint. Use POST /api/v1/payments/initiate and payment provider webhook flow.',
+    );
   }
 
   @Get('me')
