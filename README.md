@@ -47,7 +47,7 @@ The platform supports:
 | Layer    | Stack                                                                   |
 | -------- | ----------------------------------------------------------------------- |
 | Frontend | Next.js 16, React 19, TypeScript, TanStack Query, Zustand, Tailwind CSS |
-| Backend  | NestJS 11, TypeORM, PostgreSQL 17, Bull, Redis, Winston                 |
+| Backend  | NestJS 11, TypeORM, PostgreSQL 17, Bull, Redis 8, Winston               |
 | Shared   | Workspace package for shared types, enums, and contracts                |
 | Auth     | JWT access/refresh flow with httpOnly cookies                           |
 | Infra    | Docker Compose, Nginx                                                   |

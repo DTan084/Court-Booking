@@ -11,6 +11,9 @@ import { CourtFeatureEntity } from './entities/court-feature.entity';
 import { SlotTemplateEntity } from './entities/slot-template.entity';
 import { SlotTemplateItemEntity } from './entities/slot-template-item.entity';
 import { SystemSettingEntity } from './entities/system-setting.entity';
+import { PaymentProviderEntity } from './entities/payment-provider.entity';
+import { PaymentEntity } from './entities/payment.entity';
+import { PaymentEventEntity } from './entities/payment-event.entity';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -38,6 +41,9 @@ export const dataSourceOptions: DataSourceOptions = {
     SlotTemplateEntity,
     SlotTemplateItemEntity,
     SystemSettingEntity,
+    PaymentProviderEntity,
+    PaymentEntity,
+    PaymentEventEntity,
     path.join(__dirname, 'entities/notification.entity{.ts,.js}'),
   ],
   // Use .js in production (compiled), .ts in development

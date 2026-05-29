@@ -283,8 +283,8 @@ export default function AdminFeaturesPage() {
               )}
               {Number(pendingDelete.courtCount ?? 0) > 0 ? (
                 <p className="mt-2 text-xs text-amber-700">
-                  {pendingDelete.courtCount} san dang su dung feature nay - feature van hien thi
-                  tren cac san do nhung khong the gan them.
+                  {pendingDelete.courtCount} courts are currently using this feature. It will remain
+                  visible on those courts, but cannot be assigned to new courts.
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-slate-500">

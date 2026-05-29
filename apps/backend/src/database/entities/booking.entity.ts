@@ -12,6 +12,7 @@
 import { UserEntity } from './user.entity';
 import { CourtEntity } from './court.entity';
 import { BookingStatus, BookingSource, CancelledBy } from '@court-booking/shared';
+import { PaymentEntity } from './payment.entity';
 
 @Entity('bookings')
 @Index(['courtId', 'startTime', 'status'])
@@ -58,9 +59,6 @@ export class BookingEntity {
   @Column({ type: 'timestamp with time zone', name: 'paid_at', nullable: true })
   paidAt: Date | null;
 
-  @Column({ type: 'varchar', name: 'payment_method', nullable: true })
-  paymentMethod: string | null;
-
   @Column({ type: 'timestamp with time zone', name: 'expired_at', nullable: true })
   expiredAt: Date | null;
 
@@ -100,11 +98,12 @@ export class BookingEntity {
   @Column({ type: 'text', name: 'cancellation_note', nullable: true })
   cancellationNote: string | null;
 
-  @Column({ type: 'timestamp with time zone', name: 'refunded_at', nullable: true })
-  refundedAt: Date | null;
+  @Column({ type: 'uuid', name: 'successful_payment_id', nullable: true })
+  successfulPaymentId: string | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'refund_amount', nullable: true })
-  refundAmount: number | null;
+  @ManyToOne(() => PaymentEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'successful_payment_id' })
+  successfulPayment: PaymentEntity | null;
 
   @Column({ type: 'boolean', name: 'payment_reminder_sent', default: false })
   paymentReminderSent: boolean;

@@ -138,6 +138,11 @@ export const queryKeys = {
     myList: (params: Record<string, unknown>) => ['bookings', 'me', params] as const,
     detail: (id: string) => ['bookings', id] as const,
   },
+  payments: {
+    all: ['payments'] as const,
+    detail: (id: string) => ['payments', id] as const,
+    lookup: (params: Record<string, unknown>) => ['payments', 'lookup', params] as const,
+  },
   auth: {
     me: ['auth', 'me'] as const,
   },

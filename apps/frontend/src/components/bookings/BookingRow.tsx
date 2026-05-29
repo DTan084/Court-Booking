@@ -121,10 +121,24 @@ export function BookingRow({ booking, isHighlighted }: BookingRowProps) {
     courtAddress,
   )}`;
 
-  const isCancelledPaid = booking.status === BookingStatus.CANCELLED && !!booking.paidAt;
+  const paymentStatus = (booking as BookingWithCourt & { paymentStatus?: string | null })
+    .paymentStatus;
+  const paymentRefundedAt = (booking as BookingWithCourt & { paymentRefundedAt?: string | null })
+    .paymentRefundedAt;
+  const paymentRefundProcessing = (
+    booking as BookingWithCourt & { paymentRefundProcessing?: boolean | null }
+  ).paymentRefundProcessing;
+  const isCancelledPaid =
+    booking.status === BookingStatus.CANCELLED &&
+    (!!booking.paidAt || paymentStatus === 'SUCCESS' || paymentStatus === 'RECONCILING');
   const refundPending =
-    booking.status === BookingStatus.CANCELLED && isCancelledPaid && !booking.refundedAt;
-  const refundProcessed = booking.status === BookingStatus.CANCELLED && !!booking.refundedAt;
+    booking.status === BookingStatus.CANCELLED &&
+    isCancelledPaid &&
+    !paymentRefundedAt &&
+    (paymentRefundProcessing || paymentStatus === 'SUCCESS' || paymentStatus === 'RECONCILING');
+  const refundProcessed =
+    booking.status === BookingStatus.CANCELLED &&
+    (paymentStatus === 'REFUNDED' || paymentStatus === 'PARTIAL_REFUND' || !!paymentRefundedAt);
   const cancellationReason =
     booking.cancellationNote || booking.cancelledReason || 'No reason provided';
   const isSystemCancelled =

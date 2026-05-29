@@ -36,7 +36,6 @@ export interface CreateAdminBookingDto {
   guestName?: string;
   guestPhone?: string;
   note?: string;
-  paymentMethod?: string;
   bookingSource?: BookingSource;
 }
 
@@ -200,39 +199,6 @@ export function useBooking(id: string, options?: { refetchInterval?: number }) {
     },
     enabled: !!id,
     ...options,
-  });
-}
-
-/**
- * Hook to confirm payment (REQ-17)
- */
-export function useConfirmPayment() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await api.post<{ success: boolean; data: BookingWithCourt }>(
-        `/bookings/${id}/confirm-payment`,
-      );
-      return response.data.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.detail(data.id) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings.all });
-      toast.success('Payment confirmed successfully!');
-    },
-    onError: (error: AxiosError<ApiErrorPayload>) => {
-      const status = error.response?.status;
-      const message = error.response?.data?.message || '';
-
-      if (status === 400 && message.toLowerCase().includes('expired')) {
-        toast.error('Booking payment window has expired');
-      } else if (status === 409) {
-        toast.error('This booking is already paid');
-      } else {
-        toast.error('Failed to confirm payment, please try again');
-      }
-    },
   });
 }
 

@@ -12,6 +12,7 @@ import {
   Search,
 } from 'lucide-react';
 import { BookingSource, BookingStatus, CancelledBy } from '@court-booking/shared';
+import { AxiosError } from 'axios';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { MetricCard } from '@/components/admin/MetricCard';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,8 @@ import { api } from '@/lib/api';
 import { formatDateByTimezone, formatTimeByTimezone } from '@/lib/datetime';
 import { formatCurrency } from '@/lib/utils';
 import { CourtStatus } from '@/types';
+import { toast } from 'sonner';
+import { PaymentStatus } from '@/hooks/usePayments';
 
 export default function AdminBookingsPage() {
   const timezone = 'Asia/Ho_Chi_Minh';
@@ -35,14 +38,16 @@ export default function AdminBookingsPage() {
     id: string;
     amount: number;
     name: string;
+    percent: number;
+    mode: 'PROVIDER' | 'MANUAL';
   } | null>(null);
+  const [isRefundSubmitting, setIsRefundSubmitting] = useState(false);
   const [editModal, setEditModal] = useState<{
     id: string;
     status: BookingStatus;
     guestName: string;
     guestPhone: string;
     note: string;
-    paymentMethod: string;
     cancelledReason: string;
     cancellationNote: string;
     cancelledBy: CancelledBy;
@@ -73,9 +78,6 @@ export default function AdminBookingsPage() {
     [status, statusView, source, page, keyword, day, sportTypeId],
   );
   const { data, refetch } = useAdminBookings(query);
-  type BookingWithPayment = (typeof data extends { data: infer T } ? T : never)[number] & {
-    paymentMethod?: string | null;
-  };
   const rows = useMemo(() => data?.data ?? [], [data]);
   const meta = data?.meta;
   const total = meta?.total ?? 0;
@@ -83,31 +85,27 @@ export default function AdminBookingsPage() {
   const end = total === 0 ? 0 : Math.min(start + rows.length - 1, total);
   const isCancelledLike = (statusValue: BookingStatus) =>
     statusValue === BookingStatus.CANCELLED || statusValue === BookingStatus.EXPIRED;
-  const isRefundedState = (statusValue: BookingStatus, refundedAt?: string | null) =>
-    isCancelledLike(statusValue) && !!refundedAt;
+  const isManualRefundEligibleStatus = (statusValue: BookingStatus) =>
+    statusValue === BookingStatus.CANCELLED ||
+    statusValue === BookingStatus.EXPIRED ||
+    statusValue === BookingStatus.COMPLETED;
+  const isRefundedState = (statusValue: BookingStatus, paymentStatus?: PaymentStatus | null) =>
+    isCancelledLike(statusValue) &&
+    (paymentStatus === 'REFUNDED' || paymentStatus === 'PARTIAL_REFUND');
   const isRefundPending = (
     statusValue: BookingStatus,
     paidAt?: string | null,
-    refundedAt?: string | null,
-    refundAmount?: number | null,
+    paymentStatus?: PaymentStatus | null,
+    paymentRefundProcessing?: boolean,
+    refundableViaProvider?: boolean,
   ) =>
     isCancelledLike(statusValue) &&
-    (!!paidAt || Number(refundAmount ?? 0) > 0) &&
-    !isRefundedState(statusValue, refundedAt);
+    Boolean(refundableViaProvider) &&
+    !paymentRefundProcessing &&
+    (!!paidAt || paymentStatus === 'SUCCESS' || paymentStatus === 'RECONCILING') &&
+    !isRefundedState(statusValue, paymentStatus);
   const shouldShowCancelFields = (statusValue: BookingStatus) =>
     statusValue !== BookingStatus.COMPLETED && statusValue !== BookingStatus.EXPIRED;
-  const resolvePaymentMethod = (
-    row: (typeof rows)[number] & { payment_method?: string | null; paymentMethod?: string | null },
-  ) => {
-    const raw = row.paymentMethod ?? row.payment_method ?? null;
-    const normalized = (raw ?? '').trim();
-    if (normalized) return normalized;
-    if (row.status === BookingStatus.CONFIRMED || row.status === BookingStatus.COMPLETED) {
-      return 'AUTO';
-    }
-    return 'N/A';
-  };
-
   return (
     <AdminShell
       title="Booking Management"
@@ -269,6 +267,14 @@ export default function AdminBookingsPage() {
                 start.getTime() <= now.getTime() &&
                 end.getTime() >= now.getTime();
               const displayStatus = isLive ? 'LIVE' : row.status;
+              const refundableViaProvider = (row as { refundableViaProvider?: boolean })
+                .refundableViaProvider;
+              const refundDisabledReason =
+                (
+                  row as {
+                    refundDisabledReason?: string | null;
+                  }
+                ).refundDisabledReason ?? 'Booking cannot be refunded via VNPay.';
               return (
                 <tr key={row.id} className="border-t border-slate-100">
                   <td className="px-6 py-4 font-semibold">{row.id.slice(0, 8)}</td>
@@ -315,7 +321,47 @@ export default function AdminBookingsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    {isRefundPending(row.status, row.paidAt, row.refundedAt, row.refundAmount) ? (
+                    {(row as { paymentRefundProcessing?: boolean }).paymentRefundProcessing ? (
+                      <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold tracking-wide text-indigo-700">
+                        REFUND_PROCESSING
+                      </span>
+                    ) : isRefundPending(
+                        row.status,
+                        row.paidAt,
+                        (row as { paymentStatus?: PaymentStatus | null }).paymentStatus ?? null,
+                        (row as { paymentRefundProcessing?: boolean }).paymentRefundProcessing ??
+                          false,
+                        refundableViaProvider ?? false,
+                      ) ? (
+                      <button
+                        title={!refundableViaProvider ? refundDisabledReason : undefined}
+                        disabled={!refundableViaProvider}
+                        className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-bold tracking-wide text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => {
+                          if (!refundableViaProvider) {
+                            toast.error(refundDisabledReason);
+                            return;
+                          }
+                          setRefundModal({
+                            id: row.id,
+                            amount: Number(row.totalPrice),
+                            name:
+                              (row as { customerName?: string }).customerName ??
+                              row.guestName ??
+                              'Customer',
+                            percent: 100,
+                            mode: 'PROVIDER',
+                          });
+                        }}
+                      >
+                        REFUND_PENDING
+                      </button>
+                    ) : isManualRefundEligibleStatus(row.status) &&
+                      !(row as { manualRefundRecorded?: boolean }).manualRefundRecorded &&
+                      !isRefundedState(
+                        row.status,
+                        (row as { paymentStatus?: PaymentStatus | null }).paymentStatus ?? null,
+                      ) ? (
                       <button
                         className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-bold tracking-wide text-amber-800 transition-colors hover:bg-amber-100"
                         onClick={() =>
@@ -326,12 +372,21 @@ export default function AdminBookingsPage() {
                               (row as { customerName?: string }).customerName ??
                               row.guestName ??
                               'Customer',
+                            percent: 100,
+                            mode: 'MANUAL',
                           })
                         }
                       >
-                        REFUND_PENDING
+                        MANUAL_REFUND_PENDING
                       </button>
-                    ) : isRefundedState(row.status, row.refundedAt) ? (
+                    ) : (row as { manualRefundRecorded?: boolean }).manualRefundRecorded ? (
+                      <span className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-bold tracking-wide text-emerald-700">
+                        MANUAL_REFUNDED
+                      </span>
+                    ) : isRefundedState(
+                        row.status,
+                        (row as { paymentStatus?: PaymentStatus | null }).paymentStatus ?? null,
+                      ) ? (
                       <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold tracking-wide text-emerald-700">
                         REFUNDED
                       </span>
@@ -366,9 +421,6 @@ export default function AdminBookingsPage() {
                           guestName: row.guestName ?? '',
                           guestPhone: row.guestPhone ?? '',
                           note: row.note ?? '',
-                          paymentMethod: resolvePaymentMethod(
-                            row as BookingWithPayment & { payment_method?: string | null },
-                          ),
                           cancelledReason: row.cancelledReason ?? 'customer_request',
                           cancellationNote: row.cancellationNote ?? '',
                           cancelledBy: (row.cancelledBy as CancelledBy) ?? CancelledBy.ADMIN,
@@ -418,10 +470,28 @@ export default function AdminBookingsPage() {
             </p>
             <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Refund amount</span>
+                <span className="text-slate-500">Refund max amount</span>
                 <span className="font-bold text-slate-900">
                   {formatCurrency(refundModal.amount)}
                 </span>
+              </div>
+              <div className="mt-3">
+                <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                  Refund Percent
+                </label>
+                <select
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={refundModal.percent}
+                  onChange={(e) =>
+                    setRefundModal((current) =>
+                      current ? { ...current, percent: Number(e.target.value) } : current,
+                    )
+                  }
+                >
+                  <option value={100}>100%</option>
+                  <option value={80}>80%</option>
+                  <option value={50}>50%</option>
+                </select>
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
@@ -429,15 +499,37 @@ export default function AdminBookingsPage() {
                 Cancel
               </Button>
               <Button
+                disabled={isRefundSubmitting}
                 onClick={async () => {
-                  await api.patch(`/admin/bookings/${refundModal.id}/refund`, {
-                    refundAmount: refundModal.amount,
-                  });
-                  setRefundModal(null);
-                  await refetch();
+                  try {
+                    setIsRefundSubmitting(true);
+                    if (refundModal.mode === 'PROVIDER') {
+                      await api.patch(`/payments/admin/bookings/${refundModal.id}/refund`, {
+                        percent: refundModal.percent,
+                        reason: 'admin_dashboard_refund',
+                      });
+                    } else {
+                      await api.patch(`/admin/bookings/${refundModal.id}/manual-refund`, {
+                        percent: refundModal.percent,
+                        reason: 'admin_manual_refund',
+                        note: 'Manual refund recorded by admin dashboard',
+                      });
+                    }
+                    toast.success('Refund requested successfully');
+                    setRefundModal(null);
+                    await refetch();
+                  } catch (error) {
+                    const message =
+                      error instanceof AxiosError
+                        ? (error.response?.data as { message?: string } | undefined)?.message
+                        : undefined;
+                    toast.error(message || 'Failed to process refund');
+                  } finally {
+                    setIsRefundSubmitting(false);
+                  }
                 }}
               >
-                Confirm Refunded
+                {isRefundSubmitting ? 'Processing...' : 'Confirm Refunded'}
               </Button>
             </div>
           </div>
@@ -469,18 +561,6 @@ export default function AdminBookingsPage() {
                   value={editModal.guestPhone}
                   onChange={(e) =>
                     setEditModal((m) => (m ? { ...m, guestPhone: e.target.value } : m))
-                  }
-                />
-              </label>
-              <label className="text-sm md:col-span-2">
-                <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                  Payment Method
-                </span>
-                <input
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  value={editModal.paymentMethod}
-                  onChange={(e) =>
-                    setEditModal((m) => (m ? { ...m, paymentMethod: e.target.value } : m))
                   }
                 />
               </label>
@@ -573,7 +653,6 @@ export default function AdminBookingsPage() {
                     await api.patch(`/admin/bookings/${editModal.id}`, {
                       guestName: editModal.guestName || null,
                       guestPhone: editModal.guestPhone || null,
-                      paymentMethod: editModal.paymentMethod || null,
                       note: editModal.note || null,
                       cancelledReason: editModal.cancelledReason || null,
                       cancellationNote: editModal.cancellationNote || null,

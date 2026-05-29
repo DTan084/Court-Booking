@@ -394,10 +394,6 @@ export class CourtsService {
       booking.cancellationNote = cancellationNote;
       if (prevStatus === BookingStatus.CONFIRMED) {
         booking.paidAt = booking.paidAt ?? now;
-        booking.paymentMethod = booking.paymentMethod ?? 'AUTO';
-        booking.refundAmount = Number(booking.totalPrice);
-      } else if (booking.paidAt) {
-        booking.refundAmount = booking.totalPrice;
       }
     }
     await this.dataSource.getRepository(BookingEntity).save(futureTargets);
