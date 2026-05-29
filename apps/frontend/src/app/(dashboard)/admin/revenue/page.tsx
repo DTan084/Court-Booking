@@ -9,6 +9,14 @@ import { useSportTypes } from '@/hooks/useSportTypes';
 import { formatCurrency } from '@/lib/utils';
 import { formatDateByTimezone } from '@/lib/datetime';
 
+const parseManualRefundAmount = (note?: string | null): number => {
+  if (!note || !note.includes('[MANUAL_REFUND]')) return 0;
+  const matched = note.match(/amount=([0-9]+(?:\.[0-9]+)?)/);
+  if (!matched?.[1]) return 0;
+  const parsed = Number(matched[1]);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export default function AdminRevenuePage() {
   const timezone = 'Asia/Ho_Chi_Minh';
   const locale = 'vi-VN';
@@ -36,7 +44,11 @@ export default function AdminRevenuePage() {
 
   const monthlyBookings = useMemo(() => monthlyBookingsData?.data ?? [], [monthlyBookingsData]);
   const recentBookings = useMemo(() => recentBookingsData?.data ?? [], [recentBookingsData]);
-  type BookingWithPayment = (typeof recentBookings)[number] & { paymentMethod?: string | null };
+  type BookingWithPayment = (typeof recentBookings)[number] & {
+    paymentProvider?: string | null;
+    manualRefundRecorded?: boolean;
+    paymentRefundAmount?: number | null;
+  };
   const recentMeta = recentBookingsData?.meta;
   const recentTotal = recentMeta?.total ?? 0;
   const recentPageCount = Math.max(1, recentMeta?.totalPages ?? 1);
@@ -45,10 +57,26 @@ export default function AdminRevenuePage() {
 
   const paidStatuses = [BookingStatus.CONFIRMED, BookingStatus.COMPLETED];
   const paidBookings = monthlyBookings.filter((b) => paidStatuses.includes(b.status));
-  const refundedBookings = monthlyBookings.filter((b) => !!b.refundedAt || !!b.refundAmount);
+  const refundedBookings = monthlyBookings.filter((b) => {
+    const paymentStatus = (b as { paymentStatus?: string | null }).paymentStatus;
+    const manualRefundRecorded = (b as { manualRefundRecorded?: boolean }).manualRefundRecorded;
+    return (
+      paymentStatus === 'REFUNDED' ||
+      paymentStatus === 'PARTIAL_REFUND' ||
+      manualRefundRecorded === true
+    );
+  });
 
   const grossRevenue = paidBookings.reduce((sum, b) => sum + Number(b.totalPrice), 0);
-  const refundTotal = refundedBookings.reduce((sum, b) => sum + Number(b.refundAmount ?? 0), 0);
+  const refundTotal = refundedBookings.reduce((sum, b) => {
+    const paymentRefundAmount = Number(
+      (b as { paymentRefundAmount?: number | null }).paymentRefundAmount ?? 0,
+    );
+    const manualRefundAmount = parseManualRefundAmount(
+      (b as { cancellationNote?: string | null }).cancellationNote,
+    );
+    return sum + Math.max(paymentRefundAmount, manualRefundAmount);
+  }, 0);
   const netProfit = Math.max(0, grossRevenue - refundTotal);
   const avgBookingValue = paidBookings.length > 0 ? grossRevenue / paidBookings.length : 0;
   const refundRate =
@@ -228,7 +256,8 @@ export default function AdminRevenuePage() {
                     </span>
                   </td>
                   <td className="px-4 py-4 text-sm text-slate-600">
-                    {(b as BookingWithPayment).paymentMethod ?? 'N/A'}
+                    {(b as BookingWithPayment).paymentProvider ??
+                      ((b as BookingWithPayment).manualRefundRecorded ? 'MANUAL' : 'N/A')}
                   </td>
                   <td className="px-8 py-4 text-right text-sm font-black text-slate-900">
                     {formatCurrency(Number(b.totalPrice))}

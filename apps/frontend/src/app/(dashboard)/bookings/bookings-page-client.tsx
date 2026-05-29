@@ -140,10 +140,19 @@ function BookingsPageContent() {
   const allBookings = (allBookingsData?.data ?? []) as BookingWithCourt[];
   const paidPastBookings = allBookings.filter((booking) => {
     const isPast = new Date(booking.endTime) < now;
-    const isPaidByTimestamp = !!booking.paidAt || !!booking.refundedAt;
+    const paymentStatus = (booking as BookingWithCourt & { paymentStatus?: string | null })
+      .paymentStatus;
+    const paymentRefundedAt = (booking as BookingWithCourt & { paymentRefundedAt?: string | null })
+      .paymentRefundedAt;
+    const isPaidByTimestamp = !!booking.paidAt || !!paymentRefundedAt;
     const isPaidByStatus =
       booking.status === BookingStatus.COMPLETED ||
-      (booking.status === BookingStatus.CANCELLED && (!!booking.refundedAt || !!booking.paidAt));
+      (booking.status === BookingStatus.CANCELLED &&
+        (!!booking.paidAt ||
+          paymentStatus === 'SUCCESS' ||
+          paymentStatus === 'RECONCILING' ||
+          paymentStatus === 'REFUNDED' ||
+          paymentStatus === 'PARTIAL_REFUND'));
     return isPast && (isPaidByTimestamp || isPaidByStatus);
   });
 
@@ -199,12 +208,29 @@ function BookingsPageContent() {
           booking.status === BookingStatus.CANCELLED && booking.cancelledBy === CancelledBy.USER;
         const isAdminCancelled =
           booking.status === BookingStatus.CANCELLED && booking.cancelledBy === CancelledBy.ADMIN;
-        const isCancelledPaid = booking.status === BookingStatus.CANCELLED && !!booking.paidAt;
+        const paymentStatus = (booking as BookingWithCourt & { paymentStatus?: string | null })
+          .paymentStatus;
+        const paymentRefundedAt = (
+          booking as BookingWithCourt & { paymentRefundedAt?: string | null }
+        ).paymentRefundedAt;
+        const paymentRefundProcessing = (
+          booking as BookingWithCourt & { paymentRefundProcessing?: boolean | null }
+        ).paymentRefundProcessing;
+        const isCancelledPaid =
+          booking.status === BookingStatus.CANCELLED &&
+          (!!booking.paidAt || paymentStatus === 'SUCCESS' || paymentStatus === 'RECONCILING');
         const refundPending =
           booking.status === BookingStatus.CANCELLED &&
-          !booking.refundedAt &&
-          (isSystemCancelled || isAdminCancelled || isCancelledPaid);
-        const refundProcessed = booking.status === BookingStatus.CANCELLED && !!booking.refundedAt;
+          !paymentRefundedAt &&
+          (isSystemCancelled ||
+            isAdminCancelled ||
+            isCancelledPaid ||
+            paymentRefundProcessing === true);
+        const refundProcessed =
+          booking.status === BookingStatus.CANCELLED &&
+          (!!paymentRefundedAt ||
+            paymentStatus === 'REFUNDED' ||
+            paymentStatus === 'PARTIAL_REFUND');
         const title = booking.court?.name ?? 'Unknown court';
         const isVenueDeleted = booking.court?.deletedAt != null;
         const isVenueUnavailable = booking.court?.status === CourtStatus.INACTIVE;

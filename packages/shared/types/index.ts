@@ -155,8 +155,6 @@ export interface Booking {
   cancelledBy?: CancelledBy | null;
   cancelledReason?: string | null;
   cancellationNote?: string | null;
-  refundedAt?: string | null;
-  refundAmount?: number | null;
   guestName?: string | null;
   guestPhone?: string | null;
   cancelledAt: string | null;

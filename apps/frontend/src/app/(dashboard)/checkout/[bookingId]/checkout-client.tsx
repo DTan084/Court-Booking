@@ -43,6 +43,17 @@ const checkoutSteps: Array<{ key: Step; label: string }> = [
   { key: 'confirmation', label: 'Confirmation' },
 ];
 
+const deriveBannerFromVnpReturn = (
+  responseCode: string | null,
+  transactionStatus: string | null,
+): 'PROCESSING' | 'FAILED' | 'CANCELLED' | null => {
+  if (!responseCode && !transactionStatus) return null;
+  if (responseCode === '24' || transactionStatus === '24') return 'CANCELLED';
+  if (responseCode && responseCode !== '00') return 'FAILED';
+  if (transactionStatus && transactionStatus !== '00') return 'FAILED';
+  return 'PROCESSING';
+};
+
 function CheckoutSidebar({ step }: { step: Step }) {
   const stepIcons: Record<Step, React.ReactNode> = {
     review: <CheckCircle2 className="h-4 w-4" />,
@@ -137,12 +148,20 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   const reconcilePayment = useReconcilePayment();
 
   React.useEffect(() => {
+    returnReconcileTriggeredRef.current = false;
+  }, [currentPaymentId]);
+
+  React.useEffect(() => {
     const paymentIdFromQuery = searchParams.get('paymentId');
     const providerOrderIdFromQuery = searchParams.get('vnp_TxnRef');
+    const returnBanner = deriveBannerFromVnpReturn(
+      searchParams.get('vnp_ResponseCode'),
+      searchParams.get('vnp_TransactionStatus'),
+    );
     if (paymentIdFromQuery) {
       setCurrentPaymentId(paymentIdFromQuery);
       setStep('payment');
-      setPaymentStateBanner('PROCESSING');
+      setPaymentStateBanner(returnBanner ?? 'PROCESSING');
       return;
     }
 
@@ -160,7 +179,7 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
           setCurrentPaymentId(persisted.paymentId);
           setCurrentProviderOrderId(persisted.providerOrderId ?? null);
           setStep('payment');
-          setPaymentStateBanner('PROCESSING');
+          setPaymentStateBanner(returnBanner ?? 'PROCESSING');
           return;
         }
       } catch {
@@ -171,7 +190,7 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
     if (providerOrderIdFromQuery) {
       setCurrentProviderOrderId(providerOrderIdFromQuery);
       setStep('payment');
-      setPaymentStateBanner('RECONCILING');
+      setPaymentStateBanner(returnBanner ?? 'RECONCILING');
     }
   }, [bookingId, searchParams]);
 
@@ -182,7 +201,7 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
     const transactionStatus = searchParams.get('vnp_TransactionStatus');
     if (!currentPaymentId) return;
 
-    if (responseCode === '00' && (transactionStatus === '00' || !transactionStatus)) {
+    if (responseCode || transactionStatus) {
       returnReconcileTriggeredRef.current = true;
       reconcilePayment.mutate(currentPaymentId);
     }
@@ -202,6 +221,10 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
   React.useEffect(() => {
     const status = paymentStatusQuery.data?.paymentStatus;
     const bookingStatus = paymentStatusQuery.data?.bookingStatus;
+    const returnBanner = deriveBannerFromVnpReturn(
+      searchParams.get('vnp_ResponseCode'),
+      searchParams.get('vnp_TransactionStatus'),
+    );
     if (!status) return;
 
     if (status === 'SUCCESS' && bookingStatus === BookingStatus.CONFIRMED) {
@@ -241,8 +264,12 @@ export function CheckoutClient({ bookingId }: CheckoutClientProps) {
       setPaymentStateBanner('RECONCILING');
       return;
     }
+    if (returnBanner === 'FAILED' || returnBanner === 'CANCELLED') {
+      setPaymentStateBanner(returnBanner);
+      return;
+    }
     setPaymentStateBanner('PROCESSING');
-  }, [bookingId, currentPaymentId, currentProviderOrderId, paymentStatusQuery.data]);
+  }, [bookingId, currentPaymentId, currentProviderOrderId, paymentStatusQuery.data, searchParams]);
 
   const bookingDaySlots = React.useMemo(() => {
     if (!booking || !timeSlots?.length) return [];

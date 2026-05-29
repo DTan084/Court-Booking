@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { Button } from '@/components/ui/button';
 import { useCourts } from '@/hooks/useCourts';
@@ -18,6 +19,7 @@ type SelectedSlot = {
 };
 
 export default function AdminNewBookingPage() {
+  const router = useRouter();
   const [courtId, setCourtId] = useState('');
   const [date, setDate] = useState(formatDate(new Date()));
   const [selected, setSelected] = useState<SelectedSlot | null>(null);
@@ -30,7 +32,7 @@ export default function AdminNewBookingPage() {
   const courts = courtsData?.data ?? [];
   const { data: schedule } = useSchedule(courtId, date);
   const { data: timeSlots } = useTimeSlots(courtId);
-  const { mutate: createAdminBooking, isPending } = useCreateAdminBooking();
+  const { mutateAsync: createAdminBooking, isPending } = useCreateAdminBooking();
 
   const bookedRanges = useMemo(() => {
     if (!schedule) return [];
@@ -40,19 +42,31 @@ export default function AdminNewBookingPage() {
     }));
   }, [schedule]);
 
-  const availableSlots = useMemo(() => {
+  const slotsWithState = useMemo(() => {
     if (!timeSlots) return [];
     const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
     const slots = timeSlots.filter((s) => s.dayOfWeek === dayOfWeek);
-    return slots.filter((slot) => {
+    const now = new Date();
+    const isSelectedDayToday = formatDate(now) === date;
+
+    return slots.map((slot) => {
       const overlap = bookedRanges.some(
         (range) => slot.startHour < range.end && slot.endHour > range.start,
       );
-      return !overlap;
+      const slotStart = new Date(
+        `${date}T${String(slot.startHour).padStart(2, '0')}:00:00`,
+      ).getTime();
+      const isPast = isSelectedDayToday && slotStart <= now.getTime();
+
+      return {
+        ...slot,
+        blockedByBooking: overlap,
+        blockedByPast: isPast,
+      };
     });
   }, [timeSlots, date, bookedRanges]);
 
-  const submit = () => {
+  const submit = async () => {
     if (!courtId || !selected) {
       toast.error('Please select court and timeslot');
       return;
@@ -61,17 +75,25 @@ export default function AdminNewBookingPage() {
       toast.error('Guest name is required for manual booking');
       return;
     }
-    createAdminBooking({
-      courtId,
-      startTime: new Date(
-        `${date}T${String(selected.startHour).padStart(2, '0')}:00:00`,
-      ).toISOString(),
-      endTime: new Date(`${date}T${String(selected.endHour).padStart(2, '0')}:00:00`).toISOString(),
-      guestName: guestName.trim(),
-      guestPhone: guestPhone || undefined,
-      note: note || undefined,
-      bookingSource,
-    });
+    try {
+      const created = await createAdminBooking({
+        courtId,
+        startTime: new Date(
+          `${date}T${String(selected.startHour).padStart(2, '0')}:00:00`,
+        ).toISOString(),
+        endTime: new Date(
+          `${date}T${String(selected.endHour).padStart(2, '0')}:00:00`,
+        ).toISOString(),
+        guestName: guestName.trim(),
+        guestPhone: guestPhone || undefined,
+        note: note || undefined,
+        bookingSource,
+      });
+      toast.success('Booking created. Redirecting to booking list...');
+      router.push(`/admin/bookings?search=${encodeURIComponent(created.id)}`);
+    } catch {
+      // error toast handled in hook/global interceptor
+    }
   };
 
   return (
@@ -143,17 +165,19 @@ export default function AdminNewBookingPage() {
           {!courtsLoading && courts.length === 0 && (
             <p className="mb-3 text-sm text-rose-600">No courts found from DB.</p>
           )}
-          {availableSlots.length === 0 ? (
+          {slotsWithState.length === 0 ? (
             <p className="text-sm text-slate-500">No available slot</p>
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {availableSlots.map((slot) => {
+              {slotsWithState.map((slot) => {
                 const active =
                   selected?.startHour === slot.startHour && selected?.endHour === slot.endHour;
+                const blocked = slot.blockedByBooking || slot.blockedByPast;
                 return (
                   <button
                     key={`${slot.id}-${slot.startHour}-${slot.endHour}`}
                     type="button"
+                    disabled={blocked}
                     onClick={() =>
                       setSelected({
                         startHour: slot.startHour,
@@ -162,9 +186,11 @@ export default function AdminNewBookingPage() {
                       })
                     }
                     className={`rounded-lg border px-3 py-2 text-left text-sm ${
-                      active
-                        ? 'border-[#944a00] bg-orange-50 text-[#944a00]'
-                        : 'border-slate-300 bg-white text-slate-700 hover:border-orange-400'
+                      blocked
+                        ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                        : active
+                          ? 'border-[#944a00] bg-orange-50 text-[#944a00]'
+                          : 'border-slate-300 bg-white text-slate-700 hover:border-orange-400'
                     }`}
                   >
                     <p className="font-semibold">
@@ -172,6 +198,8 @@ export default function AdminNewBookingPage() {
                       {String(slot.endHour).padStart(2, '0')}:00
                     </p>
                     <p className="text-xs">{formatCurrency(Number(slot.price))}</p>
+                    {slot.blockedByBooking && <p className="text-xs font-medium">Booked</p>}
+                    {slot.blockedByPast && <p className="text-xs font-medium">Past</p>}
                   </button>
                 );
               })}
