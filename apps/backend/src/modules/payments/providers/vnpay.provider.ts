@@ -142,6 +142,9 @@ export class VNPayProvider implements PaymentProviderAdapter {
       vnp_CreateDate: this.toVnpDate(new Date()),
       vnp_IpAddr: '127.0.0.1',
     };
+    if (paymentRef.providerTxnId) {
+      payload.vnp_TransactionNo = paymentRef.providerTxnId;
+    }
     payload.vnp_SecureHash = this.signPipe(payload, [
       'vnp_RequestId',
       'vnp_Version',
@@ -155,6 +158,20 @@ export class VNPayProvider implements PaymentProviderAdapter {
     ]);
 
     const response = await this.postJson(this.paymentCfg.vnpay.queryUrl, payload);
+    const verified = this.verifyTransactionApiResponse(response, 'querydr');
+    if (!verified) {
+      return {
+        paymentStatus: 'PROCESSING',
+        raw: {
+          ...response,
+          normalized: {
+            mappedPaymentStatus: 'PROCESSING',
+            signatureVerified: false,
+            note: 'Invalid secure hash in VNPay query response',
+          },
+        },
+      };
+    }
     const responseCode = String(response.vnp_ResponseCode || '');
     const transactionStatus = String(response.vnp_TransactionStatus || '');
     const paymentStatus = this.mapQueryStatus(responseCode, transactionStatus);
@@ -205,13 +222,14 @@ export class VNPayProvider implements PaymentProviderAdapter {
 
     const originalAmount = Number(paymentRef.metadata?.vnp_Amount || 0);
     const refundAmount = amount ? Math.round(amount * 100) : originalAmount;
+    const isFullRefund = refundAmount >= originalAmount;
     const requestId = randomUUID().replace(/-/g, '');
     const payload: Record<string, string> = {
       vnp_RequestId: requestId,
       vnp_Version: this.version,
       vnp_Command: 'refund',
       vnp_TmnCode: this.paymentCfg.vnpay.tmnCode,
-      vnp_TransactionType: amount ? '03' : '02',
+      vnp_TransactionType: isFullRefund ? '02' : '03',
       vnp_TxnRef: paymentRef.providerOrderId,
       vnp_Amount: String(refundAmount),
       vnp_TransactionNo: paymentRef.providerTxnId,
@@ -238,21 +256,87 @@ export class VNPayProvider implements PaymentProviderAdapter {
     ]);
 
     const response = await this.postJson(this.paymentCfg.vnpay.refundUrl, payload);
+    const verified = this.verifyTransactionApiResponse(response, 'refund');
+    if (!verified) {
+      return {
+        status: 'FAILED',
+        raw: {
+          ...response,
+          normalized: {
+            mappedRefundStatus: 'FAILED',
+            signatureVerified: false,
+            note: 'Invalid secure hash in VNPay refund response',
+          },
+        },
+      };
+    }
     const responseCode = String(response.vnp_ResponseCode || '');
     const txStatus = String(response.vnp_TransactionStatus || '');
-    const success = responseCode === '00' && txStatus === '00';
+    const refundStatus = this.mapRefundStatus(responseCode, txStatus, isFullRefund);
 
     return {
-      status: success ? (amount ? 'PARTIAL_REFUND' : 'REFUNDED') : 'FAILED',
+      status: refundStatus,
       raw: {
         ...response,
         normalized: {
           responseCode,
           transactionStatus: txStatus,
-          mappedRefundStatus: success ? (amount ? 'PARTIAL_REFUND' : 'REFUNDED') : 'FAILED',
+          mappedRefundStatus: refundStatus,
         },
       },
     };
+  }
+
+  private mapRefundStatus(
+    responseCode: string,
+    transactionStatus: string,
+    isFullRefund: boolean,
+  ): 'REFUNDED' | 'PARTIAL_REFUND' | 'PROCESSING' | 'FAILED' {
+    if (responseCode === '94') return 'PROCESSING';
+    if (responseCode !== '00') return 'FAILED';
+    if (transactionStatus === '00') return isFullRefund ? 'REFUNDED' : 'PARTIAL_REFUND';
+    if (transactionStatus === '05' || transactionStatus === '06' || transactionStatus === '01') {
+      return 'PROCESSING';
+    }
+    return 'FAILED';
+  }
+
+  private verifyTransactionApiResponse(
+    response: Record<string, unknown>,
+    command: 'querydr' | 'refund',
+  ): boolean {
+    const secureHash = String(response.vnp_SecureHash || '');
+    if (!secureHash || !this.paymentCfg.vnpay.hashSecret) return false;
+
+    const common = [
+      String(response.vnp_ResponseId || ''),
+      String(response.vnp_Command || command),
+      String(response.vnp_ResponseCode || ''),
+      String(response.vnp_Message || ''),
+      String(response.vnp_TmnCode || ''),
+      String(response.vnp_TxnRef || ''),
+      String(response.vnp_Amount || ''),
+      String(response.vnp_BankCode || ''),
+      String(response.vnp_PayDate || ''),
+      String(response.vnp_TransactionNo || ''),
+      String(response.vnp_TransactionType || ''),
+      String(response.vnp_TransactionStatus || ''),
+      String(response.vnp_OrderInfo || ''),
+    ];
+
+    const fields =
+      command === 'querydr'
+        ? [
+            ...common,
+            String(response.vnp_PromotionCode || ''),
+            String(response.vnp_PromotionAmount || ''),
+          ]
+        : common;
+    const data = fields.join('|');
+    const expected = createHmac('sha512', this.paymentCfg.vnpay.hashSecret)
+      .update(data)
+      .digest('hex');
+    return expected.toLowerCase() === secureHash.toLowerCase();
   }
 
   private buildSignedPaymentUrl(params: Record<string, string>) {

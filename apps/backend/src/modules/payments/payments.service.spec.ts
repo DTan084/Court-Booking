@@ -11,6 +11,7 @@ import { PaymentEventEntity } from '../../database/entities/payment-event.entity
 import { BookingEntity } from '../../database/entities/booking.entity';
 import paymentsConfig from '../../config/payments.config';
 import { VNPayProvider } from './providers/vnpay.provider';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -74,6 +75,7 @@ describe('PaymentsService', () => {
         { provide: 'REDIS_CLIENT', useValue: { set: jest.fn().mockResolvedValue('OK') } },
         { provide: DataSource, useFactory: mockDataSource },
         { provide: VNPayProvider, useFactory: mockProvider },
+        { provide: NotificationsService, useValue: { create: jest.fn().mockResolvedValue({}) } },
       ],
     }).compile();
 
@@ -822,6 +824,60 @@ describe('PaymentsService', () => {
       await expect(
         service.handleManualReviewAction('payment-x', { action: 'RESOLVE' }, 'admin-3'),
       ).rejects.toThrow('Payment is not in manual review queue');
+    });
+  });
+
+  describe('refundByBooking', () => {
+    it('refunds via linked successfulPaymentId', async () => {
+      const bookingRepository = (service as any).bookingRepository;
+      bookingRepository.findOne.mockResolvedValue({
+        id: 'booking-rf-1',
+        status: BookingStatus.CANCELLED,
+        successfulPaymentId: 'payment-rf-1',
+      });
+
+      paymentRepository.findOne
+        .mockResolvedValueOnce({
+          id: 'payment-rf-1',
+          providerCode: 'VNPAY',
+          providerOrderId: 'VNPAY-payment-rf-1',
+          providerTxnId: 'txn-rf-1',
+          providerRaw: { vnp_CreateDate: '20260525090000', vnp_Amount: 10000000 },
+          amount: 100000,
+          status: PaymentStatus.SUCCESS,
+        })
+        .mockResolvedValueOnce({
+          id: 'payment-rf-1',
+          providerCode: 'VNPAY',
+          providerOrderId: 'VNPAY-payment-rf-1',
+          providerTxnId: 'txn-rf-1',
+          providerRaw: { vnp_CreateDate: '20260525090000', vnp_Amount: 10000000 },
+          amount: 100000,
+          status: PaymentStatus.SUCCESS,
+        });
+      (service as any).providers.VNPAY.refund.mockResolvedValue({
+        status: 'REFUNDED',
+        raw: { ok: true },
+      });
+      const eventRepository = (service as any).paymentEventRepository;
+      eventRepository.create.mockImplementation((v: any) => v);
+      eventRepository.save.mockResolvedValue({});
+
+      const result = await service.refundByBooking('booking-rf-1', {});
+      expect(result.status).toBe(PaymentStatus.REFUNDED);
+    });
+
+    it('rejects refund when booking is not cancelled or expired', async () => {
+      const bookingRepository = (service as any).bookingRepository;
+      bookingRepository.findOne.mockResolvedValue({
+        id: 'booking-rf-2',
+        status: BookingStatus.PENDING_PAYMENT,
+        successfulPaymentId: null,
+      });
+
+      await expect(service.refundByBooking('booking-rf-2', {})).rejects.toThrow(
+        'Booking must be CANCELLED/EXPIRED before refund',
+      );
     });
   });
 });

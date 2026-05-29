@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, LessThan, Repository } from 'typeorm';
-import { BookingStatus } from '@court-booking/shared';
+import { BookingStatus, NotificationType } from '@court-booking/shared';
 import { BookingEntity } from '../../database/entities/booking.entity';
 import { PaymentEntity, PaymentStatus } from '../../database/entities/payment.entity';
 import {
@@ -24,6 +24,7 @@ import paymentsConfig from '../../config/payments.config';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import Redis from 'ioredis';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
@@ -46,6 +47,7 @@ export class PaymentsService {
     @Inject('REDIS_CLIENT')
     private readonly redis: Redis,
     private readonly dataSource: DataSource,
+    private readonly notificationsService: NotificationsService,
     vnpayProvider: VNPayProvider,
   ) {
     this.providers = {
@@ -410,24 +412,106 @@ export class PaymentsService {
     const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
     if (!payment) throw new NotFoundException('Payment not found');
 
+    if (![PaymentStatus.SUCCESS, PaymentStatus.PARTIAL_REFUND].includes(payment.status)) {
+      throw new BadRequestException(
+        `Payment is not refundable in state ${payment.status}. Expected SUCCESS/PARTIAL_REFUND.`,
+      );
+    }
+
+    const totalAmount = Number(payment.amount);
+    const alreadyRefunded = Number(payment.refundAmount ?? 0);
+    const maxRefundable = Number((totalAmount - alreadyRefunded).toFixed(2));
+    if (maxRefundable <= 0) {
+      throw new BadRequestException('Payment has no refundable amount remaining.');
+    }
+
+    const requestedAmountFromPercent =
+      payload.percent !== undefined
+        ? Number(((maxRefundable * payload.percent) / 100).toFixed(2))
+        : undefined;
+    const requestedAmount = Number(
+      (payload.amount ?? requestedAmountFromPercent ?? maxRefundable).toFixed(2),
+    );
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      throw new BadRequestException('Refund amount must be greater than 0.');
+    }
+    if (requestedAmount > maxRefundable) {
+      throw new BadRequestException(
+        `Refund amount exceeds remaining refundable amount (${maxRefundable.toLocaleString('vi-VN')} VND).`,
+      );
+    }
+
     const result = await this.providers[payment.providerCode as PaymentProviderCode].refund(
       {
         providerOrderId: payment.providerOrderId,
         providerTxnId: payment.providerTxnId,
         metadata: payment.providerRaw,
       },
-      payload.amount,
+      requestedAmount,
     );
+
+    if (result.status === 'FAILED') {
+      await this.paymentEventRepository.save(
+        this.paymentEventRepository.create({
+          paymentId: payment.id,
+          eventType: 'REFUND_OUT',
+          direction: PaymentEventDirection.OUT,
+          payload: result.raw,
+        }),
+      );
+      throw new BadRequestException('Provider refund failed. Please reconcile or retry later.');
+    }
+
+    if (result.status === 'PROCESSING') {
+      payment.providerRaw = {
+        ...(payment.providerRaw ?? {}),
+        refund: {
+          status: 'PROCESSING',
+          updatedAt: new Date().toISOString(),
+        },
+      };
+      await this.paymentRepository.save(payment);
+      await this.paymentEventRepository.save(
+        this.paymentEventRepository.create({
+          paymentId: payment.id,
+          eventType: 'REFUND_OUT',
+          direction: PaymentEventDirection.OUT,
+          payload: result.raw,
+        }),
+      );
+      await this.enqueueReconcile(payment.id);
+      return {
+        paymentId: payment.id,
+        status: payment.status,
+        refundedAt: payment.refundedAt,
+        refundAmount: payment.refundAmount,
+        processing: true,
+      };
+    }
 
     if (result.status === 'REFUNDED') {
       payment.status = PaymentStatus.REFUNDED;
       payment.refundedAt = new Date();
-      payment.refundAmount = Number(payment.amount);
+      payment.refundAmount = totalAmount;
+      payment.providerRaw = {
+        ...(payment.providerRaw ?? {}),
+        refund: {
+          status: 'REFUNDED',
+          updatedAt: new Date().toISOString(),
+        },
+      };
     }
     if (result.status === 'PARTIAL_REFUND') {
       payment.status = PaymentStatus.PARTIAL_REFUND;
       payment.refundedAt = new Date();
-      payment.refundAmount = payload.amount ?? null;
+      payment.refundAmount = Number((alreadyRefunded + requestedAmount).toFixed(2));
+      payment.providerRaw = {
+        ...(payment.providerRaw ?? {}),
+        refund: {
+          status: 'PARTIAL_REFUND',
+          updatedAt: new Date().toISOString(),
+        },
+      };
     }
     await this.paymentRepository.save(payment);
 
@@ -440,12 +524,49 @@ export class PaymentsService {
       }),
     );
 
+    await this.sendRefundProcessedNotification(payment.bookingId, requestedAmount);
+
     return {
       paymentId: payment.id,
       status: payment.status,
       refundedAt: payment.refundedAt,
       refundAmount: payment.refundAmount,
     };
+  }
+
+  async refundByBooking(bookingId: string, payload: RefundPaymentDto) {
+    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (![BookingStatus.CANCELLED, BookingStatus.EXPIRED].includes(booking.status)) {
+      throw new BadRequestException(
+        `Booking must be CANCELLED/EXPIRED before refund (current: ${booking.status})`,
+      );
+    }
+
+    let paymentId = booking.successfulPaymentId ?? null;
+    if (!paymentId) {
+      const fallbackPayment = await this.paymentRepository.findOne({
+        where: {
+          bookingId: booking.id,
+          status: In([
+            PaymentStatus.SUCCESS,
+            PaymentStatus.RECONCILING,
+            PaymentStatus.PARTIAL_REFUND,
+            PaymentStatus.REFUNDED,
+          ]),
+        },
+        order: { createdAt: 'DESC' },
+      });
+      paymentId = fallbackPayment?.id ?? null;
+    }
+
+    if (!paymentId) {
+      throw new BadRequestException(
+        'Cannot refund booking without linked successful payment. Reconcile payment first.',
+      );
+    }
+
+    return this.refund(paymentId, payload);
   }
 
   async handleWebhook(
@@ -486,7 +607,7 @@ export class PaymentsService {
         ) &&
         incomingStatus === payment.status
       ) {
-        return { ok: true, paymentId: payment.id, status: payment.status };
+        return { ok: true, paymentId: payment.id, status: payment.status, bookingConfirmed: false };
       }
 
       await manager.save(
@@ -544,7 +665,7 @@ export class PaymentsService {
           payment.status = PaymentStatus.RECONCILING;
           await manager.save(payment);
         }
-        return { ok: true, paymentId: payment.id, status: payment.status };
+        return { ok: true, paymentId: payment.id, status: payment.status, bookingConfirmed: false };
       }
 
       if (incomingStatus === PaymentStatus.SUCCESS) {
@@ -562,12 +683,17 @@ export class PaymentsService {
 
       await manager.save(payment);
 
-      if (payment.status === PaymentStatus.SUCCESS) {
-        await this.convergeBookingForSuccessfulPayment(manager, payment);
-      }
+      const bookingConfirmed =
+        payment.status === PaymentStatus.SUCCESS
+          ? await this.convergeBookingForSuccessfulPayment(manager, payment)
+          : false;
 
-      return { ok: true, paymentId: payment.id, status: payment.status };
+      return { ok: true, paymentId: payment.id, status: payment.status, bookingConfirmed };
     });
+
+    if (txResult.bookingConfirmed) {
+      await this.sendBookingConfirmedNotification(txResult.paymentId);
+    }
 
     if (txResult.status === PaymentStatus.RECONCILING) {
       await this.enqueueApplySuccessfulPayment(txResult.paymentId);
@@ -724,14 +850,19 @@ export class PaymentsService {
 
       await manager.save(lockedPayment);
 
-      if (lockedPayment.status === PaymentStatus.SUCCESS) {
-        await this.convergeBookingForSuccessfulPayment(manager, lockedPayment);
-      }
+      const bookingConfirmed =
+        lockedPayment.status === PaymentStatus.SUCCESS
+          ? await this.convergeBookingForSuccessfulPayment(manager, lockedPayment)
+          : false;
 
-      return lockedPayment;
+      return { payment: lockedPayment, bookingConfirmed };
     });
 
-    return { paymentId: updated.id, status: updated.status };
+    if (updated.bookingConfirmed) {
+      await this.sendBookingConfirmedNotification(updated.payment.id);
+    }
+
+    return { paymentId: updated.payment.id, status: updated.payment.status };
   }
 
   async applySuccessfulPayment(paymentId: string) {
@@ -748,7 +879,7 @@ export class PaymentsService {
         payment.status !== PaymentStatus.SUCCESS &&
         payment.status !== PaymentStatus.RECONCILING
       ) {
-        return payment;
+        return { payment, bookingConfirmed: false };
       }
 
       if (payment.status === PaymentStatus.RECONCILING) {
@@ -757,11 +888,15 @@ export class PaymentsService {
         await manager.save(payment);
       }
 
-      await this.convergeBookingForSuccessfulPayment(manager, payment);
-      return payment;
+      const bookingConfirmed = await this.convergeBookingForSuccessfulPayment(manager, payment);
+      return { payment, bookingConfirmed };
     });
 
-    return { paymentId: updated.id, status: updated.status };
+    if (updated.bookingConfirmed) {
+      await this.sendBookingConfirmedNotification(updated.payment.id);
+    }
+
+    return { paymentId: updated.payment.id, status: updated.payment.status };
   }
 
   async refundOrphanSuccess(paymentId: string) {
@@ -881,10 +1016,68 @@ export class PaymentsService {
     return result;
   }
 
+  async markTestRefundSuccess(paymentId: string, amount?: number) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new BadRequestException('Test refund hook is disabled in production');
+    }
+
+    const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
+    if (!payment) throw new NotFoundException('Payment not found');
+
+    const totalAmount = Number(payment.amount);
+    const requestedAmount = Number((amount ?? totalAmount).toFixed(2));
+    if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) {
+      throw new BadRequestException('Refund amount must be greater than 0.');
+    }
+    if (requestedAmount > totalAmount) {
+      throw new BadRequestException(
+        `Refund amount exceeds payment amount (${totalAmount.toLocaleString('vi-VN')} VND).`,
+      );
+    }
+
+    const fullRefund = requestedAmount >= totalAmount;
+    payment.status = fullRefund ? PaymentStatus.REFUNDED : PaymentStatus.PARTIAL_REFUND;
+    payment.refundedAt = new Date();
+    payment.refundAmount = fullRefund
+      ? totalAmount
+      : Number((Number(payment.refundAmount ?? 0) + requestedAmount).toFixed(2));
+    payment.providerRaw = {
+      ...(payment.providerRaw ?? {}),
+      refund: {
+        status: fullRefund ? 'REFUNDED' : 'PARTIAL_REFUND',
+        source: 'TEST_HOOK',
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    await this.paymentRepository.save(payment);
+    await this.paymentEventRepository.save(
+      this.paymentEventRepository.create({
+        paymentId: payment.id,
+        eventType: 'REFUND_OUT',
+        direction: PaymentEventDirection.OUT,
+        payload: {
+          source: 'TEST_HOOK',
+          amount: requestedAmount,
+          status: payment.status,
+        },
+      }),
+    );
+
+    await this.sendRefundProcessedNotification(payment.bookingId, requestedAmount);
+
+    return {
+      paymentId: payment.id,
+      status: payment.status,
+      refundedAt: payment.refundedAt,
+      refundAmount: payment.refundAmount,
+      source: 'TEST_HOOK',
+    };
+  }
+
   private async convergeBookingForSuccessfulPayment(
     manager: EntityManager,
     payment: PaymentEntity,
-  ) {
+  ): Promise<boolean> {
     const booking = await manager.findOne(BookingEntity, {
       where: { id: payment.bookingId },
       lock: { mode: 'pessimistic_write' },
@@ -893,7 +1086,7 @@ export class PaymentsService {
     if (!booking) {
       payment.status = PaymentStatus.RECONCILING;
       await manager.save(payment);
-      return;
+      return false;
     }
 
     if (booking.status === BookingStatus.PENDING_PAYMENT) {
@@ -901,7 +1094,7 @@ export class PaymentsService {
       booking.paidAt = booking.paidAt ?? new Date();
       booking.successfulPaymentId = payment.id;
       await manager.save(booking);
-      return;
+      return true;
     }
 
     if (booking.status === BookingStatus.CONFIRMED) {
@@ -914,12 +1107,74 @@ export class PaymentsService {
         booking.paidAt = booking.paidAt ?? new Date();
         await manager.save(booking);
       }
-      return;
+      return false;
     }
 
     // Financially successful payment but booking is not in convergable state.
     payment.status = PaymentStatus.RECONCILING;
     await manager.save(payment);
+    return false;
+  }
+
+  private async sendBookingConfirmedNotification(paymentId: string): Promise<void> {
+    try {
+      const payment = await this.paymentRepository.findOne({ where: { id: paymentId } });
+      if (!payment) return;
+
+      const booking = await this.bookingRepository.findOne({
+        where: { id: payment.bookingId },
+        relations: ['court'],
+      });
+      if (!booking?.userId) return;
+
+      const start = new Date(booking.startTime);
+      const startTimeStr = start.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const startDateStr = start.toLocaleDateString('vi-VN');
+
+      await this.notificationsService.create({
+        userId: booking.userId,
+        type: NotificationType.BOOKING_CONFIRMED,
+        title: 'Booking Confirmed',
+        message: `You have successfully booked ${booking.court?.name || 'your court'} at ${startTimeStr} on ${startDateStr}.`,
+        bookingId: booking.id,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to send booking confirmed notification for paymentId=${paymentId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async sendRefundProcessedNotification(
+    bookingId: string,
+    refundAmount: number,
+  ): Promise<void> {
+    try {
+      const booking = await this.bookingRepository.findOne({
+        where: { id: bookingId },
+        relations: ['court'],
+      });
+      if (!booking?.userId) return;
+
+      await this.notificationsService.create({
+        userId: booking.userId,
+        type: NotificationType.REFUND_PROCESSED,
+        title: 'Refund processed',
+        message: `A refund of ${Number(refundAmount || 0).toLocaleString('vi-VN')} VND for your booking at ${booking.court?.name || 'your court'} has been processed.`,
+        bookingId,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to send refund notification for bookingId=${bookingId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private mapIncomingPaymentStatus(

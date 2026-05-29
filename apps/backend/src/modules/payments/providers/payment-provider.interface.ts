@@ -24,7 +24,7 @@ export interface VerifyWebhookResult {
 }
 
 export interface RefundResult {
-  status: 'REFUNDED' | 'PARTIAL_REFUND' | 'FAILED';
+  status: 'REFUNDED' | 'PARTIAL_REFUND' | 'PROCESSING' | 'FAILED';
   raw: Record<string, unknown>;
 }
 

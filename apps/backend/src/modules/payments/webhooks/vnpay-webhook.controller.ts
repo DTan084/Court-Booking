@@ -9,10 +9,12 @@ import {
   NotFoundException,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { PaymentsService } from '../payments.service';
 import { Logger } from '@nestjs/common';
+import { Response } from 'express';
 
 type VnpIpnResponse = { RspCode: '00' | '01' | '02' | '04' | '97' | '99'; Message: string };
 
@@ -29,6 +31,7 @@ export class VNPayWebhookController {
     @Body() body: Record<string, unknown>,
     @Headers() headers: Record<string, string>,
     @Ip() ip: string,
+    @Res() res: Response,
   ) {
     this.logger.log(
       JSON.stringify({
@@ -51,7 +54,7 @@ export class VNPayWebhookController {
           rspCode: '00',
         }),
       );
-      return { RspCode: '00', Message: 'Confirm Success' };
+      return res.status(200).json({ RspCode: '00', Message: 'Confirm Success' });
     } catch (error) {
       const mapped = this.mapToVnpIpnResponse(error);
       this.logger.warn(
@@ -64,7 +67,7 @@ export class VNPayWebhookController {
           message: mapped.Message,
         }),
       );
-      return mapped;
+      return res.status(200).json(mapped);
     }
   }
 
@@ -75,6 +78,7 @@ export class VNPayWebhookController {
     @Query() query: Record<string, unknown>,
     @Headers() headers: Record<string, string>,
     @Ip() ip: string,
+    @Res() res: Response,
   ) {
     this.logger.log(
       JSON.stringify({
@@ -97,7 +101,7 @@ export class VNPayWebhookController {
           rspCode: '00',
         }),
       );
-      return { RspCode: '00', Message: 'Confirm Success' };
+      return res.status(200).json({ RspCode: '00', Message: 'Confirm Success' });
     } catch (error) {
       const mapped = this.mapToVnpIpnResponse(error);
       this.logger.warn(
@@ -110,7 +114,7 @@ export class VNPayWebhookController {
           message: mapped.Message,
         }),
       );
-      return mapped;
+      return res.status(200).json(mapped);
     }
   }
 

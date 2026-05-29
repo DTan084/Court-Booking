@@ -11,6 +11,7 @@ import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { VNPayProvider } from './providers/vnpay.provider';
 import { VNPayWebhookController } from './webhooks/vnpay-webhook.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { VNPayWebhookController } from './webhooks/vnpay-webhook.controller';
       PaymentEventEntity,
     ]),
     BullModule.registerQueue({ name: 'payment-jobs' }),
+    NotificationsModule,
   ],
   controllers: [PaymentsController, VNPayWebhookController],
   providers: [PaymentsService, VNPayProvider, PaymentJobsProcessor, PaymentJobsScheduler],

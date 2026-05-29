@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@court-booking/shared';
+import { z } from 'zod';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -22,6 +23,10 @@ import { manualReviewListSchema } from './dto/manual-review-list.dto';
 import { paymentLookupSchema } from './dto/payment-lookup.dto';
 import { refundPaymentSchema } from './dto/refund-payment.dto';
 import { PaymentsService } from './payments.service';
+
+const testRefundSuccessSchema = z.object({
+  amount: z.number().positive().optional(),
+});
 
 @Controller('payments')
 export class PaymentsController {
@@ -80,9 +85,20 @@ export class PaymentsController {
   refund(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(refundPaymentSchema))
-    body: { amount?: number; reason?: string },
+    body: { amount?: number; percent?: number; reason?: string },
   ) {
     return this.paymentsService.refund(id, body);
+  }
+
+  @Patch('admin/bookings/:bookingId/refund')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  refundByBooking(
+    @Param('bookingId') bookingId: string,
+    @Body(new ZodValidationPipe(refundPaymentSchema))
+    body: z.infer<typeof refundPaymentSchema>,
+  ) {
+    return this.paymentsService.refundByBooking(bookingId, body);
   }
 
   @Post(':id/reconcile')
@@ -103,5 +119,16 @@ export class PaymentsController {
   ) {
     if (!user?.id) throw new UnauthorizedException();
     return this.paymentsService.handleManualReviewAction(id, body, user.id);
+  }
+
+  @Post(':id/test/refund-success')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  markTestRefundSuccess(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(testRefundSuccessSchema))
+    body: z.infer<typeof testRefundSuccessSchema>,
+  ) {
+    return this.paymentsService.markTestRefundSuccess(id, body.amount);
   }
 }
