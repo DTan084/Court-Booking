@@ -107,6 +107,7 @@ The backend reads values from the repository root environment files.
 | `GOOGLE_CLIENT_SECRET`                     | No       | Google OAuth client secret                      |
 | `GOOGLE_CALLBACK_URL`                      | No       | Google OAuth callback URL on backend            |
 | `FRONTEND_OAUTH_FAILURE_URL`               | No       | Frontend login URL to receive OAuth error query |
+| `GOOGLE_OAUTH_STATE_SECRET`                | No       | HMAC secret for stateless OAuth state signing   |
 | `REDIS_HOST`                               | Yes      | Redis host                                      |
 | `REDIS_PORT`                               | Yes      | Redis port                                      |
 | `REDIS_USERNAME`                           | No       | Redis ACL username                              |
@@ -171,6 +172,7 @@ Notes:
 7. Set:
    - `GOOGLE_CALLBACK_URL=http://localhost:3001/api/v1/auth/oauth/google/callback`
    - `FRONTEND_OAUTH_FAILURE_URL=http://localhost:3000/login`
+   - `GOOGLE_OAUTH_STATE_SECRET=<long-random-secret>`
 8. Restart backend and frontend after env update.
 
 ## Payment Setup (Production)
