@@ -86,7 +86,14 @@ export function LoginForm() {
   const handleGoogleSignIn = () => {
     setIsOAuthLoading(true);
     const callbackUrl = searchParams.get('callbackUrl') || '/courts';
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiBaseUrl) {
+      const message = 'OAuth is not configured: NEXT_PUBLIC_API_URL is missing.';
+      setError('root', { message });
+      toast.error(message);
+      setIsOAuthLoading(false);
+      return;
+    }
     const oauthStartUrl = `${apiBaseUrl}/api/v1/auth/oauth/google?callbackUrl=${encodeURIComponent(callbackUrl)}`;
     window.location.href = oauthStartUrl;
   };

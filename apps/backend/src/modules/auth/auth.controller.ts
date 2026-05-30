@@ -35,6 +35,7 @@ import { Response, Request } from 'express';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { GoogleCallbackGuard } from './guards/google-callback.guard';
 import { GoogleAuthProfile } from './strategies/google.strategy';
+import { resolveOAuthStatePath } from './oauth-state.util';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -200,10 +201,11 @@ export class AuthController {
   }
 
   private resolveRedirectState(state: unknown): string {
-    if (typeof state === 'string' && state.startsWith('/')) {
-      return state;
-    }
-    return '/courts';
+    const stateSecret =
+      this.configService.get<string>('GOOGLE_OAUTH_STATE_SECRET') ||
+      this.configService.get<string>('jwt.secret') ||
+      'oauth-state-fallback-secret';
+    return resolveOAuthStatePath(state, stateSecret);
   }
 
   private buildSuccessRedirectUrl(path: string): string {
