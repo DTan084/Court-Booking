@@ -186,4 +186,77 @@ describe('AuthService', () => {
       expect(result.expires_in).toBe(900);
     });
   });
+
+  describe('loginWithGoogle', () => {
+    const googleProfile = {
+      provider: 'google' as const,
+      providerUserId: 'google-user-1',
+      email: 'test@example.com',
+      emailVerified: true,
+      name: 'Google Test User',
+      avatarUrl: 'https://example.com/avatar.png',
+    };
+
+    it('links existing user and returns tokens', async () => {
+      userRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        authProvider: null,
+        authProviderUserId: null,
+        avatarUrl: null,
+      });
+      userRepository.save.mockImplementation(async (value: any) => value);
+      jwtService.sign.mockReturnValue('mock-jwt-token');
+      refreshTokenRepository.create.mockReturnValue({ token: 'mock-uuid' });
+      refreshTokenRepository.save.mockResolvedValue({});
+
+      const result = await service.loginWithGoogle(googleProfile);
+
+      expect(result.tokens.access_token).toBe('mock-jwt-token');
+      expect(userRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'test@example.com',
+          authProvider: 'google',
+          authProviderUserId: 'google-user-1',
+        }),
+      );
+    });
+
+    it('creates new USER when no user found', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+      jwtService.sign.mockReturnValue('mock-jwt-token');
+      refreshTokenRepository.create.mockReturnValue({ token: 'mock-uuid' });
+      refreshTokenRepository.save.mockResolvedValue({});
+      userRepository.create.mockImplementation((value: any) => ({ ...value, id: 'new-user' }));
+      userRepository.save.mockImplementation(async (value: any) => value);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('random-hash');
+
+      const result = await service.loginWithGoogle(googleProfile);
+
+      expect(userRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: 'USER',
+        }),
+      );
+      expect(result.user.authProvider).toBe('google');
+      expect(result.user.authProviderUserId).toBe('google-user-1');
+    });
+
+    it('rejects unverified email', async () => {
+      await expect(
+        service.loginWithGoogle({
+          ...googleProfile,
+          emailVerified: false,
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects missing email', async () => {
+      await expect(
+        service.loginWithGoogle({
+          ...googleProfile,
+          email: undefined,
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
 });

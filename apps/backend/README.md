@@ -103,6 +103,11 @@ The backend reads values from the repository root environment files.
 | `JWT_SECRET`                               | Yes      | JWT signing secret                              |
 | `JWT_EXPIRES_IN`                           | Yes      | Access token TTL                                |
 | `JWT_REFRESH_EXPIRES_IN`                   | Yes      | Refresh token TTL                               |
+| `GOOGLE_CLIENT_ID`                         | No       | Google OAuth client id                          |
+| `GOOGLE_CLIENT_SECRET`                     | No       | Google OAuth client secret                      |
+| `GOOGLE_CALLBACK_URL`                      | No       | Google OAuth callback URL on backend            |
+| `FRONTEND_OAUTH_FAILURE_URL`               | No       | Frontend login URL to receive OAuth error query |
+| `GOOGLE_OAUTH_STATE_SECRET`                | No       | HMAC secret for stateless OAuth state signing   |
 | `REDIS_HOST`                               | Yes      | Redis host                                      |
 | `REDIS_PORT`                               | Yes      | Redis port                                      |
 | `REDIS_USERNAME`                           | No       | Redis ACL username                              |
@@ -141,6 +146,34 @@ Reference template:
 - [`../../.env.example`](../../.env.example)
 
 `*`: Required when that provider is enabled in `PAYMENT_PROVIDERS_ENABLED`.
+
+## OAuth Endpoints (Google)
+
+- `GET /api/v1/auth/oauth/google`
+- `GET /api/v1/auth/oauth/google/callback`
+
+Notes:
+
+- callback issues the same auth cookies as password login
+- existing users are linked by verified email
+- new users are auto-created with role `USER`
+
+### Manual Setup (Google Sandbox / Test)
+
+1. Go to Google Cloud Console: `APIs & Services` -> `Credentials`.
+2. Create project (or choose existing), then configure OAuth consent screen (External/Test mode is enough for sandbox).
+3. Add test users in OAuth consent screen (required for non-published app).
+4. Create `OAuth client ID` (type: Web application).
+5. Add Authorized redirect URI:
+   - `http://localhost:3001/api/v1/auth/oauth/google/callback`
+6. Copy Client ID/Secret into backend env:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+7. Set:
+   - `GOOGLE_CALLBACK_URL=http://localhost:3001/api/v1/auth/oauth/google/callback`
+   - `FRONTEND_OAUTH_FAILURE_URL=http://localhost:3000/login`
+   - `GOOGLE_OAUTH_STATE_SECRET=<long-random-secret>`
+8. Restart backend and frontend after env update.
 
 ## Payment Setup (Production)
 

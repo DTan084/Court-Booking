@@ -145,6 +145,7 @@ In local development, frontend-specific values usually live in:
 - refresh/access behavior is handled through the Axios interceptor
 - auth tokens remain in httpOnly cookies
 - public routes no longer probe `/auth/me` unnecessarily for anonymous visitors
+- login page supports Google OAuth redirect via backend (`/api/v1/auth/oauth/google`)
 
 ### SEO and Metadata
 

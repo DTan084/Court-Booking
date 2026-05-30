@@ -1,10 +1,10 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth';
@@ -22,8 +22,10 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setUser = useAuthStore((state) => state.setUser);
   const [isLoading, setIsLoading] = useState(false);
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
 
   const {
     register,
@@ -33,6 +35,19 @@ export function LoginForm() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
+
+  const oauthErrorMessage = useMemo(() => {
+    const errorCode = searchParams.get('error');
+    if (!errorCode) return null;
+    if (errorCode === 'google_oauth_failed') return 'Google sign-in failed. Please try again.';
+    return 'Unable to complete OAuth sign-in. Please try again.';
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!oauthErrorMessage) return;
+    setError('root', { message: oauthErrorMessage });
+    toast.error(oauthErrorMessage);
+  }, [oauthErrorMessage, setError]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
@@ -66,6 +81,21 @@ export function LoginForm() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoogleSignIn = () => {
+    setIsOAuthLoading(true);
+    const callbackUrl = searchParams.get('callbackUrl') || '/courts';
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiBaseUrl) {
+      const message = 'OAuth is not configured: NEXT_PUBLIC_API_URL is missing.';
+      setError('root', { message });
+      toast.error(message);
+      setIsOAuthLoading(false);
+      return;
+    }
+    const oauthStartUrl = `${apiBaseUrl}/api/v1/auth/oauth/google?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+    window.location.href = oauthStartUrl;
   };
 
   return (
@@ -117,9 +147,19 @@ export function LoginForm() {
         <Button
           type="submit"
           className="h-12 w-full bg-[#944a00] text-white hover:bg-[#7f3f00]"
-          disabled={isLoading}
+          disabled={isLoading || isOAuthLoading}
         >
           {isLoading ? 'Signing in...' : 'Sign In'}
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="h-12 w-full border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+          disabled={isLoading || isOAuthLoading}
+          onClick={handleGoogleSignIn}
+        >
+          {isOAuthLoading ? 'Redirecting to Google...' : 'Continue with Google'}
         </Button>
 
         <p className="text-center text-sm text-slate-600">

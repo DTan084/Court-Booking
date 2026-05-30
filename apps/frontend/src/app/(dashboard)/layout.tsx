@@ -10,7 +10,6 @@ import { User } from '@/types';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const user = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
   const clearUser = useAuthStore((state) => state.clearUser);
   // Use ref to ensure we only attempt hydration once per mount, not on every render
@@ -18,11 +17,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isCheckoutRoute = pathname.startsWith('/checkout/');
   const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
   const isAccountRoute = pathname === '/profile' || pathname.startsWith('/bookings');
-  const shouldHydrateAuth = isCheckoutRoute || isAdminRoute || isAccountRoute || Boolean(user);
 
   useEffect(() => {
-    // Public routes do not need a session probe for anonymous visitors.
-    if (!shouldHydrateAuth || hasFetched.current) return;
+    if (hasFetched.current) return;
 
     hasFetched.current = true;
 
