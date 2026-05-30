@@ -18,10 +18,6 @@ export class GoogleAuthGuard extends AuthGuard('google') {
       'oauth-state-fallback-secret';
     const redirectPath =
       typeof callbackUrl === 'string' && callbackUrl.startsWith('/') ? callbackUrl : '/courts';
-
-    if (typeof callbackUrl === 'string' && callbackUrl.startsWith('/')) {
-      return { state: createSignedOAuthState(redirectPath, stateSecret) };
-    }
-    return { state: createSignedOAuthState('/courts', stateSecret) };
+    return { state: createSignedOAuthState(redirectPath, stateSecret) };
   }
 }

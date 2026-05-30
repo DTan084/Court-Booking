@@ -2,6 +2,9 @@ import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { createSignedOAuthState } from './oauth-state.util';
+
+const STATE_SECRET = 'test-oauth-state-secret';
 
 describe('AuthController OAuth', () => {
   const authService = {
@@ -19,6 +22,8 @@ describe('AuthController OAuth', () => {
       if (key === 'jwt.refreshExpiresIn') return '7d';
       if (key === 'app.frontendUrl') return 'http://localhost:3000';
       if (key === 'FRONTEND_OAUTH_FAILURE_URL') return 'http://localhost:3000/login';
+      if (key === 'GOOGLE_OAUTH_STATE_SECRET') return STATE_SECRET;
+      if (key === 'jwt.secret') return 'jwt-secret';
       return undefined;
     }),
   } as unknown as ConfigService;
@@ -39,7 +44,7 @@ describe('AuthController OAuth', () => {
     } as any);
 
     const req = {
-      query: { state: '/bookings' },
+      query: { state: createSignedOAuthState('/bookings', STATE_SECRET) },
       user: {
         provider: 'google',
         providerUserId: 'google-1',
@@ -67,7 +72,7 @@ describe('AuthController OAuth', () => {
       .mockRejectedValue(new UnauthorizedException('Google profile not found'));
 
     const req = {
-      query: { state: '/courts' },
+      query: { state: createSignedOAuthState('/courts', STATE_SECRET) },
       user: undefined,
     } as any;
 
@@ -95,6 +100,36 @@ describe('AuthController OAuth', () => {
 
     const req = {
       query: { state: 'https://evil.site/phish' },
+      user: {
+        provider: 'google',
+        providerUserId: 'google-1',
+        email: 'user@test.dev',
+        emailVerified: true,
+        name: 'Test User',
+      },
+    } as any;
+
+    const res = {
+      cookie: jest.fn(),
+      redirect: jest.fn(),
+    } as any;
+
+    await controller.googleOAuthCallback(req, res);
+
+    expect(res.redirect).toHaveBeenCalledWith('http://localhost:3000/courts');
+  });
+
+  it('ignores unsigned path state and redirects to default route', async () => {
+    authService.loginWithGoogle = jest.fn().mockResolvedValue({
+      user: { id: 'user-1' },
+      tokens: {
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+      },
+    } as any);
+
+    const req = {
+      query: { state: '/admin' },
       user: {
         provider: 'google',
         providerUserId: 'google-1',

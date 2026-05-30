@@ -29,8 +29,6 @@ export const createSignedOAuthState = (path: string, secret: string): string => 
 export const resolveOAuthStatePath = (state: unknown, secret: string): string => {
   if (typeof state !== 'string' || state.length === 0) return DEFAULT_PATH;
 
-  if (state.startsWith('/')) return state;
-
   const [payloadB64, signature] = state.split('.');
   if (!payloadB64 || !signature) return DEFAULT_PATH;
 
