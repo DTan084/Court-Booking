@@ -157,6 +157,22 @@ Notes:
 - existing users are linked by verified email
 - new users are auto-created with role `USER`
 
+### Manual Setup (Google Sandbox / Test)
+
+1. Go to Google Cloud Console: `APIs & Services` -> `Credentials`.
+2. Create project (or choose existing), then configure OAuth consent screen (External/Test mode is enough for sandbox).
+3. Add test users in OAuth consent screen (required for non-published app).
+4. Create `OAuth client ID` (type: Web application).
+5. Add Authorized redirect URI:
+   - `http://localhost:3001/api/v1/auth/oauth/google/callback`
+6. Copy Client ID/Secret into backend env:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+7. Set:
+   - `GOOGLE_CALLBACK_URL=http://localhost:3001/api/v1/auth/oauth/google/callback`
+   - `FRONTEND_OAUTH_FAILURE_URL=http://localhost:3000/login`
+8. Restart backend and frontend after env update.
+
 ## Payment Setup (Production)
 
 Current payment module already includes:
