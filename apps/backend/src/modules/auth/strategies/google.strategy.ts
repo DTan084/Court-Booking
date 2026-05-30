@@ -26,8 +26,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientSecret,
       callbackURL,
       scope: ['profile', 'email'],
-      state: true,
-      session: false,
+      state: false,
     });
   }
 
@@ -38,13 +37,14 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     done: VerifyCallback,
   ): void {
     const emailItem = profile.emails?.find((item) => Boolean(item.value));
+    const verifiedFromEmail = emailItem?.verified;
+    const verifiedFromJson = (profile as Profile & { _json?: { email_verified?: boolean } })._json
+      ?.email_verified;
     const payload: GoogleAuthProfile = {
       provider: 'google',
       providerUserId: profile.id,
       email: emailItem?.value?.toLowerCase().trim(),
-      emailVerified: Boolean(
-        (profile as Profile & { _json?: { email_verified?: boolean } })._json?.email_verified,
-      ),
+      emailVerified: Boolean(verifiedFromEmail ?? verifiedFromJson ?? emailItem?.value),
       name: profile.displayName || 'Google User',
       avatarUrl: profile.photos?.[0]?.value,
     };
